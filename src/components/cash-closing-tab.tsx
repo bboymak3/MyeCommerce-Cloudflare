@@ -102,9 +102,14 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
   const loadClosings = useCallback(async () => {
     try {
       const res = await fetch("/api/cash-closing?limit=50");
+      if (!res.ok) {
+        setClosings([]);
+        return;
+      }
       const data = await res.json();
-      setClosings(data);
+      setClosings(Array.isArray(data) ? data : []);
     } catch {
+      setClosings([]);
       toast.error("Error al cargar cierres de caja");
     }
   }, []);
@@ -933,36 +938,36 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                       <div className="text-xs">Zelle: Bs {dd.zelle.bs.toFixed(2)} (${dd.zelle.usd.toFixed(2)}) | USDT: Bs {dd.usdt.bs.toFixed(2)} (${dd.usdt.usd.toFixed(2)})</div>
                       <div className="text-xs font-medium">Subtotal: Bs {dd.bs.toFixed(2)} (${dd.usd.toFixed(2)})</div>
                     </div>
+                    {/* TOTAL - EXPLICITO PARA ARQUEO */}
+                    <div className="border-2 border-amber-500 rounded-lg p-2 bg-amber-50/80 space-y-1.5 mt-2">
+                      <p className="text-[10px] font-black text-amber-900 uppercase tracking-wider">Resumen para Arqueo</p>
+                      {/* DOLARES */}
+                      <div className="space-y-0.5">
+                        <p className="text-[9px] font-bold text-green-800 uppercase tracking-wide">Dolares (USD electronico + Efectivo $):</p>
+                        {effUsd.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo $ (contar):</span><span className="text-right font-semibold">${effUsd.usd.toFixed(2)}</span></div>}
+                        {dd.zelle.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Zelle (ver app):</span><span className="text-right font-semibold">${dd.zelle.usd.toFixed(2)}</span></div>}
+                        {dd.usdt.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">USDT (ver wallet):</span><span className="text-right font-semibold">${dd.usdt.usd.toFixed(2)}</span></div>}
+                        <div className="flex justify-between text-[10px] bg-green-100/60 rounded px-1.5 py-0.5">
+                          <span className="font-black text-green-900">TOTAL USD:</span>
+                          <span className="font-black text-green-900">${(dd.usd + effUsd.usd).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="border-t border-dashed border-amber-300" />
+                      {/* BOLIVARES */}
+                      <div className="space-y-0.5">
+                        <p className="text-[9px] font-bold text-blue-800 uppercase tracking-wide">Bolivares (Bs electronicos + Efectivo Bs):</p>
+                        <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo Bs (contar):</span><span className="text-right font-semibold">Bs {effBs.bs.toFixed(2)}</span></div>
+                        {bse.puntoVenta.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Punto Venta (ver terminal):</span><span className="text-right font-semibold">Bs {bse.puntoVenta.bs.toFixed(2)}</span></div>}
+                        {bse.transferencia.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Transferencia (ver banco):</span><span className="text-right font-semibold">Bs {bse.transferencia.bs.toFixed(2)}</span></div>}
+                        {bse.pagoMovil.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Pago Movil (ver banco):</span><span className="text-right font-semibold">Bs {bse.pagoMovil.bs.toFixed(2)}</span></div>}
+                        <div className="flex justify-between text-[10px] bg-blue-100/60 rounded px-1.5 py-0.5">
+                          <span className="font-black text-blue-900">TOTAL BS:</span>
+                          <span className="font-black text-blue-900">Bs {(bse.bs + effBs.bs).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
                   </>);
                 })()}
-                {/* TOTAL - EXPLICITO PARA ARQUEO */}
-                <div className="border-2 border-amber-500 rounded-lg p-2 bg-amber-50/80 space-y-1.5 mt-2">
-                  <p className="text-[10px] font-black text-amber-900 uppercase tracking-wider">Resumen para Arqueo</p>
-                  {/* DOLARES */}
-                  <div className="space-y-0.5">
-                    <p className="text-[9px] font-bold text-green-800 uppercase tracking-wide">Dolares (USD electronico + Efectivo $):</p>
-                    {effUsd.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo $ (contar):</span><span className="text-right font-semibold">${effUsd.usd.toFixed(2)}</span></div>}
-                    {dd.zelle.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Zelle (ver app):</span><span className="text-right font-semibold">${dd.zelle.usd.toFixed(2)}</span></div>}
-                    {dd.usdt.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">USDT (ver wallet):</span><span className="text-right font-semibold">${dd.usdt.usd.toFixed(2)}</span></div>}
-                    <div className="flex justify-between text-[10px] bg-green-100/60 rounded px-1.5 py-0.5">
-                      <span className="font-black text-green-900">TOTAL USD:</span>
-                      <span className="font-black text-green-900">${(dd.usd + effUsd.usd).toFixed(2)}</span>
-                    </div>
-                  </div>
-                  <div className="border-t border-dashed border-amber-300" />
-                  {/* BOLIVARES */}
-                  <div className="space-y-0.5">
-                    <p className="text-[9px] font-bold text-blue-800 uppercase tracking-wide">Bolivares (Bs electronicos + Efectivo Bs):</p>
-                    <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo Bs (contar):</span><span className="text-right font-semibold">Bs {effBs.bs.toFixed(2)}</span></div>
-                    {bse.puntoVenta.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Punto Venta (ver terminal):</span><span className="text-right font-semibold">Bs {bse.puntoVenta.bs.toFixed(2)}</span></div>}
-                    {bse.transferencia.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Transferencia (ver banco):</span><span className="text-right font-semibold">Bs {bse.transferencia.bs.toFixed(2)}</span></div>}
-                    {bse.pagoMovil.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Pago Movil (ver banco):</span><span className="text-right font-semibold">Bs {bse.pagoMovil.bs.toFixed(2)}</span></div>}
-                    <div className="flex justify-between text-[10px] bg-blue-100/60 rounded px-1.5 py-0.5">
-                      <span className="font-black text-blue-900">TOTAL BS:</span>
-                      <span className="font-black text-blue-900">Bs {(bse.bs + effBs.bs).toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* ===== DESGLOSE DE REFERENCIAS ===== */}
