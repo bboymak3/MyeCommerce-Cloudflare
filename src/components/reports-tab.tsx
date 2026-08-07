@@ -1090,6 +1090,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                     <span className="font-semibold text-green-700">Bs {efectivoFisicoBs_totalBs.toFixed(2)} ({currency} {efectivoFisicoBs_totalUsd.toFixed(2)})</span>
                   </div>
                   <p className="text-right text-xs font-bold text-green-700 mt-1">Subtotal: Bs {efectivoFisicoBs_totalBs.toFixed(2)}</p>
+                  <p className="text-right text-[10px] text-green-600">Equivalente: {currency} {efectivoFisicoBs_totalUsd.toFixed(2)}</p>
                 </div>
 
                 {/* EFECTIVO FISICO $ */}
@@ -1100,47 +1101,62 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                     <span className="font-semibold text-green-700">{currency} {efectivoFisicoUsd_totalUsd.toFixed(2)} (Bs {efectivoFisicoUsd_totalBs.toFixed(2)})</span>
                   </div>
                   <p className="text-right text-xs font-bold text-green-700 mt-1">Subtotal: {currency} {efectivoFisicoUsd_totalUsd.toFixed(2)}</p>
+                  <p className="text-right text-[10px] text-green-600">Equivalente: Bs {efectivoFisicoUsd_totalBs.toFixed(2)}</p>
                 </div>
 
                 {/* BS ELECTRONICOS */}
                 <div className="border-l-4 border-l-blue-500 pl-3">
                   <p className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">Bs Electronicos</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="space-y-1 text-xs">
                     <div className="flex justify-between bg-blue-50/50 rounded px-2 py-1">
                       <span className="text-muted-foreground">Punto de Venta</span>
-                      <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["punto-de-venta"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["punto-de-venta"]?.totalBs || 0).toFixed(2)} <span className="text-muted-foreground">(${(paymentBreakdown["punto-de-venta"]?.totalUsd || 0).toFixed(2)})</span></span>
                     </div>
                     <div className="flex justify-between bg-blue-50/50 rounded px-2 py-1">
                       <span className="text-muted-foreground">Transferencia</span>
-                      <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["transferencia"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["transferencia"]?.totalBs || 0).toFixed(2)} <span className="text-muted-foreground">(${(paymentBreakdown["transferencia"]?.totalUsd || 0).toFixed(2)})</span></span>
                     </div>
                     <div className="flex justify-between bg-blue-50/50 rounded px-2 py-1">
                       <span className="text-muted-foreground">Pago Movil</span>
-                      <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["pago-movil"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["pago-movil"]?.totalBs || 0).toFixed(2)} <span className="text-muted-foreground">(${(paymentBreakdown["pago-movil"]?.totalUsd || 0).toFixed(2)})</span></span>
                     </div>
                   </div>
-                  <p className="text-right text-xs font-bold text-blue-700 mt-1">Subtotal: Bs {bsElectronicos_totalBs.toFixed(2)} ({currency} {bsElectronicos_totalUsd.toFixed(2)})</p>
+                  <div className="text-right text-xs mt-1 space-y-0.5">
+                    <p className="font-bold text-blue-700">Subtotal: Bs {bsElectronicos_totalBs.toFixed(2)}</p>
+                    <p className="text-blue-600">Equivalente: {currency} {bsElectronicos_totalUsd.toFixed(2)}</p>
+                  </div>
                 </div>
 
                 {/* DIVISAS DIGITALES */}
                 <div className="border-l-4 border-l-purple-500 pl-3">
                   <p className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-1">Divisas Digitales</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="space-y-1 text-xs">
                     <div className="flex justify-between bg-purple-50/50 rounded px-2 py-1">
                       <span className="text-muted-foreground">Zelle</span>
-                      <span className="font-semibold text-purple-700">Bs {(paymentBreakdown["zelle"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="font-semibold text-purple-700">{currency} {(paymentBreakdown["zelle"]?.totalUsd || 0).toFixed(2)} <span className="text-muted-foreground">(Bs {(paymentBreakdown["zelle"]?.totalBs || 0).toFixed(2)})</span></span>
                     </div>
                     <div className="flex justify-between bg-purple-50/50 rounded px-2 py-1">
                       <span className="text-muted-foreground">USDT</span>
-                      <span className="font-semibold text-purple-700">Bs {(paymentBreakdown["usdt"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="font-semibold text-purple-700">{currency} {(paymentBreakdown["usdt"]?.totalUsd || 0).toFixed(2)} <span className="text-muted-foreground">(Bs {(paymentBreakdown["usdt"]?.totalBs || 0).toFixed(2)})</span></span>
                     </div>
                   </div>
-                  <p className="text-right text-xs font-bold text-purple-700 mt-1">Subtotal: {currency} {divisasDigitales_totalUsd.toFixed(2)} (Bs {divisasDigitales_totalBs.toFixed(2)})</p>
+                  <div className="text-right text-xs mt-1 space-y-0.5">
+                    <p className="font-bold text-purple-700">Subtotal: {currency} {divisasDigitales_totalUsd.toFixed(2)}</p>
+                    <p className="text-purple-600">Equivalente: Bs {divisasDigitales_totalBs.toFixed(2)}</p>
+                  </div>
                 </div>
 
                 {/* TOTAL */}
-                <div className="border-l-4 border-l-amber-500 pl-3 bg-amber-50/50 rounded-r-lg py-2">
-                  <p className="text-sm font-bold text-amber-800">TOTAL ENTRADAS: Bs {totalEntradasBs.toFixed(2)} | {currency} {totalEntradasUsd.toFixed(2)}</p>
+                <div className="border-l-4 border-l-amber-500 pl-3 bg-amber-50/50 rounded-r-lg py-2 space-y-0.5">
+                  <p className="text-sm font-bold text-amber-800">TOTAL ENTRADAS:</p>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-bold text-amber-900">Dolares ({currency}):</span>
+                    <span className="font-black text-amber-900">{currency} {totalEntradasUsd.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-bold text-amber-700">Bolivares (Bs):</span>
+                    <span className="font-black text-amber-700">Bs {totalEntradasBs.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
