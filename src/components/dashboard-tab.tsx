@@ -32,7 +32,7 @@ interface DashboardData {
   pctChange: number;
   weekDays: { label: string; total: number; count: number; cashea: number; casheaCount: number }[];
   topProducts: { name: string; qty: number; total: number }[];
-  paymentBreakdown: Record<string, { count: number; total: number }>;
+  paymentBreakdown: Record<string, { count: number; totalUsd: number; totalBs: number }>;
   recentSales: {
     id: string; time: string; customer: string;
     total: number; totalBs: number; method: string;
@@ -246,30 +246,75 @@ export default function DashboardTab({ bcvRate, currency }: DashboardProps) {
               <p className="text-sm text-muted-foreground text-center py-8">Sin ventas hoy</p>
             ) : (
               <div className="space-y-2">
-                {Object.entries(paymentBreakdown)
-                  .sort((a, b) => b[1].total - a[1].total)
-                  .map(([method, info]) => (
-                    <div key={method} className={`flex items-center justify-between py-1 ${method === 'cashea' ? 'bg-purple-50/60 -mx-1 px-1 rounded' : ''}`}>
-                      <span className="text-sm flex items-center gap-1">
-                        {method === 'cashea' && <span className="text-xs">&#128241;</span>}
-                        {METHOD_LABELS[method] || method}
-                        {method === 'cashea' && <Badge variant="outline" className="text-[8px] text-purple-700 border-purple-300">BNPL</Badge>}
-                      </span>
-                      <div className="text-right">
-                        <span className="text-sm font-bold">${info.total.toFixed(2)}</span>
-                        <span className="text-[10px] text-muted-foreground ml-1">({info.count})</span>
+                {(() => {
+                  const effBs = paymentBreakdown["efectivo"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const effUsd = paymentBreakdown["efectivo-usd"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const pdv = paymentBreakdown["punto-de-venta"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const transf = paymentBreakdown["transferencia"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const pm = paymentBreakdown["pago-movil"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const zelle = paymentBreakdown["zelle"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const usdt = paymentBreakdown["usdt"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const totalUsdMethods = effUsd.totalUsd + zelle.totalUsd + usdt.totalUsd;
+                  const totalBsMethods = effBs.totalBs + pdv.totalBs + transf.totalBs + pm.totalBs;
+                  return (
+                    <>
+                      {Object.entries(paymentBreakdown)
+                        .sort((a, b) => b[1].totalUsd - a[1].totalUsd)
+                        .map(([method, info]) => (
+                          <div key={method} className={`flex items-center justify-between py-1 ${method === 'cashea' ? 'bg-purple-50/60 -mx-1 px-1 rounded' : ''}`}>
+                            <span className="text-sm flex items-center gap-1">
+                              {method === 'cashea' && <span className="text-xs">&#128241;</span>}
+                              {METHOD_LABELS[method] || method}
+                              {method === 'cashea' && <Badge variant="outline" className="text-[8px] text-purple-700 border-purple-300">BNPL</Badge>}
+                            </span>
+                            <div className="text-right">
+                              <span className="text-sm font-bold">${info.totalUsd.toFixed(2)}</span>
+                              <span className="text-[10px] text-muted-foreground ml-1">({info.count})</span>
+                            </div>
+                          </div>
+                        ))}
+                      <Separator />
+                      <div className="flex items-center justify-between pt-1">
+                        <span className="text-sm font-bold">TOTAL BRUTO</span>
+                        <span className="text-sm font-black">${today.grossUsd.toFixed(2)}</span>
                       </div>
-                    </div>
-                  ))}
-                <Separator />
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-sm font-bold">TOTAL BRUTO</span>
-                  <span className="text-sm font-black">${today.grossUsd.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Entradas Netas (sin Cashea/Credito)</span>
-                  <span className="font-bold text-green-700">${today.totalUsd.toFixed(2)}</span>
-                </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Entradas Netas (sin Cashea/Credito)</span>
+                        <span className="font-bold text-green-700">${today.totalUsd.toFixed(2)}</span>
+                      </div>
+                      {/* ===== RESUMEN EXPLICITO PARA ARQUEO ===== */}
+                      {(totalUsdMethods > 0 || totalBsMethods > 0) && (
+                        <div className="border-2 border-amber-400 rounded-lg p-2 bg-amber-50/80 space-y-1.5 mt-2">
+                          <p className="text-[10px] font-black text-amber-900 uppercase tracking-wider">Resumen para Arqueo</p>
+                          {/* DOLARES: USD electronico (Zelle+USDT) + Efectivo $ */}
+                          <div className="space-y-0.5">
+                            <p className="text-[9px] font-bold text-green-800 uppercase tracking-wide">Dolares (USD electronico + Efectivo $):</p>
+                            {effUsd.totalUsd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo $ (contar):</span><span className="text-right font-semibold">${effUsd.totalUsd.toFixed(2)}</span></div>}
+                            {zelle.totalUsd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Zelle (ver app):</span><span className="text-right font-semibold">${zelle.totalUsd.toFixed(2)}</span></div>}
+                            {usdt.totalUsd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">USDT (ver wallet):</span><span className="text-right font-semibold">${usdt.totalUsd.toFixed(2)}</span></div>}
+                            <div className="flex justify-between text-[10px] bg-green-100/60 rounded px-1.5 py-0.5">
+                              <span className="font-black text-green-900">TOTAL USD:</span>
+                              <span className="font-black text-green-900">${totalUsdMethods.toFixed(2)}</span>
+                            </div>
+                          </div>
+                          <div className="border-t border-dashed border-amber-300" />
+                          {/* BOLIVARES: Bs electronicos (PdV+Transf+PM) + Efectivo Bs */}
+                          <div className="space-y-0.5">
+                            <p className="text-[9px] font-bold text-blue-800 uppercase tracking-wide">Bolivares (Bs electronicos + Efectivo Bs):</p>
+                            {effBs.totalBs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo Bs (contar):</span><span className="text-right font-semibold">Bs {effBs.totalBs.toFixed(2)}</span></div>}
+                            {pdv.totalBs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Punto Venta (ver terminal):</span><span className="text-right font-semibold">Bs {pdv.totalBs.toFixed(2)}</span></div>}
+                            {transf.totalBs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Transferencia (ver banco):</span><span className="text-right font-semibold">Bs {transf.totalBs.toFixed(2)}</span></div>}
+                            {pm.totalBs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Pago Movil (ver banco):</span><span className="text-right font-semibold">Bs {pm.totalBs.toFixed(2)}</span></div>}
+                            <div className="flex justify-between text-[10px] bg-blue-100/60 rounded px-1.5 py-0.5">
+                              <span className="font-black text-blue-900">TOTAL BS:</span>
+                              <span className="font-black text-blue-900">Bs {totalBsMethods.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
           </CardContent>

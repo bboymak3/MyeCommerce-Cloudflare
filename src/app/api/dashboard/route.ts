@@ -123,7 +123,8 @@ export async function GET() {
     const pctChange = yesterdayTotal > 0 ? ((todayTotalUsd - yesterdayTotal) / yesterdayTotal) * 100 : todayTotalUsd > 0 ? 100 : 0;
 
     // ===== METODOS DE PAGO HOY (excluir ventas a credito, desglosar mixtos, INCLUIR cashea) =====
-    const paymentBreakdown: Record<string, { count: number; total: number }> = {};
+    // paymentBreakdown: { count, totalUsd, totalBs } por metodo — para desglose explicito en dashboard
+    const paymentBreakdown: Record<string, { count: number; totalUsd: number; totalBs: number }> = {};
     for (const sale of todaySales) {
       if (sale.isCredit) continue;
       const m = (sale.paymentMethod || 'efectivo').toLowerCase();
@@ -132,19 +133,22 @@ export async function GET() {
           const entries = JSON.parse(sale.mixedPaymentJson) as Array<{ method: string; amountBs: number; amountUsd: number }>;
           entries.forEach((e) => {
             const me = e.method.toLowerCase();
-            if (!paymentBreakdown[me]) paymentBreakdown[me] = { count: 0, total: 0 };
+            if (!paymentBreakdown[me]) paymentBreakdown[me] = { count: 0, totalUsd: 0, totalBs: 0 };
             paymentBreakdown[me].count++;
-            paymentBreakdown[me].total += e.amountUsd || 0;
+            paymentBreakdown[me].totalUsd += e.amountUsd || 0;
+            paymentBreakdown[me].totalBs += e.amountBs;
           });
         } catch {
-          if (!paymentBreakdown[m]) paymentBreakdown[m] = { count: 0, total: 0 };
+          if (!paymentBreakdown[m]) paymentBreakdown[m] = { count: 0, totalUsd: 0, totalBs: 0 };
           paymentBreakdown[m].count++;
-          paymentBreakdown[m].total += sale.total;
+          paymentBreakdown[m].totalUsd += sale.total;
+          paymentBreakdown[m].totalBs += sale.totalBs;
         }
       } else {
-        if (!paymentBreakdown[m]) paymentBreakdown[m] = { count: 0, total: 0 };
+        if (!paymentBreakdown[m]) paymentBreakdown[m] = { count: 0, totalUsd: 0, totalBs: 0 };
         paymentBreakdown[m].count++;
-        paymentBreakdown[m].total += sale.total;
+        paymentBreakdown[m].totalUsd += sale.total;
+        paymentBreakdown[m].totalBs += sale.totalBs;
       }
     }
 

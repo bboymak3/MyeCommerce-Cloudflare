@@ -304,22 +304,34 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
       <div style="margin-top:12px;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:11px">
         <div style="font-weight:bold;margin-bottom:6px">DESGLOSE DE INGRESOS POR CANAL</div>
         <div style="border-left:3px solid #22c55e;padding-left:6px;margin-bottom:4px">
-          <div style="font-weight:bold;color:#15803d">EFECTIVO FISICO</div>
-          <div>Bs ${c.cashBs.toFixed(2)}</div>
+          <div style="font-weight:bold;color:#15803d">EFECTIVO FISICO Bs</div>
+          <div>Bs ${c.cashBs.toFixed(2)} ($ ${c.cashUsd.toFixed(2)})</div>
         </div>
+        ${c.cardUsd > 0 ? `
+        <div style="border-left:3px solid #22c55e;padding-left:6px;margin-bottom:4px">
+          <div style="font-weight:bold;color:#15803d">EFECTIVO FISICO $</div>
+          <div>$ ${c.cardUsd.toFixed(2)} (Bs ${c.cardBs.toFixed(2)})</div>
+        </div>` : ''}
         <div style="border-left:3px solid #3b82f6;padding-left:6px;margin-bottom:4px">
-          <div style="font-weight:bold;color:#1d4ed8">Bs ELECTRONICOS</div>
-          <div>Transf: Bs ${(c.transferBs || 0).toFixed(2)} | PM: Bs ${(c.mobileBs || 0).toFixed(2)}</div>
-          <div style="font-weight:bold">Subtotal: Bs ${((c.transferBs || 0) + (c.mobileBs || 0)).toFixed(2)}</div>
+          <div style="font-weight:bold;color:#1d4ed8">Bs ELECTRONICOS (Punto Venta + Transferencia + Pago Movil)</div>
+          <div>Pto.Venta: Bs ${(c.cardBs || 0).toFixed(2)} | Transf: Bs ${(c.transferBs || 0).toFixed(2)} | PM: Bs ${(c.mobileBs || 0).toFixed(2)}</div>
+          <div style="font-weight:bold">Subtotal: Bs ${((c.cardBs || 0) + (c.transferBs || 0) + (c.mobileBs || 0)).toFixed(2)}</div>
         </div>
         <div style="border-left:3px solid #a855f7;padding-left:6px;margin-bottom:4px">
-          <div style="font-weight:bold;color:#7e22ce">DIVISAS DIGITALES</div>
-          <div>Zelle: Bs ${(c.zelleBs || 0).toFixed(2)} | USDT: Bs ${(c.usdtBs || 0).toFixed(2)}</div>
-          <div style="font-weight:bold">Subtotal: Bs ${((c.zelleBs || 0) + (c.usdtBs || 0)).toFixed(2)}</div>
+          <div style="font-weight:bold;color:#7e22ce">DIVISAS DIGITALES (Zelle + USDT)</div>
+          <div>Zelle: $ ${(c.zelleUsd || 0).toFixed(2)} | USDT: $ ${(c.usdtUsd || 0).toFixed(2)}</div>
+          <div style="font-weight:bold">Subtotal: $ ${((c.zelleUsd || 0) + (c.usdtUsd || 0)).toFixed(2)}</div>
         </div>
-        <div style="border-top:1px solid #000;margin-top:6px;padding-top:4px;font-weight:bold;font-size:12px;display:flex;justify-content:space-between">
-          <span>TOTAL ENTRADAS</span>
-          <span>Bs ${c.netTotalBs.toFixed(2)} ($ ${(c.netTotalBs / (c.exchangeRate || 36.5)).toFixed(2)})</span>
+        <div style="border-top:2px solid #000;margin-top:8px;padding-top:6px;font-size:12px">
+          <div style="font-weight:bold;margin-bottom:4px;color:#92400e">TOTAL ENTRADAS (Resumen para Arqueo):</div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+            <span style="color:#15803d">Dolares (USD electronico + Efectivo $):</span>
+            <span style="font-weight:bold">$ ${((c.zelleUsd || 0) + (c.usdtUsd || 0)).toFixed(2)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:#1d4ed8">Bolivares (Bs electronicos + Efectivo Bs):</span>
+            <span style="font-weight:bold">Bs ${((c.cardBs || 0) + (c.transferBs || 0) + (c.mobileBs || 0) + c.cashBs).toFixed(2)}</span>
+          </div>
         </div>
       </div>
 
@@ -891,11 +903,32 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                     </div>
                   </>);
                 })()}
-                {/* TOTAL */}
-                <div className="border-t pt-2 mt-2">
-                  <div className="flex justify-between font-bold text-sm">
-                    <span>TOTAL ENTRADAS</span>
-                    <span>Bs {(selectedClosing.netTotalBs || 0).toFixed(2)} (${((selectedClosing.netTotalBs || 0) / (selectedClosing.exchangeRate || 36.5)).toFixed(2)})</span>
+                {/* TOTAL - EXPLICITO PARA ARQUEO */}
+                <div className="border-2 border-amber-500 rounded-lg p-2 bg-amber-50/80 space-y-1.5 mt-2">
+                  <p className="text-[10px] font-black text-amber-900 uppercase tracking-wider">Resumen para Arqueo</p>
+                  {/* DOLARES */}
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] font-bold text-green-800 uppercase tracking-wide">Dolares (USD electronico + Efectivo $):</p>
+                    {effUsd.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo $ (contar):</span><span className="text-right font-semibold">${effUsd.usd.toFixed(2)}</span></div>}
+                    {dd.zelle.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Zelle (ver app):</span><span className="text-right font-semibold">${dd.zelle.usd.toFixed(2)}</span></div>}
+                    {dd.usdt.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">USDT (ver wallet):</span><span className="text-right font-semibold">${dd.usdt.usd.toFixed(2)}</span></div>}
+                    <div className="flex justify-between text-[10px] bg-green-100/60 rounded px-1.5 py-0.5">
+                      <span className="font-black text-green-900">TOTAL USD:</span>
+                      <span className="font-black text-green-900">${(dd.usd + (effUsd.bs > 0 ? effUsd.usd : 0)).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="border-t border-dashed border-amber-300" />
+                  {/* BOLIVARES */}
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] font-bold text-blue-800 uppercase tracking-wide">Bolivares (Bs electronicos + Efectivo Bs):</p>
+                    <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo Bs (contar):</span><span className="text-right font-semibold">Bs {effBs.bs.toFixed(2)}</span></div>
+                    {bse.puntoVenta.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Punto Venta (ver terminal):</span><span className="text-right font-semibold">Bs {bse.puntoVenta.bs.toFixed(2)}</span></div>}
+                    {bse.transferencia.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Transferencia (ver banco):</span><span className="text-right font-semibold">Bs {bse.transferencia.bs.toFixed(2)}</span></div>}
+                    {bse.pagoMovil.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Pago Movil (ver banco):</span><span className="text-right font-semibold">Bs {bse.pagoMovil.bs.toFixed(2)}</span></div>}
+                    <div className="flex justify-between text-[10px] bg-blue-100/60 rounded px-1.5 py-0.5">
+                      <span className="font-black text-blue-900">TOTAL BS:</span>
+                      <span className="font-black text-blue-900">Bs {(bse.bs + effBs.bs).toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
