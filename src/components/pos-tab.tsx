@@ -249,6 +249,7 @@ export default function PosTab({
   // Mixed payment calculations
   const mixedTotalBs = mixedPayments.reduce((s, e) => s + e.amountBs, 0);
   const mixedRemaining = Math.max(0, totalBs - mixedTotalBs);
+  const mixedRemainingUsd = bcvRate > 0 ? mixedRemaining / bcvRate : 0;
   const isMixedValid = Math.abs(mixedTotalBs - totalBs) < 0.01;
   const showRefField = ["transferencia", "pago-movil", "zelle", "usdt", "mixto"].includes(paymentMethod);
 
@@ -584,7 +585,7 @@ export default function PosTab({
     if (!isCredit && paymentMethod === "mixto") {
       const filledEntries = mixedPayments.filter(e => e.amountBs > 0);
       if (filledEntries.length < 2) { toast.error("En pago mixto debe usar al menos 2 metodos de pago"); return; }
-      if (!isMixedValid) { toast.error(`El desglose no coincide con el total. Faltan Bs ${mixedRemaining.toFixed(2)}`); return; }
+      if (!isMixedValid) { toast.error(`El desglose no coincide con el total. Faltan Bs ${mixedRemaining.toFixed(2)} ($ ${mixedRemainingUsd.toFixed(2)})`); return; }
       const needsRef = filledEntries.filter(e => ["transferencia", "pago-movil", "zelle", "usdt"].includes(e.method) && !e.reference.trim());
       if (needsRef.length > 0) { toast.error("Los metodos Transferencia, Pago Movil, Zelle y USDT requieren referencia"); return; }
     }
@@ -806,7 +807,7 @@ export default function PosTab({
                 <div className="flex items-center justify-between">
                   <Label className="text-sm font-bold text-blue-800">Desglose de Pago Mixto</Label>
                   <Badge variant={isMixedValid ? "default" : "destructive"} className="text-xs px-3 py-1">
-                    {isMixedValid ? "COMPLETO" : `FALTAN Bs ${mixedRemaining.toFixed(2)}`}
+                    {isMixedValid ? "COMPLETO" : `FALTAN Bs ${mixedRemaining.toFixed(2)} ($ ${mixedRemainingUsd.toFixed(2)})`}
                   </Badge>
                 </div>
                 {mixedPayments.map((entry, idx) => (
@@ -851,7 +852,7 @@ export default function PosTab({
                 </div>
                 <div className="text-xs space-y-0.5">
                   <div className="flex justify-between"><span className="text-muted-foreground">Total desglose:</span><span className={isMixedValid ? "text-green-700 font-bold" : "text-red-600 font-bold"}>Bs {mixedTotalBs.toFixed(2)}</span></div>
-                  {!isMixedValid && <p className="text-red-600">Restante: Bs {mixedRemaining.toFixed(2)}</p>}
+                  {!isMixedValid && <p className="text-red-600">Restante: Bs {mixedRemaining.toFixed(2)} ($ {mixedRemainingUsd.toFixed(2)})</p>}
                   <div className="flex justify-between"><span className="text-muted-foreground">Total venta:</span><span>Bs {totalBs.toFixed(2)}</span></div>
                 </div>
               </div>
