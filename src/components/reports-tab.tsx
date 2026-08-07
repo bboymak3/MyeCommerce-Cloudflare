@@ -1146,16 +1146,61 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                   </div>
                 </div>
 
-                {/* TOTAL */}
-                <div className="border-l-4 border-l-amber-500 pl-3 bg-amber-50/50 rounded-r-lg py-2 space-y-0.5">
-                  <p className="text-sm font-bold text-amber-800">TOTAL ENTRADAS:</p>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-bold text-amber-900">Dolares ({currency}):</span>
-                    <span className="font-black text-amber-900">{currency} {totalEntradasUsd.toFixed(2)}</span>
+                {/* TOTAL - EXPLICITO PARA CONTEO FISICO Y COTEJO */}
+                <div className="border-2 border-amber-500 rounded-lg pl-3 bg-amber-50/80 py-2 space-y-1.5">
+                  <p className="text-sm font-black text-amber-900 uppercase tracking-wide">Resumen para Arqueo y Cotejo</p>
+                  <Separator className="my-1" />
+                  {/* DOLARES: lo que el admin debe contar/cotejar en USD */}
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-bold text-green-800 uppercase tracking-wider">Dolares (Efectivo $ + Zelle + USDT):</p>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">Efectivo $:</span>
+                      <span className="text-right font-semibold">{currency} {efectivoFisicoUsd_totalUsd.toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(contar billetes)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">Zelle:</span>
+                      <span className="text-right font-semibold">{currency} {(paymentBreakdown["zelle"]?.totalUsd || 0).toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(ver app)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">USDT:</span>
+                      <span className="text-right font-semibold">{currency} {(paymentBreakdown["usdt"]?.totalUsd || 0).toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(ver wallet)</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="font-bold text-amber-700">Bolivares (Bs):</span>
-                    <span className="font-black text-amber-700">Bs {totalEntradasBs.toFixed(2)}</span>
+                  <div className="flex justify-between text-xs bg-green-100/60 rounded px-2 py-1">
+                    <span className="font-black text-green-900">TOTAL USD:</span>
+                    <span className="font-black text-green-900">{currency} {totalEntradasUsd.toFixed(2)}</span>
+                  </div>
+                  <Separator className="my-1" />
+                  {/* BOLIVARES: lo que el admin debe contar/cotejar en Bs */}
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Bolivares (Efectivo Bs + Transferencia + Pago Movil + Punto de Venta):</p>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">Efectivo Bs:</span>
+                      <span className="text-right font-semibold">Bs {efectivoFisicoBs_totalBs.toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(contar billetes)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">Punto de Venta:</span>
+                      <span className="text-right font-semibold">Bs {(paymentBreakdown["punto-de-venta"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(ver terminal)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">Transferencia:</span>
+                      <span className="text-right font-semibold">Bs {(paymentBreakdown["transferencia"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(ver banco)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">Pago Movil:</span>
+                      <span className="text-right font-semibold">Bs {(paymentBreakdown["pago-movil"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(ver banco)</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs bg-blue-100/60 rounded px-2 py-1">
+                    <span className="font-black text-blue-900">TOTAL BS:</span>
+                    <span className="font-black text-blue-900">Bs {totalEntradasBs.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
