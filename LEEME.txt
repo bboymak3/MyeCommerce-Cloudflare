@@ -1,5 +1,5 @@
 =============================================================
-MyeCommerce POS v2.9.16 - Guia de Instalacion Completa
+MyeCommerce POS v2.9.23 - Guia de Instalacion Completa
 =============================================================
 
 CONTENIDO
@@ -16,6 +16,9 @@ CONTENIDO
 10. INICIO AUTOMATICO CON WINDOWS
 11. RESPALDAR BASE DE DATOS
 12. SOLUCION DE PROBLEMAS
+13. HISTORIAL DE VERSIONES
+14. METODOS DE PAGO SOPORTADOS
+15. MODULOS DEL SISTEMA
 
 
 =============================================================
@@ -45,8 +48,10 @@ PASO 1 - Instalar Node.js
 
 PASO 2 - Descargar MyeCommerce POS
 -----------------------------------
-  a) Descargue el ZIP desde:
-     https://github.com/csglider/myecommerce-pos/archive/refs/heads/main.zip
+  a) Descargue el ZIP desde el repositorio:
+     https://github.com/csglider/MyeCommerce-v2.9.20
+     (boton verde "Code" > "Download ZIP")
+     O descargue la ultima version desde la carpeta zip/
   b) Descomprimalo en una carpeta fija, por ejemplo:
      C:\MyeCommercePOS
   c) IMPORTANTE: No use carpetas con espacios ni caracteres especiales
@@ -56,25 +61,26 @@ PASO 2 - Descargar MyeCommerce POS
 PASO 3 - Ejecutar la instalacion
 -------------------------------
   a) Abra la carpeta donde descomprimio el sistema
-  b) Click DERECHO sobre INSTALAR-LIMPIO.vbs
+  b) Click DERECHO sobre INSTALAR.bat
   c) Seleccione "Ejecutar como administrador"
   d) Espere a que termine (tarda 3-5 minutos la primera vez)
   e) El instalador hace todo automaticamente:
-     - Instala dependencias del sistema
-     - Crea la base de datos
-     - Instala el agente de impresion
-     - Descarga Caddy para el dominio local
-     - Configura el dominio myecommerce.ve
-     - Compila para produccion
-     - Crea un acceso directo en el escritorio
+     - Instala dependencias del sistema (npm install)
+     - Crea la base de datos (npx prisma db push)
+     - Compila para produccion (npm run build)
 
-PASO 4 - Usar el sistema
--------------------------
-  a) Haga doble clic en "MyeCommerce POS" del escritorio
-  b) Se abrira el navegador automaticamente
-  c) URL: https://myecommerce.ve (con candado verde)
-  d) Usuario: admin   Clave: admin
-  e) Cambie la clave inmediatamente despues del primer ingreso
+PASO 4 - Crear usuario administrador
+------------------------------------
+  a) Doble clic en CREAR-ADMIN.bat
+  b) Siga las instrucciones (usuario y clave)
+
+PASO 5 - Iniciar el sistema
+---------------------------
+  a) Doble clic en INICIAR-MYECCOMMERCE.bat
+  b) O use INICIAR-TODO.bat para iniciar con Caddy + impresora
+  c) Se abrira el navegador automaticamente en:
+     - https://myecommerce.ve (con Caddy activo)
+     - http://localhost:3000 (sin Caddy)
 
 
 =============================================================
@@ -83,16 +89,21 @@ PASO 4 - Usar el sistema
 
 ARCHIVOS PRINCIPALES (en la raiz del sistema):
 
+INSTALAR.bat
+  - Instala las dependencias (npm install)
+  - Crea/actualiza la base de datos (prisma db push)
+  - Compila el proyecto (npm run build)
+  - Ejecutar como Administrador.
+  - Ejecutar SOLO la primera vez o al actualizar version.
+
 INSTALAR-LIMPIO.vbs
-  - Es el instalador completo. Ejecutar una sola vez.
+  - Instalacion completa desde cero.
   - Hace TODO: dependencias, base de datos, printer-agent, caddy,
     compilacion, acceso directo.
   - Ejecutar como Administrador.
-  - Muestra ventanas de progreso paso a paso.
 
 INICIAR-TODO-OCULTO.vbs
   - Inicia los 3 servicios SIN abrir ventanas CMD.
-  - Es el archivo que usa el acceso directo del escritorio.
   - Inicia: Printer-Agent + Caddy + Next.js
   - Espera a que Next.js este listo y abre el navegador.
 
@@ -100,16 +111,28 @@ INICIAR-TODO.bat
   - Igual que el VBS pero con ventanas CMD visibles.
   - Usar SOLO para ver errores o hacer debug.
 
+INICIAR-MYECCOMMERCE.bat
+  - Inicia solo Next.js (sin Caddy ni printer-agent).
+  - Ideal para uso rapido sin extras.
+
 DETENER-TODO.bat
-  - Detiene los 3 servicios (Node.js + Caddy).
+  - Detiene todos los servicios.
   - Usar antes de apagar la PC o reinstalar.
+
+CREAR-ADMIN.bat
+  - Crea el primer usuario administrador.
+  - Ejecutar despues de INSTALAR.bat.
+
+GENERAR-LICENCIA.bat
+  - Genera una clave de licencia para el sistema.
+  - Requiere plan BASICA+ para funciones avanzadas.
 
 RESPALDAR-BD.bat
   - Crea un ZIP con la base de datos completa.
   - Se guarda en la carpeta "respaldos".
 
 LEEME.txt
-  - Este archivo que estas leyendo.
+  - Esta guia de instalacion y referencia.
 
 
 =============================================================
@@ -120,12 +143,16 @@ Estructura de carpetas:
 
 MyeCommercePOS/
   |
-  |--- INSTALAR-LIMPIO.vbs          (instalador completo)
-  |--- INICIAR-TODO-OCULTO.vbs     (iniciar sin ventanas)
+  |--- INSTALAR.bat                (instalador rapido)
+  |--- INSTALAR-LIMPIO.vbs         (instalador completo)
+  |--- INICIAR-TODO-OCULTO.vbs    (iniciar sin ventanas)
   |--- INICIAR-TODO.bat            (iniciar con ventanas)
+  |--- INICIAR-MYECCOMMERCE.bat    (iniciar solo Next.js)
   |--- DETENER-TODO.bat            (detener servicios)
+  |--- CREAR-ADMIN.bat             (crear admin)
+  |--- GENERAR-LICENCIA.bat        (generar licencia)
   |--- RESPALDAR-BD.bat            (respaldar base de datos)
-  |--- LEEME.txt                  (esta guia)
+  |--- LEEME.txt                   (esta guia)
   |--- package.json
   |--- next.config.js
   |--- tailwind.config.ts
@@ -133,25 +160,55 @@ MyeCommercePOS/
   |
   |--- src/                       (codigo fuente de la app)
   |    |--- app/                   (paginas y API routes)
+  |    |    |--- api/              (21 endpoints de API)
+  |    |    |--- page.tsx          (pagina principal con tabs)
+  |    |    |--- layout.tsx        (layout global)
+  |    |    |--- globals.css       (estilos globales)
   |    |--- components/            (componentes React)
-  |    |--- lib/                   (funciones: tickets, ESC/POS, etc)
+  |    |    |--- pos-tab.tsx       (punto de venta)
+  |    |    |--- dashboard-tab.tsx (panel principal)
+  |    |    |--- products-tab.tsx   (productos)
+  |    |    |--- clients-tab.tsx   (clientes)
+  |    |    |--- reports-tab.tsx   (informes)
+  |    |    |--- cash-closing-tab.tsx (cierre de caja)
+  |    |    |--- credit-tab.tsx    (cuentas por cobrar)
+  |    |    |--- devolutions-tab.tsx (devoluciones)
+  |    |    |--- config-tab.tsx    (configuracion)
+  |    |    |--- users-tab.tsx     (usuarios y roles)
+  |    |    |--- license-tab.tsx   (licencia)
+  |    |    |--- backup-tab.tsx    (respaldos)
+  |    |    |--- suppliers-tab.tsx (proveedores)
+  |    |    |--- purchases-tab.tsx (compras)
+  |    |--- lib/                   (funciones utilitarias)
+  |    |    |--- db.ts             (conexion Prisma/SQLite)
+  |    |    |--- ticket-printer.ts (impresion tickets)
+  |    |    |--- escpos-buffer.ts  (comandos ESC/POS)
+  |    |    |--- license.ts        (validacion licencias)
+  |    |    |--- auth.ts           (autenticacion)
+  |    |    |--- auto-backup.ts    (auto-respaldo)
+  |    |--- types/                 (definiciones TypeScript)
   |
   |--- prisma/
-  |    |--- schema.prisma          (estructura de la base de datos)
+  |    |--- schema.prisma          (15 modelos de base de datos)
   |    |--- dev.db                 (base de datos SQLite)
   |
   |--- printer-agent/             (agente de impresion termica)
   |    |--- agent.js               (servidor HTTP puerto 9100)
-  |    |--- package.json
   |    |--- INICIAR-AGENTE-OCULTO.vbs
   |
   |--- caddy/                     (proxy inverso para dominio local)
-  |    |--- caddy.exe              (se descarga automaticamente)
   |    |--- Caddyfile              (configuracion del proxy)
   |    |--- INICIAR-CADDY-OCULTO.vbs
   |
-  |--- public/                    (archivos estaticos)
-  |--- respaldos/                 (aqui se guardan los respaldos)
+  |--- zip/                       (archivos ZIP de versiones)
+  |    |--- MyeCommerce-v2.9.20.zip
+  |    |--- MyeCommerce-v2.9.21.zip
+  |    |--- MyeCommerce-v2.9.22.zip
+  |    |--- MyeCommerce-v2.9.23.zip
+  |    |--- VERSIONES.md           (registro de versiones)
+  |
+  |--- public/                    (archivos estaticos, PWA)
+  |--- respaldos/                 (respaldos de base de datos)
 
 
 =============================================================
@@ -159,15 +216,17 @@ MyeCommercePOS/
 =============================================================
 
 FORMA NORMAL (recomendada):
-  - Doble clic en "MyeCommerce POS" del escritorio
-  - O doble clic en INICIAR-TODO-OCULTO.vbs
+  - Doble clic en INICIAR-TODO-OCULTO.vbs
   - No abre ventanas CMD, inicia todo en segundo plano
   - Abre el navegador automaticamente
+
+FORMA RAPIDA (sin Caddy ni impresora):
+  - Doble clic en INICIAR-MYECCOMMERCE.bat
+  - Inicia solo Next.js en el puerto 3000
 
 FORMA DEBUG (para ver errores):
   - Doble clic en INICIAR-TODO.bat
   - Abre ventanas CMD donde puede ver si hay errores
-  - Usar solo si algo no funciona
 
 QUE SE INICIA:
   1. Printer-Agent en puerto 9100 (impresion termica)
@@ -211,14 +270,6 @@ CONFIGURAR EN LA APP:
   6. Haga clic en "Probar conexion"
   7. Debe aparecer verde: "Agente conectado"
 
-SI NO CONECTA:
-  - Verifique que Node.js esta instalado
-  - Abra una terminal CMD y ejecute:
-    cd printer-agent
-    node agent.js
-  - Si hay errores, instale dependencias:
-    npm install
-
 IMPRESORAS COMPATIBLES:
   - Cualquier impresora termica POS de 58mm o 80mm
   - Las que usan chip CH340, CP210, Prolific
@@ -238,12 +289,6 @@ QUE HACE:
 REQUISITOS:
   - Ejecutar como Administrador (para usar el puerto 443)
   - El instalador INSTALAR-LIMPIO.vbs lo configura automaticamente
-
-QUE CONFIGURA:
-  1. Agrega "127.0.0.1  myecommerce.ve" al archivo hosts de Windows
-  2. Descarga caddy.exe a la carpeta caddy/
-  3. Instala la CA de Caddy en Windows (para confiar en el SSL)
-  4. Caddy redirige HTTPS (puerto 443) al puerto 3000
 
 SI CADDY NO SE DESCARGO:
   1. Vaya a: https://caddyserver.com/download
@@ -288,6 +333,9 @@ Para que el sistema inicie automaticamente al encender la PC:
      (ubicado en la carpeta del sistema)
   5. Listo, cada vez que encienda la PC el sistema iniciara solo
 
+Tambien puede usar CREAR-INICIO-AUTOMATICO.bat que lo hace
+automaticamente.
+
 
 =============================================================
 11. RESPALDAR BASE DE DATOS
@@ -296,10 +344,10 @@ Para que el sistema inicie automaticamente al encender la PC:
   1. Doble clic en RESPALDAR-BD.bat
   2. Se crea un archivo ZIP en la carpeta "respaldos"
   3. El ZIP contiene la base de datos completa:
-     - Productos y categorias
-     - Clientes
-     - Ventas y devoluciones
-     - Usuarios y configuracion
+     - Productos, categorias, proveedores y compras
+     - Clientes con limites de credito
+     - Ventas, devoluciones y cierres de caja
+     - Usuarios, roles, configuracion y licencia
 
 PARA RESTAURAR:
   1. Detenga el sistema (DETENER-TODO.bat)
@@ -319,7 +367,6 @@ SOLUCION: Instale Node.js 20 LTS desde https://nodejs.org
 PROBLEMA: No abre https://myecommerce.ve
 SOLUCION: Use http://localhost:3000 mientras tanto.
          Ejecute INSTALAR-LIMPIO.vbs como Administrador.
-         Verifique que ejecuto como Administrador (requerido para SSL).
 
 PROBLEMA: La impresora no imprime
 SOLUCION: 1. Vaya a http://localhost:9100/status en el navegador
@@ -336,11 +383,211 @@ SOLUCION: 1. Verifique que telefono y PC estan en la misma WiFi
 
 PROBLEMA: Quiero reinstalar todo desde cero
 SOLUCION: 1. Haga un respaldo (RESPALDAR-BD.bat)
-         2. Ejecute INSTALAR-LIMPIO.vbs como Administrador
-         3. Esto borra todo e instala limpio
+         2. Borre la carpeta .next y node_modules
+         3. Ejecute INSTALAR.bat como Administrador
+
+PROBLEMA: Error al actualizar de una version anterior
+SOLUCION: 1. Respaldar base de datos (RESPALDAR-BD.bat)
+         2. Reemplazar todos los archivos por la nueva version
+         3. Ejecutar INSTALAR.bat (actualiza dependencias + BD)
+         4. La base de datos se migra automaticamente
 
 
 =============================================================
-MyeCommerce POS v2.9.16
+13. HISTORIAL DE VERSIONES
+=============================================================
+
+v2.9.23 (2026-08-07)
+  [CORRECION CRITICA] Error "effusd is not defined" en Cierre de Caja
+  - Corregido bug de scope de variables en cash-closing-tab.tsx
+  - Proteccion en loadClosings contra respuestas no-array del API
+  - El tab Cierre de Caja ahora carga correctamente
+
+v2.9.22 (2026-08-07)
+  - Mejoras en desglose de cierres por canal de ingreso
+  - Separacion visual: Efectivo Bs, Efectivo $, Bs Electronicos, Divisas Digitales
+
+v2.9.21 (2026-08-07)
+  - Metodo de pago Efectivo USD ($)
+  - Metodo de pago Zelle
+  - Metodo de pago USDT (Tether)
+  - Metodo de pago Cashea (BNPL)
+  - Desglose por grupos en cierres de caja
+  - Breakdown JSON almacenado en cada cierre
+
+v2.9.20 (2026-08-06)
+  - Separacion Efectivo Bs / Efectivo USD en cierres
+  - Mejora en ticket de impresion con desglose por canal
+  - Eliminado metodo "Tarjeta" (debito/credito)
+  - Reemplazado por "Punto de Venta" (punto de venta fisico)
+
+v2.9.16 (2026-08-05)
+  - Modulo de Cierre de Caja completo (pre-cierres + cierre final)
+  - Desglose por metodo de pago en cierres
+  - Impresion de cierres de caja
+  - Detalle de referencias (transferencias, pago movil)
+  - Desglose por rol (admin, vendedor, cajero)
+
+v2.9.15 (2026-07-30)
+  - Dashboard con resumen para arqueo
+  - Reportes con seccion de cuentas por cobrar
+  - Exportacion CSV e impresion de reportes
+
+v2.9.10 (2026-07-25)
+  - Modulo de Creditos (CxC)
+  - Limites de credito por cliente
+  - Abonos parciales a creditos
+  - Alertas de creditos vencidos
+
+v2.9.0 (2026-07-20)
+  - Modulo de Proveedores y Compras
+  - Importacion de productos desde CSV
+  - Exportacion de productos a CSV
+  - Alertas de stock bajo
+
+v2.8.0 (2026-07-15)
+  - Modulo de Usuarios y Roles
+  - Roles: Administrador, Vendedor, Cajero
+  - Permisos configurables por rol
+
+v2.7.7 (2026-07-10)
+  - Preview de cierres (sin crearlos)
+  - Error boundaries en todos los tabs
+  - Atajos de teclado F4 (efectivo), F6 (credito), F7 (mixto)
+  - Validacion de vuelto y foco automatico
+
+v2.7.0 (2026-07-01)
+  - Modulo de Devoluciones
+  - Licencias con planes BASICA / BASICA+ / PROFESIONAL
+  - Pestaña de Licencia en configuracion
+
+v2.6.0 (2026-06-25)
+  - Multi-moneda: Dolar + Bolivar
+  - Tasa BCV configurable
+  - Impresion de tickets termicos
+  - Agente ESC/POS para impresora USB
+
+v2.5.0 (2026-06-15)
+  - Primera version estable
+  - Punto de venta basico
+  - Productos e Inventario
+  - Clientes basicos
+  - Reportes de ventas
+
+
+=============================================================
+14. METODOS DE PAGO SOPORTADOS
+=============================================================
+
+METODO                | MONEDA  | DESCRIPCION
+----------------------|---------|------------------------------------------
+Efectivo (Bs)         | Bs      | Pago en efectivo bolivares
+Efectivo ($)          | USD     | Pago en efectivo dolares (billetes)
+Pago Movil            | Bs      | Transferencia via Pago Movil
+Transferencia         | Bs      | Transferencia bancaria
+Punto de Venta        | Bs      | Terminal POS fisico (debito/credito)
+Zelle                 | USD     | Transferencia Zelle (dolares)
+USDT                  | USD     | Tether / criptomonedas
+Cheque                | Bs      | Pago con cheque
+Cashea                | Bs/USD  | Buy Now Pay Later (compra ahora, paga despues)
+Credito               | Bs/USD  | Credito directo al cliente (fiado)
+Mixto                 | Ambas   | Combinacion de varios metodos
+
+
+=============================================================
+15. MODULOS DEL SISTEMA
+=============================================================
+
+PUNTO DE VENTA (POS)
+  - Carrito de compras con busqueda por nombre o codigo de barras
+  - Metodos de pago multiples (efectivo, transferencia, Zelle, etc.)
+  - Pago mixto (dividir entre varios metodos)
+  - Credito directo (fiado) con limite por cliente
+  - Calculo automatico de vuelto
+  - Impresion de ticket termico
+  - Atajos de teclado: F4, F6, F7, F9
+
+DASHBOARD
+  - Resumen del dia: ventas, devoluciones, neto
+  - Graficos de ventas por metodo de pago
+  - Resumen para arqueo con desglose explicito
+  - Ultimas ventas del dia
+
+PRODUCTOS
+  - CRUD completo de productos
+  - Categorias organizadas
+  - Busqueda y filtros
+  - Alertas de stock bajo
+  - Importacion/exportacion CSV
+  - Impresion de codigos de barras
+
+CLIENTES
+  - Registro de clientes con datos fiscales
+  - Limites de credito individuales
+  - Historial de compras por cliente
+  - Busqueda por nombre, CI/RIF, telefono
+
+CIERRE DE CAJA
+  - Pre-cierres (al cambiar turno/vendedor)
+  - Cierre final del dia
+  - Desglose por metodo de pago
+  - Desglose por canal: Efectivo Bs, Efectivo $, Bs Electronicos, Divisas Digitales
+  - Detalle de referencias (transferencias, pago movil, Zelle, USDT)
+  - Desglose por rol (admin, vendedor, cajero)
+  - Impresion del cierre
+  - Historial de cierres
+
+REPORTES
+  - Ventas por periodo (dia, semana, mes, rango)
+  - Desglose por metodo de pago
+  - Cuentas por cobrar (creditos pendientes)
+  - Resumen para arqueo
+  - Exportacion CSV
+  - Impresion
+
+CREDITOS (CxC)
+  - Lista de clientes con deuda
+  - Ventas a credito por cliente
+  - Registro de abonos parciales
+  - Alertas de creditos vencidos
+
+DEVOLUCIONES
+  - Registro de devoluciones
+  - Desglose del motivo
+  - Afectacion en reportes y cierres
+
+PROVEEDORES Y COMPRAS
+  - Registro de proveedores
+  - Registro de compras (ordenes)
+  - Control de inventario por compras
+
+USUARIOS Y ROLES
+  - Creacion de usuarios con contrasena
+  - Roles: Administrador, Vendedor, Cajero
+  - Permisos por rol
+  - Control de acceso a modulos
+
+CONFIGURACION
+  - Datos de la tienda (nombre, RIF, direccion)
+  - Tasa BCV (manual o automatica)
+  - Impresora termica (agente ESC/POS)
+  - Metodos de pago habilitados
+  - Facturacion (numero sequential)
+
+LICENCIA
+  - Plan BASICA (gratuito): POS basico
+  - Plan BASICA+: Cierre de caja + creditos
+  - Plan PROFESIONAL: Todos los modulos
+  - Validez de la licencia
+
+RESPALDOS
+  - Respaldo manual de base de datos
+  - Auto-respaldo programado
+  - Descarga del respaldo
+
+
+=============================================================
+MyeCommerce POS v2.9.23
 Sistema Punto de Venta Venezuela
+Doble Moneda $/Bs
 =============================================================
