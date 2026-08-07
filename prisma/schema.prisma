@@ -229,6 +229,8 @@ model CashClosing {
   transferBs      Float    @default(0)
   mobileUsd       Float    @default(0)
   mobileBs        Float    @default(0)
+  efectivoUsdUsd   Float    @default(0)
+  efectivoUsdBs    Float    @default(0)
   creditSalesUsd    Float    @default(0)
   creditSalesBs     Float    @default(0)
   creditSalesCount  Int      @default(0)

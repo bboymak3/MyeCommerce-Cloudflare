@@ -35,6 +35,8 @@ interface CashClosing {
   transferBs: number;
   mobileUsd: number;
   mobileBs: number;
+  efectivoUsdUsd: number;
+  efectivoUsdBs: number;
   creditSalesUsd: number;
   creditSalesBs: number;
   creditSalesCount: number;
@@ -55,6 +57,7 @@ interface ReferenceDetail {
   saleId: string;
   date: string;
   paymentType: string;
+  label: string;
   reference: string;
   totalBs: number;
   totalUsd: number;
@@ -222,11 +225,26 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
     });
     const now = new Date().toLocaleString("es-VE");
 
-    // Reference rows
-    const transferTotalUsd = refData.referenceDetails.filter(r => r.paymentType === 'Transferencia').reduce((s, r) => s + r.totalUsd, 0);
-    const mobileTotalUsd = refData.referenceDetails.filter(r => r.paymentType === 'Pago Movil').reduce((s, r) => s + r.totalUsd, 0);
+    // Reference rows - separated by currency
+    const bsRefs = refData.referenceDetails.filter(r => r.paymentType === 'Transferencia' || r.paymentType === 'Pago Movil');
+    const usdRefs = refData.referenceDetails.filter(r => r.paymentType === 'Zelle' || r.paymentType === 'USDT');
+    const bsTotal = bsRefs.reduce((s, r) => s + r.totalBs, 0);
+    const bsTotalUsd = bsRefs.reduce((s, r) => s + r.totalUsd, 0);
+    const usdTotal = usdRefs.reduce((s, r) => s + r.totalUsd, 0);
+    const usdTotalBs = usdRefs.reduce((s, r) => s + r.totalBs, 0);
 
-    const refRows = refData.referenceDetails.map((r) =>
+    const bsRefRows = bsRefs.map((r) =>
+      `<tr>
+        <td>${r.saleTime}</td>
+        <td>${r.customerName}</td>
+        <td><strong>${r.paymentType}</strong></td>
+        <td class="ref">${r.reference}</td>
+        <td class="amount">Bs ${r.totalBs.toFixed(2)}</td>
+        <td class="amount">$ ${r.totalUsd.toFixed(2)}</td>
+      </tr>`
+    ).join('');
+
+    const usdRefRows = usdRefs.map((r) =>
       `<tr>
         <td>${r.saleTime}</td>
         <td>${r.customerName}</td>
@@ -307,17 +325,17 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
           <div style="font-weight:bold;color:#15803d">EFECTIVO FISICO Bs</div>
           <div>Bs ${c.cashBs.toFixed(2)} ($ ${c.cashUsd.toFixed(2)})</div>
         </div>
-        ${c.cardUsd > 0 ? `
-        <div style="border-left:3px solid #22c55e;padding-left:6px;margin-bottom:4px">
-          <div style="font-weight:bold;color:#15803d">EFECTIVO FISICO $</div>
-          <div>$ ${c.cardUsd.toFixed(2)} (Bs ${c.cardBs.toFixed(2)})</div>
+        ${(c.efectivoUsdUsd || 0) > 0 ? `
+        <div style="border-left:3px solid #10b981;padding-left:6px;margin-bottom:4px">
+          <div style="font-weight:bold;color:#059669">EFECTIVO FISICO $</div>
+          <div>$ ${(c.efectivoUsdUsd || 0).toFixed(2)} (Bs ${(c.efectivoUsdBs || 0).toFixed(2)})</div>
         </div>` : ''}
-        <div style="border-left:3px solid #3b82f6;padding-left:6px;margin-bottom:4px">
+        <div style="border-left:3px solid #3b82f6;padding-left:6px;margin-bottom:4px;background:#eff6ff;border-radius:0 4px 4px 0">
           <div style="font-weight:bold;color:#1d4ed8">Bs ELECTRONICOS (Punto Venta + Transferencia + Pago Movil)</div>
           <div>Pto.Venta: Bs ${(c.cardBs || 0).toFixed(2)} | Transf: Bs ${(c.transferBs || 0).toFixed(2)} | PM: Bs ${(c.mobileBs || 0).toFixed(2)}</div>
           <div style="font-weight:bold">Subtotal: Bs ${((c.cardBs || 0) + (c.transferBs || 0) + (c.mobileBs || 0)).toFixed(2)}</div>
         </div>
-        <div style="border-left:3px solid #a855f7;padding-left:6px;margin-bottom:4px">
+        <div style="border-left:3px solid #a855f7;padding-left:6px;margin-bottom:4px;background:#faf5ff;border-radius:0 4px 4px 0">
           <div style="font-weight:bold;color:#7e22ce">DIVISAS DIGITALES (Zelle + USDT)</div>
           <div>Zelle: $ ${(c.zelleUsd || 0).toFixed(2)} | USDT: $ ${(c.usdtUsd || 0).toFixed(2)}</div>
           <div style="font-weight:bold">Subtotal: $ ${((c.zelleUsd || 0) + (c.usdtUsd || 0)).toFixed(2)}</div>
@@ -325,8 +343,8 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
         <div style="border-top:2px solid #000;margin-top:8px;padding-top:6px;font-size:12px">
           <div style="font-weight:bold;margin-bottom:4px;color:#92400e">TOTAL ENTRADAS (Resumen para Arqueo):</div>
           <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-            <span style="color:#15803d">Dolares (USD electronico + Efectivo $):</span>
-            <span style="font-weight:bold">$ ${((c.zelleUsd || 0) + (c.usdtUsd || 0)).toFixed(2)}</span>
+            <span style="color:#059669">Dolares (USD electronico + Efectivo $):</span>
+            <span style="font-weight:bold">$ ${((c.zelleUsd || 0) + (c.usdtUsd || 0) + (c.efectivoUsdUsd || 0)).toFixed(2)}</span>
           </div>
           <div style="display:flex;justify-content:space-between">
             <span style="color:#1d4ed8">Bolivares (Bs electronicos + Efectivo Bs):</span>
@@ -348,24 +366,36 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
         </tbody>
       </table>` : ''}
 
-      ${refData.referenceDetails.length > 0 ? `
-      <h2>Detalle de Transferencias y Pago Movil</h2>
-      <table>
-        <thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto (Bs)</th><th style="text-align:right">Monto ($)</th></tr></thead>
-        <tbody>
-          ${refRows}
-          <tr class="totals-row">
-            <td colspan="4">Total Transferencias: ${refData.referenceDetails.filter(r => r.paymentType === 'Transferencia').length} ops</td>
-            <td style="text-align:right">Bs ${refData.transferTotal.toFixed(2)}</td>
-            <td style="text-align:right">$ ${transferTotalUsd.toFixed(2)}</td>
-          </tr>
-          <tr class="totals-row">
-            <td colspan="4">Total Pago Movil: ${refData.referenceDetails.filter(r => r.paymentType === 'Pago Movil').length} ops</td>
-            <td style="text-align:right">Bs ${refData.mobileTotal.toFixed(2)}</td>
-            <td style="text-align:right">$ ${mobileTotalUsd.toFixed(2)}</td>
-          </tr>
-        </tbody>
-      </table>` : ''}
+      ${bsRefRows.length > 0 ? `
+      <h2>Detalle de Referencias - Bs Electrónicos</h2>
+      <div style="border:1px solid #3b82f6;border-radius:6px;padding:8px;margin-bottom:8px;background:#eff6ff">
+        <table>
+          <thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto (Bs)</th><th style="text-align:right">Monto ($)</th></tr></thead>
+          <tbody>
+            ${bsRefRows}
+            <tr class="totals-row">
+              <td colspan="4" style="color:#1d4ed8">Total Bs Electrónicos (${bsRefs.length} ops)</td>
+              <td style="text-align:right">Bs ${bsTotal.toFixed(2)}</td>
+              <td style="text-align:right">$ ${bsTotalUsd.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>` : ''}
+      ${usdRefRows.length > 0 ? `
+      <h2>Detalle de Referencias - Dólares Digitales</h2>
+      <div style="border:1px solid #a855f7;border-radius:6px;padding:8px;margin-bottom:8px;background:#faf5ff">
+        <table>
+          <thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto (Bs)</th><th style="text-align:right">Monto ($)</th></tr></thead>
+          <tbody>
+            ${usdRefRows}
+            <tr class="totals-row">
+              <td colspan="4" style="color:#7e22ce">Total Dólares Digitales (${usdRefs.length} ops)</td>
+              <td style="text-align:right">Bs ${usdTotalBs.toFixed(2)}</td>
+              <td style="text-align:right">$ ${usdTotal.toFixed(2)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>` : ''}
 
       ${c.observations ? `<h2>Observaciones</h2><p style="font-size:11px;padding:8px;background:#f9f9f9;border-radius:4px">${c.observations}</p>` : ''}
 
@@ -881,22 +911,22 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                       </div>
                     </div>
                     {/* EFECTIVO FÍSICO $ */}
-                    {effUsd.bs > 0 && (
-                      <div className="border-l-4 border-green-500 pl-2">
-                        <div className="font-semibold text-xs text-green-700">🟢 EFECTIVO FÍSICO $</div>
+                    {effUsd.usd > 0 && (
+                      <div className="border-l-4 border-emerald-500 pl-2">
+                        <div className="font-semibold text-xs text-emerald-700">🟢 EFECTIVO FÍSICO $</div>
                         <div className="text-xs text-muted-foreground">
                           ${effUsd.usd.toFixed(2)} (Bs {effUsd.bs.toFixed(2)})
                         </div>
                       </div>
                     )}
                     {/* Bs ELECTRÓNICOS */}
-                    <div className="border-l-4 border-blue-500 pl-2">
+                    <div className="border-l-4 border-blue-500 pl-2 bg-blue-50 rounded-r">
                       <div className="font-semibold text-xs text-blue-700">🔵 Bs ELECTRÓNICOS</div>
                       <div className="text-xs">Pto.Venta: Bs {bse.puntoVenta.bs.toFixed(2)} | Transf: Bs {bse.transferencia.bs.toFixed(2)} | PM: Bs {bse.pagoMovil.bs.toFixed(2)}</div>
                       <div className="text-xs font-medium">Subtotal: Bs {bse.bs.toFixed(2)} (${bse.usd.toFixed(2)})</div>
                     </div>
                     {/* DIVISAS DIGITALES */}
-                    <div className="border-l-4 border-purple-500 pl-2">
+                    <div className="border-l-4 border-purple-500 pl-2 bg-purple-50 rounded-r">
                       <div className="font-semibold text-xs text-purple-700">🟣 DIVISAS DIGITALES</div>
                       <div className="text-xs">Zelle: Bs {dd.zelle.bs.toFixed(2)} (${dd.zelle.usd.toFixed(2)}) | USDT: Bs {dd.usdt.bs.toFixed(2)} (${dd.usdt.usd.toFixed(2)})</div>
                       <div className="text-xs font-medium">Subtotal: Bs {dd.bs.toFixed(2)} (${dd.usd.toFixed(2)})</div>
@@ -909,12 +939,12 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                   {/* DOLARES */}
                   <div className="space-y-0.5">
                     <p className="text-[9px] font-bold text-green-800 uppercase tracking-wide">Dolares (USD electronico + Efectivo $):</p>
-                    {effUsd.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo $ (contar):</span><span className="text-right font-semibold">${effUsd.usd.toFixed(2)}</span></div>}
+                    {effUsd.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo $ (contar):</span><span className="text-right font-semibold">${effUsd.usd.toFixed(2)}</span></div>}
                     {dd.zelle.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Zelle (ver app):</span><span className="text-right font-semibold">${dd.zelle.usd.toFixed(2)}</span></div>}
                     {dd.usdt.usd > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">USDT (ver wallet):</span><span className="text-right font-semibold">${dd.usdt.usd.toFixed(2)}</span></div>}
                     <div className="flex justify-between text-[10px] bg-green-100/60 rounded px-1.5 py-0.5">
                       <span className="font-black text-green-900">TOTAL USD:</span>
-                      <span className="font-black text-green-900">${(dd.usd + (effUsd.bs > 0 ? effUsd.usd : 0)).toFixed(2)}</span>
+                      <span className="font-black text-green-900">${(dd.usd + effUsd.usd).toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="border-t border-dashed border-amber-300" />
@@ -939,109 +969,140 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                   <p className="text-sm">Cargando detalle de ventas...</p>
                 </div>
               ) : detailReferenceData && detailReferenceData.referenceDetails.length > 0 ? (
-                <div className="p-3 rounded border border-blue-200 bg-blue-50/30 space-y-2">
+                <div className="space-y-3">
                   <h4 className="font-semibold flex items-center gap-2">
                     &#128196; Detalle de Referencias
                   </h4>
-
-                  {/* Resumen de referencias */}
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="p-2 rounded bg-blue-100/50 text-center">
-                      <p className="text-[10px] text-muted-foreground">Transferencias</p>
-                      <p className="text-xs font-bold text-blue-700">
-                        {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Transferencia').length} ops
-                      </p>
-                      <p className="text-[11px] font-semibold text-blue-600">Bs {detailReferenceData.transferTotal.toFixed(2)}</p>
-                      <p className="text-[10px] text-muted-foreground">{currency} {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Transferencia').reduce((s, r) => s + r.totalUsd, 0).toFixed(2)}</p>
-                    </div>
-                    <div className="p-2 rounded bg-green-100/50 text-center">
-                      <p className="text-[10px] text-muted-foreground">Pago Movil</p>
-                      <p className="text-xs font-bold text-green-700">
-                        {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Pago Movil').length} ops
-                      </p>
-                      <p className="text-[11px] font-semibold text-green-600">Bs {detailReferenceData.mobileTotal.toFixed(2)}</p>
-                      <p className="text-[10px] text-muted-foreground">{currency} {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Pago Movil').reduce((s, r) => s + r.totalUsd, 0).toFixed(2)}</p>
-                    </div>
-                    <div className="p-2 rounded bg-purple-100/50 text-center">
-                      <p className="text-[10px] text-muted-foreground">Zelle</p>
-                      <p className="text-xs font-bold text-purple-700">
-                        {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Zelle').length} ops
-                      </p>
-                      <p className="text-[11px] font-semibold text-purple-600">Bs {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Zelle').reduce((s, r) => s + r.totalBs, 0).toFixed(2)}</p>
-                      <p className="text-[10px] text-muted-foreground">{currency} {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Zelle').reduce((s, r) => s + r.totalUsd, 0).toFixed(2)}</p>
-                    </div>
-                    <div className="p-2 rounded bg-amber-100/50 text-center">
-                      <p className="text-[10px] text-muted-foreground">USDT</p>
-                      <p className="text-xs font-bold text-amber-700">
-                        {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'USDT').length} ops
-                      </p>
-                      <p className="text-[11px] font-semibold text-amber-600">Bs {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'USDT').reduce((s, r) => s + r.totalBs, 0).toFixed(2)}</p>
-                      <p className="text-[10px] text-muted-foreground">{currency} {detailReferenceData.referenceDetails.filter(r => r.paymentType === 'USDT').reduce((s, r) => s + r.totalUsd, 0).toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  {/* Tabla de referencias */}
-                  <div className="overflow-x-auto max-h-48 overflow-y-auto">
-                    <table className="w-full text-[11px]">
-                      <thead className="bg-blue-100/70 sticky top-0">
-                        <tr>
-                          <th className="text-left p-1.5 font-medium">Hora</th>
-                          <th className="text-left p-1.5 font-medium">Cliente</th>
-                          <th className="text-left p-1.5 font-medium">Tipo</th>
-                          <th className="text-left p-1.5 font-medium">Referencia</th>
-                          <th className="text-right p-1.5 font-medium">Monto (Bs)</th>
-                          <th className="text-right p-1.5 font-medium">Monto ($)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detailReferenceData.referenceDetails.map((ref, idx) => (
-                          <tr key={`${ref.saleId}-${idx}`} className="border-t hover:bg-blue-50/50">
-                            <td className="p-1.5 text-[10px]">{ref.saleTime}</td>
-                            <td className="p-1.5 text-[10px] truncate max-w-[80px]">{ref.customerName}</td>
-                            <td className="p-1.5">
-                              <Badge variant="outline" className={`text-[8px] ${
-                                ref.paymentType === 'Transferencia'
-                                  ? 'bg-blue-100 text-blue-700 border-blue-200'
-                                  : ref.paymentType === 'Pago Movil'
-                                    ? 'bg-green-100 text-green-700 border-green-200'
-                                    : ref.paymentType === 'Zelle'
-                                      ? 'bg-purple-100 text-purple-700 border-purple-200'
-                                      : 'bg-amber-100 text-amber-700 border-amber-200'
-                              }`}>
-                                {ref.paymentType === 'Transferencia' ? 'Transf.' : ref.paymentType === 'Pago Movil' ? 'P.Movil' : ref.paymentType === 'Zelle' ? 'Zelle' : 'USDT'}
-                              </Badge>
-                            </td>
-                            <td className="p-1.5 font-mono text-[10px] font-semibold tracking-wide">
-                              {ref.reference}
-                            </td>
-                            <td className="p-1.5 text-right font-bold text-green-600">
-                              Bs {ref.totalBs.toFixed(2)}
-                            </td>
-                            <td className="p-1.5 text-right font-medium">
-                              {currency} {ref.totalUsd.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t-2 border-blue-300 bg-blue-100/30 font-bold">
-                          <td colSpan={4} className="p-1.5 text-right text-[10px]">
-                            Total ({detailReferenceData.referenceDetails.length} ops)
-                          </td>
-                          <td className="p-1.5 text-right text-[10px] text-green-700">
-                            Bs {detailReferenceData.referenceDetails.reduce((s, r) => s + r.totalBs, 0).toFixed(2)}
-                          </td>
-                          <td className="p-1.5 text-right text-[10px]">
-                            {currency} {detailReferenceData.referenceDetails.reduce((s, r) => s + r.totalUsd, 0).toFixed(2)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                  {(() => {
+                    const bsRefs = detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Transferencia' || r.paymentType === 'Pago Movil');
+                    const usdRefs = detailReferenceData.referenceDetails.filter(r => r.paymentType === 'Zelle' || r.paymentType === 'USDT');
+                    const bsTotal = bsRefs.reduce((s, r) => s + r.totalBs, 0);
+                    const bsTotalUsd = bsRefs.reduce((s, r) => s + r.totalUsd, 0);
+                    const usdTotal = usdRefs.reduce((s, r) => s + r.totalUsd, 0);
+                    const usdTotalBs = usdRefs.reduce((s, r) => s + r.totalBs, 0);
+                    return (<>
+                      {/* Bs ELECTRÓNICOS */}
+                      {bsRefs.length > 0 && (
+                        <div className="p-3 rounded border border-blue-500 bg-blue-50 space-y-2">
+                          <h5 className="font-bold text-xs text-blue-800 flex items-center gap-1">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-500" />
+                            Bs Electrónicos — Transferencia + Pago Movil ({bsRefs.length} ops)
+                          </h5>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="p-1.5 rounded bg-blue-100/50 text-center">
+                              <p className="text-[10px] text-muted-foreground">Transferencias</p>
+                              <p className="text-xs font-bold text-blue-700">{bsRefs.filter(r => r.paymentType === 'Transferencia').length} ops</p>
+                              <p className="text-[11px] font-semibold text-blue-600">Bs {bsRefs.filter(r => r.paymentType === 'Transferencia').reduce((s, r) => s + r.totalBs, 0).toFixed(2)}</p>
+                            </div>
+                            <div className="p-1.5 rounded bg-blue-100/50 text-center">
+                              <p className="text-[10px] text-muted-foreground">Pago Movil</p>
+                              <p className="text-xs font-bold text-blue-700">{bsRefs.filter(r => r.paymentType === 'Pago Movil').length} ops</p>
+                              <p className="text-[11px] font-semibold text-blue-600">Bs {bsRefs.filter(r => r.paymentType === 'Pago Movil').reduce((s, r) => s + r.totalBs, 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto max-h-36 overflow-y-auto">
+                            <table className="w-full text-[11px]">
+                              <thead className="bg-blue-100/70 sticky top-0">
+                                <tr>
+                                  <th className="text-left p-1.5 font-medium">Hora</th>
+                                  <th className="text-left p-1.5 font-medium">Cliente</th>
+                                  <th className="text-left p-1.5 font-medium">Tipo</th>
+                                  <th className="text-left p-1.5 font-medium">Referencia</th>
+                                  <th className="text-right p-1.5 font-medium">Monto (Bs)</th>
+                                  <th className="text-right p-1.5 font-medium">Monto ($)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {bsRefs.map((ref, idx) => (
+                                  <tr key={`bs-${ref.saleId}-${idx}`} className="border-t hover:bg-blue-100/50">
+                                    <td className="p-1.5 text-[10px]">{ref.saleTime}</td>
+                                    <td className="p-1.5 text-[10px] truncate max-w-[80px]">{ref.customerName}</td>
+                                    <td className="p-1.5">
+                                      <Badge variant="outline" className={`text-[8px] ${ref.paymentType === 'Transferencia' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-blue-200 text-blue-800 border-blue-300'}`}>
+                                        {ref.paymentType === 'Transferencia' ? 'Transf.' : 'P.Movil'}
+                                      </Badge>
+                                    </td>
+                                    <td className="p-1.5 font-mono text-[10px] font-semibold tracking-wide">{ref.reference}</td>
+                                    <td className="p-1.5 text-right font-bold text-blue-700">Bs {ref.totalBs.toFixed(2)}</td>
+                                    <td className="p-1.5 text-right font-medium">{currency} {ref.totalUsd.toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-blue-400 bg-blue-200/40 font-bold">
+                                  <td colSpan={4} className="p-1.5 text-right text-[10px]">Total Bs Electrónicos ({bsRefs.length} ops)</td>
+                                  <td className="p-1.5 text-right text-[10px] text-blue-800">Bs {bsTotal.toFixed(2)}</td>
+                                  <td className="p-1.5 text-right text-[10px]">{currency} {bsTotalUsd.toFixed(2)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                      {/* DÓLARES DIGITALES */}
+                      {usdRefs.length > 0 && (
+                        <div className="p-3 rounded border border-purple-500 bg-purple-50 space-y-2">
+                          <h5 className="font-bold text-xs text-purple-800 flex items-center gap-1">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-purple-500" />
+                            Dólares Digitales — Zelle + USDT ({usdRefs.length} ops)
+                          </h5>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="p-1.5 rounded bg-purple-100/50 text-center">
+                              <p className="text-[10px] text-muted-foreground">Zelle</p>
+                              <p className="text-xs font-bold text-purple-700">{usdRefs.filter(r => r.paymentType === 'Zelle').length} ops</p>
+                              <p className="text-[11px] font-semibold text-purple-600">${usdRefs.filter(r => r.paymentType === 'Zelle').reduce((s, r) => s + r.totalUsd, 0).toFixed(2)}</p>
+                            </div>
+                            <div className="p-1.5 rounded bg-purple-100/50 text-center">
+                              <p className="text-[10px] text-muted-foreground">USDT</p>
+                              <p className="text-xs font-bold text-purple-700">{usdRefs.filter(r => r.paymentType === 'USDT').length} ops</p>
+                              <p className="text-[11px] font-semibold text-purple-600">${usdRefs.filter(r => r.paymentType === 'USDT').reduce((s, r) => s + r.totalUsd, 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <div className="overflow-x-auto max-h-36 overflow-y-auto">
+                            <table className="w-full text-[11px]">
+                              <thead className="bg-purple-100/70 sticky top-0">
+                                <tr>
+                                  <th className="text-left p-1.5 font-medium">Hora</th>
+                                  <th className="text-left p-1.5 font-medium">Cliente</th>
+                                  <th className="text-left p-1.5 font-medium">Tipo</th>
+                                  <th className="text-left p-1.5 font-medium">Referencia</th>
+                                  <th className="text-right p-1.5 font-medium">Monto (Bs)</th>
+                                  <th className="text-right p-1.5 font-medium">Monto ($)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {usdRefs.map((ref, idx) => (
+                                  <tr key={`usd-${ref.saleId}-${idx}`} className="border-t hover:bg-purple-100/50">
+                                    <td className="p-1.5 text-[10px]">{ref.saleTime}</td>
+                                    <td className="p-1.5 text-[10px] truncate max-w-[80px]">{ref.customerName}</td>
+                                    <td className="p-1.5">
+                                      <Badge variant="outline" className={`text-[8px] ${ref.paymentType === 'Zelle' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-purple-200 text-purple-800 border-purple-300'}`}>
+                                        {ref.paymentType === 'Zelle' ? 'Zelle' : 'USDT'}
+                                      </Badge>
+                                    </td>
+                                    <td className="p-1.5 font-mono text-[10px] font-semibold tracking-wide">{ref.reference}</td>
+                                    <td className="p-1.5 text-right font-bold text-purple-700">Bs {ref.totalBs.toFixed(2)}</td>
+                                    <td className="p-1.5 text-right font-medium">{currency} {ref.totalUsd.toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-purple-400 bg-purple-200/40 font-bold">
+                                  <td colSpan={4} className="p-1.5 text-right text-[10px]">Total Dólares Digitales ({usdRefs.length} ops)</td>
+                                  <td className="p-1.5 text-right text-[10px] text-purple-800">Bs {usdTotalBs.toFixed(2)}</td>
+                                  <td className="p-1.5 text-right text-[10px]">{currency} {usdTotal.toFixed(2)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </>);
+                  })()}
                 </div>
               ) : !detailLoading && detailReferenceData ? (
                 <div className="p-3 rounded border text-center text-muted-foreground">
-                  <p className="text-xs">No hay transferencias ni pagos moviles en este cierre.</p>
+                  <p className="text-xs">No hay transferencias, pagos moviles, Zelle ni USDT en este cierre.</p>
                 </div>
               ) : null}
 
