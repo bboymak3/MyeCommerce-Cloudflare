@@ -1060,17 +1060,18 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
 
       {/* ====== ENTRADAS AGRUPADAS ====== */}
       {(() => {
-        const efectivoFisicoBs = (paymentBreakdown["efectivo"]?.totalBs || 0);
-        const efectivoFisicoBsUsd = bcvRate > 0 ? efectivoFisicoBs / bcvRate : 0;
-        const efectivoFisicoUsd = (paymentBreakdown["efectivo-usd"]?.totalBs || 0);
-        const efectivoFisicoUsdUsd = bcvRate > 0 ? efectivoFisicoUsd / bcvRate : 0;
-        const efectivoFisico = efectivoFisicoBs + efectivoFisicoUsd;
-        const bsElectronicos = (paymentBreakdown["punto-de-venta"]?.totalBs || 0) + (paymentBreakdown["transferencia"]?.totalBs || 0) + (paymentBreakdown["pago-movil"]?.totalBs || 0);
-        const bsElectronicosUsd = bcvRate > 0 ? bsElectronicos / bcvRate : 0;
-        const divisasDigitales = (paymentBreakdown["zelle"]?.totalBs || 0) + (paymentBreakdown["usdt"]?.totalBs || 0);
-        const divisasDigitalesUsd = bcvRate > 0 ? divisasDigitales / bcvRate : 0;
-        const totalEntradasBs = efectivoFisico + bsElectronicos + divisasDigitales;
-        const totalEntradasUsd = bcvRate > 0 ? totalEntradasBs / bcvRate : 0;
+        // USD methods (efectivo-usd, zelle, usdt): el totalUsd es el valor real, NO se recalcula con tasa actual
+        // Bs methods (efectivo, transferencia, pago-movil, punto-de-venta): totalBs es fijo, totalUsd se calcula con tasa al momento de la venta
+        const efectivoFisicoBs_totalBs = (paymentBreakdown["efectivo"]?.totalBs || 0);
+        const efectivoFisicoBs_totalUsd = (paymentBreakdown["efectivo"]?.totalUsd || 0);
+        const efectivoFisicoUsd_totalUsd = (paymentBreakdown["efectivo-usd"]?.totalUsd || 0);
+        const efectivoFisicoUsd_totalBs = (paymentBreakdown["efectivo-usd"]?.totalBs || 0);
+        const bsElectronicos_totalBs = (paymentBreakdown["punto-de-venta"]?.totalBs || 0) + (paymentBreakdown["transferencia"]?.totalBs || 0) + (paymentBreakdown["pago-movil"]?.totalBs || 0);
+        const bsElectronicos_totalUsd = (paymentBreakdown["punto-de-venta"]?.totalUsd || 0) + (paymentBreakdown["transferencia"]?.totalUsd || 0) + (paymentBreakdown["pago-movil"]?.totalUsd || 0);
+        const divisasDigitales_totalUsd = (paymentBreakdown["zelle"]?.totalUsd || 0) + (paymentBreakdown["usdt"]?.totalUsd || 0);
+        const divisasDigitales_totalBs = (paymentBreakdown["zelle"]?.totalBs || 0) + (paymentBreakdown["usdt"]?.totalBs || 0);
+        const totalEntradasBs = efectivoFisicoBs_totalBs + efectivoFisicoUsd_totalBs + bsElectronicos_totalBs + divisasDigitales_totalBs;
+        const totalEntradasUsd = efectivoFisicoBs_totalUsd + efectivoFisicoUsd_totalUsd + bsElectronicos_totalUsd + divisasDigitales_totalUsd;
         return (
           <Card className="border-primary/30">
             <CardHeader className="pb-2">
@@ -1086,9 +1087,9 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                   <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">Efectivo Fisico Bs</p>
                   <div className="text-xs flex justify-between bg-green-50/50 rounded px-2 py-1">
                     <span className="text-muted-foreground">Total</span>
-                    <span className="font-semibold text-green-700">Bs {efectivoFisicoBs.toFixed(2)} ({currency} {efectivoFisicoBsUsd.toFixed(2)})</span>
+                    <span className="font-semibold text-green-700">Bs {efectivoFisicoBs_totalBs.toFixed(2)} ({currency} {efectivoFisicoBs_totalUsd.toFixed(2)})</span>
                   </div>
-                  <p className="text-right text-xs font-bold text-green-700 mt-1">Subtotal: Bs {efectivoFisicoBs.toFixed(2)}</p>
+                  <p className="text-right text-xs font-bold text-green-700 mt-1">Subtotal: Bs {efectivoFisicoBs_totalBs.toFixed(2)}</p>
                 </div>
 
                 {/* EFECTIVO FISICO $ */}
@@ -1096,9 +1097,9 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                   <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">Efectivo Fisico $</p>
                   <div className="text-xs flex justify-between bg-green-50/50 rounded px-2 py-1">
                     <span className="text-muted-foreground">Total</span>
-                    <span className="font-semibold text-green-700">Bs {efectivoFisicoUsd.toFixed(2)} ({currency} {efectivoFisicoUsdUsd.toFixed(2)})</span>
+                    <span className="font-semibold text-green-700">{currency} {efectivoFisicoUsd_totalUsd.toFixed(2)} (Bs {efectivoFisicoUsd_totalBs.toFixed(2)})</span>
                   </div>
-                  <p className="text-right text-xs font-bold text-green-700 mt-1">Subtotal: Bs {efectivoFisicoUsd.toFixed(2)}</p>
+                  <p className="text-right text-xs font-bold text-green-700 mt-1">Subtotal: {currency} {efectivoFisicoUsd_totalUsd.toFixed(2)}</p>
                 </div>
 
                 {/* BS ELECTRONICOS */}
@@ -1118,7 +1119,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                       <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["pago-movil"]?.totalBs || 0).toFixed(2)}</span>
                     </div>
                   </div>
-                  <p className="text-right text-xs font-bold text-blue-700 mt-1">Subtotal: Bs {bsElectronicos.toFixed(2)} ({currency} {bsElectronicosUsd.toFixed(2)})</p>
+                  <p className="text-right text-xs font-bold text-blue-700 mt-1">Subtotal: Bs {bsElectronicos_totalBs.toFixed(2)} ({currency} {bsElectronicos_totalUsd.toFixed(2)})</p>
                 </div>
 
                 {/* DIVISAS DIGITALES */}
@@ -1134,12 +1135,12 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                       <span className="font-semibold text-purple-700">Bs {(paymentBreakdown["usdt"]?.totalBs || 0).toFixed(2)}</span>
                     </div>
                   </div>
-                  <p className="text-right text-xs font-bold text-purple-700 mt-1">Subtotal: Bs {divisasDigitales.toFixed(2)} ({currency} {divisasDigitalesUsd.toFixed(2)})</p>
+                  <p className="text-right text-xs font-bold text-purple-700 mt-1">Subtotal: {currency} {divisasDigitales_totalUsd.toFixed(2)} (Bs {divisasDigitales_totalBs.toFixed(2)})</p>
                 </div>
 
                 {/* TOTAL */}
                 <div className="border-l-4 border-l-amber-500 pl-3 bg-amber-50/50 rounded-r-lg py-2">
-                  <p className="text-sm font-bold text-amber-800">TOTAL ENTRADAS: Bs {totalEntradasBs.toFixed(2)} ({currency} {totalEntradasUsd.toFixed(2)} equivalente)</p>
+                  <p className="text-sm font-bold text-amber-800">TOTAL ENTRADAS: Bs {totalEntradasBs.toFixed(2)} | {currency} {totalEntradasUsd.toFixed(2)}</p>
                 </div>
               </div>
             </CardContent>

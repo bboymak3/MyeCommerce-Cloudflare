@@ -240,7 +240,8 @@ export default function PosTab({
   const total = subtotal + taxAmount - effectiveDiscount;
   const totalBs = total * bcvRate;
 
-  // Efectivo USD flag and vuelto calculations
+  // USD payment methods (electronic dollars: zelle, usdt)
+  const isUsdMethod = ['zelle', 'usdt', 'efectivo-usd'].includes(paymentMethod);
   const isEfectivoUsd = paymentMethod === 'efectivo-usd';
   const vuelto = !isCredit && paymentMethod === 'efectivo' ? parseFloat(cashReceived || '0') - totalBs : 0;
   const vueltoUsd = !isCredit && isEfectivoUsd ? parseFloat(cashReceivedUsd || '0') - total : 0;
@@ -932,16 +933,36 @@ export default function PosTab({
 
           {/* Resumen - MAS GRANDE */}
           <div className="space-y-2 text-lg">
-            <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">Bs {(subtotal * bcvRate).toFixed(2)}</span></div>
-            {taxRate > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%):</span><span>Bs {(taxAmount * bcvRate).toFixed(2)}</span></div>}
-            {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-Bs {(effectiveDiscount * bcvRate).toFixed(2)}</span></div>}
-            <div className="flex justify-between text-3xl font-black text-primary"><span>Total:</span><span>Bs {totalBs.toFixed(2)}</span></div>
-            <div className="flex justify-between text-base text-muted-foreground"><span>Total USD:</span><span className="font-semibold">${total.toFixed(2)}</span></div>
-            <div className="text-sm text-muted-foreground">Tasa: 1$ = {bcvRate.toFixed(2)} Bs</div>
+            {isUsdMethod ? (
+              <>
+                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div>
+                {taxRate > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%):</span><span>${taxAmount.toFixed(2)}</span></div>}
+                {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-${effectiveDiscount.toFixed(2)}</span></div>}
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">Bs {(subtotal * bcvRate).toFixed(2)}</span></div>
+                {taxRate > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%):</span><span>Bs {(taxAmount * bcvRate).toFixed(2)}</span></div>}
+                {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-Bs {(effectiveDiscount * bcvRate).toFixed(2)}</span></div>}
+              </>
+            )}
+            {isUsdMethod ? (
+              <>
+                <div className="flex justify-between text-3xl font-black text-primary"><span>Total:</span><span>${total.toFixed(2)}</span></div>
+                <div className="flex justify-between text-base text-muted-foreground"><span>Equivalente Bs:</span><span className="font-semibold">Bs {totalBs.toFixed(2)}</span></div>
+                <div className="text-sm text-muted-foreground">Tasa: 1$ = {bcvRate.toFixed(2)} Bs</div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between text-3xl font-black text-primary"><span>Total:</span><span>Bs {totalBs.toFixed(2)}</span></div>
+                <div className="flex justify-between text-base text-muted-foreground"><span>Total USD:</span><span className="font-semibold">${total.toFixed(2)}</span></div>
+                <div className="text-sm text-muted-foreground">Tasa: 1$ = {bcvRate.toFixed(2)} Bs</div>
+              </>
+            )}
           </div>
 
           <Button className="w-full mt-2 text-xl py-6 font-black tracking-wide rounded-xl" size="lg" onClick={completeSale} disabled={cart.length === 0}>
-          {isCredit ? 'Registrar Credito $' + total.toFixed(2) : isEfectivoUsd ? 'Cobrar $ ' + total.toFixed(2) : 'Cobrar Bs ' + totalBs.toFixed(2)}
+          {isCredit ? 'Registrar Credito $' + total.toFixed(2) : isUsdMethod ? 'Cobrar $ ' + total.toFixed(2) : 'Cobrar Bs ' + totalBs.toFixed(2)}
           </Button>
         </CardContent>
       </Card>
