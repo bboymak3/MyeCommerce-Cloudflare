@@ -118,6 +118,7 @@ function rebuildLegacyBreakdown(closing: any): Record<string, { usd: number; bs:
   // Reconstruir desde columnas antiguas
   const b: Record<string, { usd: number; bs: number; count: number }> = {};
   if (closing.cashBs > 0 || closing.cashUsd > 0) b.efectivo = { usd: closing.cashUsd, bs: closing.cashBs, count: 0 };
+  if ((closing as any).efectivoUsdBs > 0 || (closing as any).efectivoUsdUsd > 0) b['efectivo-usd'] = { usd: (closing as any).efectivoUsdUsd, bs: (closing as any).efectivoUsdBs, count: 0 };
   if (closing.cardBs > 0 || closing.cardUsd > 0) b['punto-de-venta'] = { usd: closing.cardUsd, bs: closing.cardBs, count: 0 };
   if (closing.transferBs > 0 || closing.transferUsd > 0) b.transferencia = { usd: closing.transferUsd, bs: closing.transferBs, count: 0 };
   if (closing.mobileBs > 0 || closing.mobileUsd > 0) b['pago-movil'] = { usd: closing.mobileUsd, bs: closing.mobileBs, count: 0 };

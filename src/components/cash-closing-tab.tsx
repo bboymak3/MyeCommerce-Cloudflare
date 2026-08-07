@@ -308,9 +308,11 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
         <thead><tr><th>Metodo</th><th>Total $</th><th>Total Bs</th></tr></thead>
         <tbody>
           ${c.cashBs > 0 ? `<tr><td>Efectivo</td><td>$ ${c.cashUsd.toFixed(2)}</td><td>Bs ${c.cashBs.toFixed(2)}</td></tr>` : ''}
+          ${(c.efectivoUsdUsd || 0) > 0 ? `<tr><td>Efectivo ($)</td><td>$ ${(c.efectivoUsdUsd || 0).toFixed(2)}</td><td>Bs ${(c.efectivoUsdBs || 0).toFixed(2)}</td></tr>` : ''}
           ${c.checkBs > 0 ? `<tr><td>Cheque</td><td>$ ${c.checkUsd.toFixed(2)}</td><td>Bs ${c.checkBs.toFixed(2)}</td></tr>` : ''}
           ${c.transferBs > 0 ? `<tr><td>Transferencia</td><td>$ ${c.transferUsd.toFixed(2)}</td><td>Bs ${c.transferBs.toFixed(2)}</td></tr>` : ''}
           ${c.mobileBs > 0 ? `<tr><td>Pago Movil</td><td>$ ${c.mobileUsd.toFixed(2)}</td><td>Bs ${c.mobileBs.toFixed(2)}</td></tr>` : ''}
+          ${c.cardBs > 0 ? `<tr><td>Punto de Venta</td><td>$ ${c.cardUsd.toFixed(2)}</td><td>Bs ${c.cardBs.toFixed(2)}</td></tr>` : ''}
           ${c.zelleBs > 0 ? `<tr><td>Zelle ($)</td><td style="text-align:right">$ ${c.zelleUsd.toFixed(2)}</td><td style="text-align:right">Bs ${c.zelleBs.toFixed(2)}</td></tr>` : ''}
           ${c.usdtBs > 0 ? `<tr><td>USDT ($)</td><td style="text-align:right">$ ${c.usdtUsd.toFixed(2)}</td><td style="text-align:right">Bs ${c.usdtBs.toFixed(2)}</td></tr>` : ''}
           ${c.creditSalesBs > 0 ? `<tr><td>Crédito</td><td>$ ${c.creditSalesUsd.toFixed(2)}</td><td>Bs ${c.creditSalesBs.toFixed(2)}</td></tr>` : ''}
