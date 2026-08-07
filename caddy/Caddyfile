@@ -1,0 +1,15 @@
+# Caddyfile - MyeCommerce POS
+# HTTPS con certificado CA interno de Caddy
+# El navegador mostrara el candado verde (sin advertencias)
+# porque la CA de Caddy se instala en Windows con 'caddy trust'
+
+# Redirigir HTTP a HTTPS
+http://myecommerce.ve {
+    redir https://myecommerce.ve{uri}
+}
+
+# Servir HTTPS con certificado interno
+myecommerce.ve {
+    tls internal
+    reverse_proxy localhost:3000
+}

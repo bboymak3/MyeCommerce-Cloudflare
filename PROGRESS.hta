@@ -1,0 +1,77 @@
+<html><head><title>MyeCommerce POS - Instalando</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;background:#f0f2f5;padding:20px;}
+.box{background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:20px;max-width:500px;margin:0 auto;box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+.title{font-size:15px;font-weight:700;color:#1f2937;margin-bottom:14px;}
+.pct-box{background:#e5e7eb;border-radius:6px;height:22px;overflow:hidden;margin-bottom:12px;}
+.pct-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#2563eb);border-radius:6px;transition:width 0.4s;width:0%;}
+.step-info{color:#6b7280;font-size:11px;margin-bottom:6px;}
+.msg{color:#111827;font-size:13px;font-weight:600;margin-bottom:8px;min-height:18px;}
+.detail{color:#9ca3af;font-size:11px;min-height:14px;white-space:pre-wrap;word-break:break-all;max-height:60px;overflow-y:auto;}
+</style>
+<script language='VBScript'>
+Dim timerID
+timerID = setInterval("updateStatus", 500)
+
+Sub updateStatus()
+  Set fso = CreateObject("Scripting.FileSystemObject")
+  statusFile = CreateObject("WScript.Shell").ExpandEnvironmentStrings("%TEMP%") & "\mepos_status.txt"
+  If Not fso.FileExists(statusFile) Then Exit Sub
+  Set f = fso.OpenTextFile(statusFile, 1)
+  lineData = f.ReadAll
+  f.Close
+  ' Parse: STEP|TOTAL|MSG|DETAIL|PCT|DONE|ERRMSG
+  parts = Split(lineData, "|")
+  If UBound(parts) < 5 Then Exit Sub
+  stepN = parts(0)
+  totalN = parts(1)
+  msgTxt = parts(2)
+  detailTxt = parts(3)
+  pctVal = parts(4)
+  doneVal = ""
+  errMsg = ""
+  If UBound(parts) >= 6 Then doneVal = parts(5)
+  If UBound(parts) >= 7 Then errMsg = parts(6)
+
+  document.getElementById("stepInfo").innerText = "Paso " & stepN & " de " & totalN
+  document.getElementById("msg").innerText = msgTxt
+  document.getElementById("detail").innerText = detailTxt
+  document.getElementById("pctFill").style.width = pctVal & "%"
+  document.getElementById("pctText").innerText = pctVal & "%"
+
+  If errMsg <> "" Then
+    document.getElementById("detail").style.color = "#dc2626"
+    document.getElementById("msg").style.color = "#dc2626"
+  End If
+
+  If doneVal = "OK" Then
+    clearInterval timerID
+    document.getElementById("msg").innerText = "INSTALACION COMPLETADA"
+    document.getElementById("msg").style.color = "#16a34a"
+    document.getElementById("pctFill").style.width = "100%"
+    document.getElementById("pctFill").style.background = "#22c55e"
+    document.getElementById("pctText").innerText = "100%"
+    document.getElementById("stepInfo").innerText = "Listo"
+    document.getElementById("detail").innerText = "Puede cerrar esta ventana."
+    document.getElementById("detail").style.color = "#16a34a"
+  ElseIf doneVal = "FAIL" Then
+    clearInterval timerID
+    document.getElementById("msg").innerText = "ERROR EN LA INSTALACION"
+    document.getElementById("msg").style.color = "#dc2626"
+    document.getElementById("pctFill").style.background = "#ef4444"
+    document.getElementById("detail").innerText = errMsg
+    document.getElementById("detail").style.color = "#dc2626"
+  End If
+End Sub
+</script>
+</head><body>
+<div class="box">
+  <div class="title">MyeCommerce POS v2.9.16.5</div>
+  <div class="pct-box"><div class="pct-fill" id="pctFill"></div></div>
+  <div style="text-align:center;font-size:12px;color:#6b7280;margin-bottom:10px;"><span id="pctText">0%</span></div>
+  <div class="step-info" id="stepInfo">Iniciando...</div>
+  <div class="msg" id="msg">Preparando instalacion...</div>
+  <div class="detail" id="detail"></div>
+</div>
+</body></html>

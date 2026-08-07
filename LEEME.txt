@@ -1,0 +1,346 @@
+=============================================================
+MyeCommerce POS v2.9.16 - Guia de Instalacion Completa
+=============================================================
+
+CONTENIDO
+---------
+1. REQUISITOS
+2. INSTALACION EN UNA PC NUEVA (paso a paso)
+3. QUE INSTALA CADA ARCHIVO
+4. ARCHIVOS DEL SISTEMA
+5. INICIAR EL SISTEMA
+6. DETENER EL SISTEMA
+7. IMPRESORA TERMICA (Printer-Agent)
+8. DOMINIO LOCAL (Caddy)
+9. ACCESO DESDE TELEFONOS Y TABLETS
+10. INICIO AUTOMATICO CON WINDOWS
+11. RESPALDAR BASE DE DATOS
+12. SOLUCION DE PROBLEMAS
+
+
+=============================================================
+1. REQUISITOS
+=============================================================
+
+- Windows 10 o superior (64 bits)
+- Node.js 20 LTS instalado
+  Descarga: https://nodejs.org
+  (Elija la opcion LTS, la que dice "Recommended for Most Users")
+- Conexion a internet SOLO para la primera instalacion
+  Despues de instalar, el sistema funciona 100% sin internet
+- Impresora termica conectada por USB (opcional, para imprimir tickets)
+
+
+=============================================================
+2. INSTALACION EN UNA PC NUEVA (paso a paso)
+=============================================================
+
+PASO 1 - Instalar Node.js
+--------------------------
+  a) Abra el navegador y vaya a: https://nodejs.org
+  b) Descargue la version 20.x LTS
+  c) Ejecute el instalador descargado
+  d) Siga los pasos por defecto (Next, Next, Install, Finish)
+  e) Reinicie la PC si se lo pide
+
+PASO 2 - Descargar MyeCommerce POS
+-----------------------------------
+  a) Descargue el ZIP desde:
+     https://github.com/csglider/myecommerce-pos/archive/refs/heads/main.zip
+  b) Descomprimalo en una carpeta fija, por ejemplo:
+     C:\MyeCommercePOS
+  c) IMPORTANTE: No use carpetas con espacios ni caracteres especiales
+     MAL:  C:\Mis Documentos\MyeCommerce
+     BIEN: C:\MyeCommercePOS
+
+PASO 3 - Ejecutar la instalacion
+-------------------------------
+  a) Abra la carpeta donde descomprimio el sistema
+  b) Click DERECHO sobre INSTALAR-LIMPIO.vbs
+  c) Seleccione "Ejecutar como administrador"
+  d) Espere a que termine (tarda 3-5 minutos la primera vez)
+  e) El instalador hace todo automaticamente:
+     - Instala dependencias del sistema
+     - Crea la base de datos
+     - Instala el agente de impresion
+     - Descarga Caddy para el dominio local
+     - Configura el dominio myecommerce.ve
+     - Compila para produccion
+     - Crea un acceso directo en el escritorio
+
+PASO 4 - Usar el sistema
+-------------------------
+  a) Haga doble clic en "MyeCommerce POS" del escritorio
+  b) Se abrira el navegador automaticamente
+  c) URL: https://myecommerce.ve (con candado verde)
+  d) Usuario: admin   Clave: admin
+  e) Cambie la clave inmediatamente despues del primer ingreso
+
+
+=============================================================
+3. QUE INSTALA CADA ARCHIVO
+=============================================================
+
+ARCHIVOS PRINCIPALES (en la raiz del sistema):
+
+INSTALAR-LIMPIO.vbs
+  - Es el instalador completo. Ejecutar una sola vez.
+  - Hace TODO: dependencias, base de datos, printer-agent, caddy,
+    compilacion, acceso directo.
+  - Ejecutar como Administrador.
+  - Muestra ventanas de progreso paso a paso.
+
+INICIAR-TODO-OCULTO.vbs
+  - Inicia los 3 servicios SIN abrir ventanas CMD.
+  - Es el archivo que usa el acceso directo del escritorio.
+  - Inicia: Printer-Agent + Caddy + Next.js
+  - Espera a que Next.js este listo y abre el navegador.
+
+INICIAR-TODO.bat
+  - Igual que el VBS pero con ventanas CMD visibles.
+  - Usar SOLO para ver errores o hacer debug.
+
+DETENER-TODO.bat
+  - Detiene los 3 servicios (Node.js + Caddy).
+  - Usar antes de apagar la PC o reinstalar.
+
+RESPALDAR-BD.bat
+  - Crea un ZIP con la base de datos completa.
+  - Se guarda en la carpeta "respaldos".
+
+LEEME.txt
+  - Este archivo que estas leyendo.
+
+
+=============================================================
+4. ARCHIVOS DEL SISTEMA
+=============================================================
+
+Estructura de carpetas:
+
+MyeCommercePOS/
+  |
+  |--- INSTALAR-LIMPIO.vbs          (instalador completo)
+  |--- INICIAR-TODO-OCULTO.vbs     (iniciar sin ventanas)
+  |--- INICIAR-TODO.bat            (iniciar con ventanas)
+  |--- DETENER-TODO.bat            (detener servicios)
+  |--- RESPALDAR-BD.bat            (respaldar base de datos)
+  |--- LEEME.txt                  (esta guia)
+  |--- package.json
+  |--- next.config.js
+  |--- tailwind.config.ts
+  |--- tsconfig.json
+  |
+  |--- src/                       (codigo fuente de la app)
+  |    |--- app/                   (paginas y API routes)
+  |    |--- components/            (componentes React)
+  |    |--- lib/                   (funciones: tickets, ESC/POS, etc)
+  |
+  |--- prisma/
+  |    |--- schema.prisma          (estructura de la base de datos)
+  |    |--- dev.db                 (base de datos SQLite)
+  |
+  |--- printer-agent/             (agente de impresion termica)
+  |    |--- agent.js               (servidor HTTP puerto 9100)
+  |    |--- package.json
+  |    |--- INICIAR-AGENTE-OCULTO.vbs
+  |
+  |--- caddy/                     (proxy inverso para dominio local)
+  |    |--- caddy.exe              (se descarga automaticamente)
+  |    |--- Caddyfile              (configuracion del proxy)
+  |    |--- INICIAR-CADDY-OCULTO.vbs
+  |
+  |--- public/                    (archivos estaticos)
+  |--- respaldos/                 (aqui se guardan los respaldos)
+
+
+=============================================================
+5. INICIAR EL SISTEMA
+=============================================================
+
+FORMA NORMAL (recomendada):
+  - Doble clic en "MyeCommerce POS" del escritorio
+  - O doble clic en INICIAR-TODO-OCULTO.vbs
+  - No abre ventanas CMD, inicia todo en segundo plano
+  - Abre el navegador automaticamente
+
+FORMA DEBUG (para ver errores):
+  - Doble clic en INICIAR-TODO.bat
+  - Abre ventanas CMD donde puede ver si hay errores
+  - Usar solo si algo no funciona
+
+QUE SE INICIA:
+  1. Printer-Agent en puerto 9100 (impresion termica)
+  2. Caddy en puerto 443 HTTPS (proxy: myecommerce.ve -> localhost:3000)
+  3. Next.js en puerto 3000 (la aplicacion web)
+
+URLs DE ACCESO:
+  - https://myecommerce.ve    (si Caddy esta activo, requiere admin)
+  - http://localhost:3000     (alternativa sin HTTPS)
+
+
+=============================================================
+6. DETENER EL SISTEMA
+=============================================================
+
+  - Doble clic en DETENER-TODO.bat
+  - O simplemente apague la PC (se detienen solos)
+
+
+=============================================================
+7. IMPRESORA TERMICA (Printer-Agent)
+=============================================================
+
+QUE ES:
+  El Printer-Agent es un pequeno servidor que recibe comandos
+  de impresion desde el navegador y los envia directamente a
+  la impresora termica por USB.
+
+COMO VERIFICAR QUE FUNCIONA:
+  1. Inicie el sistema (doble clic en el acceso directo)
+  2. Abra el navegador y vaya a: http://localhost:9100/status
+  3. Debe mostrar: {"status":"online", ...}
+  4. Si no muestra nada, el agente no esta corriendo
+
+CONFIGURAR EN LA APP:
+  1. Abra https://myecommerce.ve (o localhost:3000)
+  2. Vaya a Configuracion (el icono de engranaje)
+  3. Busque la seccion "Agente de Impresion ESC/POS"
+  4. Active el toggle "Usar agente ESC/POS"
+  5. La direccion debe ser: http://localhost:9100
+  6. Haga clic en "Probar conexion"
+  7. Debe aparecer verde: "Agente conectado"
+
+SI NO CONECTA:
+  - Verifique que Node.js esta instalado
+  - Abra una terminal CMD y ejecute:
+    cd printer-agent
+    node agent.js
+  - Si hay errores, instale dependencias:
+    npm install
+
+IMPRESORAS COMPATIBLES:
+  - Cualquier impresora termica POS de 58mm o 80mm
+  - Las que usan chip CH340, CP210, Prolific
+  - Marcas: Xprinter, MTP, Goojprt, POS-58, POS-80, etc.
+
+
+=============================================================
+8. DOMINIO LOCAL (Caddy)
+=============================================================
+
+QUE HACE:
+  Caddy es un servidor web que actua como proxy.
+  Hace que en vez de escribir http://localhost:3000
+  pueda escribir simplemente https://myecommerce.ve
+  con certificado SSL valido (candado verde en el navegador).
+
+REQUISITOS:
+  - Ejecutar como Administrador (para usar el puerto 443)
+  - El instalador INSTALAR-LIMPIO.vbs lo configura automaticamente
+
+QUE CONFIGURA:
+  1. Agrega "127.0.0.1  myecommerce.ve" al archivo hosts de Windows
+  2. Descarga caddy.exe a la carpeta caddy/
+  3. Instala la CA de Caddy en Windows (para confiar en el SSL)
+  4. Caddy redirige HTTPS (puerto 443) al puerto 3000
+
+SI CADDY NO SE DESCARGO:
+  1. Vaya a: https://caddyserver.com/download
+  2. Descargue la version Windows AMD64
+  3. Copie caddy.exe a la carpeta caddy/ del sistema
+
+SI NO TIENE PERMISOS DE ADMIN:
+  - El sistema seguira funcionando en http://localhost:3000
+  - Caddy no podra usar el puerto 80 sin administrador
+
+
+=============================================================
+9. ACCESO DESDE TELEFONOS Y TABLETS
+=============================================================
+
+REQUISITOS:
+  - El servidor PC y el telefono deben estar en la misma red WiFi
+
+PASOS:
+  1. Necesita conocer la IP del servidor PC
+     - Abra CMD en el servidor y escriba: ipconfig
+     - Busque la direccion IPv4, ej: 192.168.1.100
+  2. En el telefono/tablet abra el navegador:
+     http://192.168.1.100:3000
+  3. Debe aparecer la pantalla de login de MyeCommerce
+
+NOTA: El dominio myecommerce.ve solo funciona en la PC servidor.
+Desde el telefono use la IP directamente.
+
+
+=============================================================
+10. INICIO AUTOMATICO CON WINDOWS
+=============================================================
+
+Para que el sistema inicie automaticamente al encender la PC:
+
+  1. Presione en el teclado: Windows + R
+  2. Escriba: shell:startup
+  3. Presione Enter (se abre una carpeta)
+  4. En esa carpeta, cree un acceso directo que apunte a:
+     INICIAR-TODO-OCULTO.vbs
+     (ubicado en la carpeta del sistema)
+  5. Listo, cada vez que encienda la PC el sistema iniciara solo
+
+
+=============================================================
+11. RESPALDAR BASE DE DATOS
+=============================================================
+
+  1. Doble clic en RESPALDAR-BD.bat
+  2. Se crea un archivo ZIP en la carpeta "respaldos"
+  3. El ZIP contiene la base de datos completa:
+     - Productos y categorias
+     - Clientes
+     - Ventas y devoluciones
+     - Usuarios y configuracion
+
+PARA RESTAURAR:
+  1. Detenga el sistema (DETENER-TODO.bat)
+  2. Descomprima el ZIP del respaldo
+  3. Copie dev.db a la carpeta prisma/ (reemplaza la actual)
+  4. Inicie el sistema normalmente
+
+
+=============================================================
+12. SOLUCION DE PROBLEMAS
+=============================================================
+
+PROBLEMA: El sistema no inicia / "Node.js no esta instalado"
+SOLUCION: Instale Node.js 20 LTS desde https://nodejs.org
+         Reinicie la PC despues de instalar.
+
+PROBLEMA: No abre https://myecommerce.ve
+SOLUCION: Use http://localhost:3000 mientras tanto.
+         Ejecute INSTALAR-LIMPIO.vbs como Administrador.
+         Verifique que ejecuto como Administrador (requerido para SSL).
+
+PROBLEMA: La impresora no imprime
+SOLUCION: 1. Vaya a http://localhost:9100/status en el navegador
+         2. Si no responde, el agente no esta corriendo
+         3. Abra CMD y ejecute:
+            cd printer-agent && node agent.js
+         4. Verifique que la impresora este conectada por USB
+         5. En Configuracion de la app, pruebe la conexion
+
+PROBLEMA: Desde el telefono no puedo acceder
+SOLUCION: 1. Verifique que telefono y PC estan en la misma WiFi
+         2. Use la IP del PC, no myecommerce.ve
+         3. Ejemplo: http://192.168.1.100:3000
+
+PROBLEMA: Quiero reinstalar todo desde cero
+SOLUCION: 1. Haga un respaldo (RESPALDAR-BD.bat)
+         2. Ejecute INSTALAR-LIMPIO.vbs como Administrador
+         3. Esto borra todo e instala limpio
+
+
+=============================================================
+MyeCommerce POS v2.9.16
+Sistema Punto de Venta Venezuela
+=============================================================

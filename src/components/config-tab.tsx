@@ -1,0 +1,962 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { getPreset, calcMaxChars } from "@/lib/ticket-printer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+
+interface Settings {
+  id: string;
+  storeName: string;
+  storeAddress: string;
+  storePhone: string;
+  storeRif: string;
+  bcvRate: number;
+  taxRate: number;
+  currency: string;
+  allowZeroStock: boolean;
+  enableDiscount: boolean;
+  maxDiscountPct: number;
+  theme: string;
+  ticketFontSize: number;
+  ticketFontFamily: string;
+  ticketHeaderMsg: string;
+  ticketFooterMsg: string;
+  ticketShowPhone: boolean;
+  ticketShowSeller: boolean;
+  ticketShowExchange: boolean;
+  ticketCurrencyMode: string;
+  ticketShowSlogan: boolean;
+  ticketBold: boolean;
+  ticketPaperWidth: string;
+  ticketMarginLeft: number;
+  ticketMarginRight: number;
+  ticketUseAgent: boolean;
+  ticketAgentUrl: string;
+}
+
+interface BackupStatus {
+  status: string;
+  backups: string[];
+  total: number;
+}
+
+interface ConfigTabProps {
+  settings: Settings;
+  onSettingsChange: (settings: Settings) => void;
+  licenseFeatures?: {
+    autoBackup: boolean;
+    exportImport: boolean;
+    allowZeroStockConfig: boolean;
+    productDiscount: boolean;
+  };
+}
+
+export default function ConfigTab({ settings, onSettingsChange, licenseFeatures }: ConfigTabProps) {
+  const [storeName, setStoreName] = useState(settings.storeName);
+  const [storeAddress, setStoreAddress] = useState(settings.storeAddress || "");
+  const [storePhone, setStorePhone] = useState(settings.storePhone || "");
+  const [storeRif, setStoreRif] = useState(settings.storeRif || "");
+  const [bcvRate, setBcvRate] = useState((settings.bcvRate ?? 36.5).toString());
+  const [taxRate, setTaxRate] = useState(settings.taxRate.toString());
+  const [currency, setCurrency] = useState(settings.currency);
+  const [allowZeroStock, setAllowZeroStock] = useState(settings.allowZeroStock || false);
+  const [enableDiscount, setEnableDiscount] = useState(settings.enableDiscount || false);
+  const [maxDiscountPct, setMaxDiscountPct] = useState((settings.maxDiscountPct || 20).toString());
+  const [saving, setSaving] = useState(false);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [theme, setTheme] = useState(settings.theme || 'blue');
+  // Ticket settings
+  const [ticketFontSize, setTicketFontSize] = useState(() => {
+    const preset = getPreset(settings.ticketPaperWidth || '58mm');
+    const val = settings.ticketFontSize || preset.baseFontSize;
+    return Math.min(val, preset.maxFontSize);
+  });
+  const [ticketFontFamily, setTicketFontFamily] = useState(settings.ticketFontFamily || 'monospace');
+  const [ticketHeaderMsg, setTicketHeaderMsg] = useState(settings.ticketHeaderMsg || '');
+  const [ticketFooterMsg, setTicketFooterMsg] = useState(settings.ticketFooterMsg || 'Gracias por su compra!');
+  const [ticketShowPhone, setTicketShowPhone] = useState(settings.ticketShowPhone !== false);
+  const [ticketShowSeller, setTicketShowSeller] = useState(settings.ticketShowSeller !== false);
+  const [ticketShowExchange, setTicketShowExchange] = useState(settings.ticketShowExchange !== false);
+  const [ticketCurrencyMode, setTicketCurrencyMode] = useState(settings.ticketCurrencyMode || "dual");
+  const [ticketShowSlogan, setTicketShowSlogan] = useState(settings.ticketShowSlogan === true);
+  const [ticketBold, setTicketBold] = useState(settings.ticketBold !== false);
+  const [ticketPaperWidth, setTicketPaperWidth] = useState(settings.ticketPaperWidth || '58mm');
+  const [ticketMarginLeft, setTicketMarginLeft] = useState(settings.ticketMarginLeft ?? 0);
+  const [ticketMarginRight, setTicketMarginRight] = useState(settings.ticketMarginRight ?? 0);
+  const [ticketUseAgent, setTicketUseAgent] = useState(settings.ticketUseAgent !== false);
+  const [ticketAgentUrl, setTicketAgentUrl] = useState(settings.ticketAgentUrl || 'http://localhost:9100');
+  const [agentStatus, setAgentStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
+  const [agentInfo, setAgentInfo] = useState<any>(null);
+
+  // Sync theme from settings
+  useEffect(() => {
+    setTheme(settings.theme || 'blue');
+  }, [settings.theme]);
+
+  // Auto-clamp fontSize when paper width changes
+  useEffect(() => {
+    const preset = getPreset(ticketPaperWidth);
+    if (ticketFontSize > preset.maxFontSize) {
+      setTicketFontSize(preset.maxFontSize);
+    }
+  }, [ticketPaperWidth]);
+
+  // Check agent status on mount and when URL changes
+  const checkAgent = async () => {
+    setAgentStatus('unknown');
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch('/api/print-agent', {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        setAgentStatus('online');
+        setAgentInfo(data);
+      } else {
+        setAgentStatus('offline');
+        setAgentInfo(null);
+      }
+    } catch {
+      setAgentStatus('offline');
+      setAgentInfo(null);
+    }
+  };
+
+  useEffect(() => {
+    if (ticketUseAgent) checkAgent();
+  }, [ticketUseAgent, ticketAgentUrl]);
+
+  const canAutoBackup = licenseFeatures?.autoBackup || false;
+  const canExportImport = licenseFeatures?.exportImport || false;
+  const canZeroStock = licenseFeatures?.allowZeroStockConfig || false;
+  const canDiscount = licenseFeatures?.productDiscount || false;
+
+  const saveSettings = async () => {
+    setSaving(true);
+    try {
+      const payload: any = {
+        storeName,
+        bcvRate: parseFloat(bcvRate),
+        taxRate: parseFloat(taxRate || "0"),
+        currency,
+        storeAddress,
+        storePhone,
+        storeRif,
+        allowZeroStock,
+        enableDiscount,
+        maxDiscountPct: parseInt(maxDiscountPct) || 20,
+        theme: theme || 'blue',
+        ticketFontSize,
+        ticketFontFamily,
+        ticketHeaderMsg,
+        ticketFooterMsg,
+        ticketShowPhone,
+        ticketShowSeller,
+        ticketShowExchange,
+        ticketCurrencyMode,
+        ticketShowSlogan,
+        ticketBold,
+        ticketPaperWidth,
+        ticketMarginLeft: parseFloat(String(ticketMarginLeft)),
+        ticketMarginRight: parseFloat(String(ticketMarginRight)),
+        ticketUseAgent,
+        ticketAgentUrl: ticketAgentUrl.replace(/\/+$/, ''),
+      };
+
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      onSettingsChange(data);
+      toast.success("Configuracion guardada");
+    } catch (error: any) {
+      toast.error(error.message || "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadBackupStatus = async () => {
+    try {
+      const res = await fetch("/api/backup/auto");
+      const data = await res.json();
+      setBackupStatus(data);
+    } catch {
+      toast.error("Error al obtener estado de respaldos");
+    }
+  };
+
+  const forceBackup = async () => {
+    try {
+      const res = await fetch("/api/backup/auto", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      toast.success("Respaldo creado: " + data.filename);
+      loadBackupStatus();
+    } catch (error: any) {
+      toast.error(error.message || "Error al forzar respaldo");
+    }
+  };
+
+  const exportData = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/backup");
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `myecommerce_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Datos exportados");
+    } catch {
+      toast.error("Error al exportar");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const importData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm("Restaurar datos desde archivo? Esto reemplazara TODOS los datos actuales.")) {
+      e.target.value = "";
+      return;
+    }
+
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const res = await fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error);
+      toast.success("Datos restaurados correctamente. Recargue la pagina.");
+      setTimeout(() => window.location.reload(), 2000);
+    } catch (error: any) {
+      toast.error(error.message || "Error al importar datos");
+    } finally {
+      setImporting(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* ====== Paleta de Colores ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
+            Paleta de Colores
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Seleccione el color principal de su sistema. El cambio se aplicara inmediatamente a toda la interfaz.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { id: 'blue', name: 'Azul', color: '#3b82f6', desc: 'Clasico y profesional' },
+              { id: 'green', name: 'Verde', color: '#10b981', desc: 'Fresco y natural' },
+              { id: 'red', name: 'Rojo', color: '#ef4444', desc: 'Vibrante y energico' },
+              { id: 'purple', name: 'Purpura', color: '#8b5cf6', desc: 'Elegante y moderno' },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setTheme(t.id);
+                  document.documentElement.setAttribute('data-theme', t.id);
+                }}
+                className={`relative p-4 rounded-xl border-2 text-center transition-all hover:scale-[1.02] ${
+                  theme === t.id
+                    ? 'border-current shadow-lg scale-[1.02]'
+                    : 'border-muted hover:border-current/30'
+                }`}
+                style={{ color: t.color, borderColor: theme === t.id ? t.color : undefined }}
+              >
+                <div className="w-10 h-10 rounded-full mx-auto mb-2 shadow-md" style={{ backgroundColor: t.color }} />
+                <span className="text-sm font-medium block" style={{ color: theme === t.id ? t.color : undefined }}>
+                  {t.name}
+                </span>
+                <span className="text-[10px] text-muted-foreground block">{t.desc}</span>
+                {theme === t.id && (
+                  <div className="absolute top-1.5 right-1.5">
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ====== Configuracion de la Tienda ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Configuracion de la Tienda</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label>Nombre de la Tienda</Label>
+            <Input
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              placeholder="Nombre de tu negocio"
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label>RIF / CI</Label>
+              <Input
+                value={storeRif}
+                onChange={(e) => setStoreRif(e.target.value)}
+                placeholder="J-00000000-0"
+              />
+            </div>
+            <div>
+              <Label>Telefono</Label>
+              <Input
+                value={storePhone}
+                onChange={(e) => setStorePhone(e.target.value)}
+                placeholder="+58 412-1234567"
+              />
+            </div>
+            <div>
+              <Label>Direccion</Label>
+              <Input
+                value={storeAddress}
+                onChange={(e) => setStoreAddress(e.target.value)}
+                placeholder="Direccion del local"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label>Tasa BCV (1 USD = ? Bs)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={bcvRate}
+                onChange={(e) => setBcvRate(e.target.value)}
+                placeholder="36.50"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Tasa actualizada del Banco Central de Venezuela
+              </p>
+            </div>
+            <div>
+              <Label>Impuesto IVA (%)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={taxRate}
+                onChange={(e) => setTaxRate(e.target.value)}
+                placeholder="0"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                0% si no aplica IVA
+              </p>
+            </div>
+          </div>
+          <div>
+            <Label>Moneda Principal</Label>
+            <select
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value)}
+              className="flex h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR</option>
+            </select>
+          </div>
+          <Button onClick={saveSettings} disabled={saving}>
+            {saving ? "Guardando..." : "Guardar Configuracion"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ====== Configuracion de Ventas ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Configuracion de Ventas</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Toggle: Venta con Stock en 0 */}
+          <div className={`p-4 rounded-lg border ${canZeroStock ? "bg-background" : "bg-muted/50 opacity-70"}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label className="font-medium">Permitir venta con stock en 0</Label>
+                  {!canZeroStock && (
+                    <Badge variant="destructive" className="text-[8px]">BASICA+</Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Al activar esta opcion, se permitira facturar productos incluso cuando su stock sea 0 o negativo.
+                  Si esta desactivada, el sistema bloqueara la venta de productos sin stock disponible.
+                </p>
+              </div>
+              <label className={`relative inline-flex items-center cursor-pointer ${!canZeroStock ? 'pointer-events-none' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={allowZeroStock}
+                  onChange={(e) => setAllowZeroStock(e.target.checked)}
+                  disabled={!canZeroStock}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+              </label>
+            </div>
+            {allowZeroStock && (
+              <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded text-xs text-orange-800">
+                <span className="font-semibold">&#9888; Precaucion:</span> El stock de los productos podria quedar en negativo.
+                Active esta opcion solo si maneja pedidos o entregas futuras.
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          {/* Toggle: Descuentos */}
+          <div className={`p-4 rounded-lg border ${canDiscount ? "bg-background" : "bg-muted/50 opacity-70"}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label className="font-medium">Permitir descuentos en ventas</Label>
+                  {!canDiscount && (
+                    <Badge variant="destructive" className="text-[8px]">BASICA+</Badge>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Permite a los cajeros aplicar descuentos en dolares a las ventas.
+                  Puede limitar el porcentaje maximo de descuento permitido.
+                </p>
+              </div>
+              <label className={`relative inline-flex items-center cursor-pointer ${!canDiscount ? 'pointer-events-none' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={enableDiscount}
+                  onChange={(e) => setEnableDiscount(e.target.checked)}
+                  disabled={!canDiscount}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+              </label>
+            </div>
+            {enableDiscount && canDiscount && (
+              <div className="mt-3 flex items-center gap-3">
+                <Label className="text-sm whitespace-nowrap">Descuento maximo (%):</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={maxDiscountPct}
+                  onChange={(e) => setMaxDiscountPct(e.target.value)}
+                  className="w-24 h-8 text-sm"
+                />
+                <span className="text-xs text-muted-foreground">
+                  El cajero no podra aplicar mas del {maxDiscountPct}% de descuento
+                </span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ====== Configuracion de Ticket / Impresora ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+            Configuracion de Ticket
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Personalice el formato del ticket de venta que se imprime en la impresora termica. Los cambios se aplicaran en el proximo ticket generado.
+          </p>
+
+          {/* Tamano y tipo de letra */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <Label>Ancho de Papel</Label>
+              <select
+                value={ticketPaperWidth}
+                onChange={(e) => setTicketPaperWidth(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="80mm">80mm (Ticket estandar)</option>
+                <option value="58mm">58mm (Ticket pequeno)</option>
+                <option value="57mm">57mm (Ticket pequeño - POS moviles)</option>
+                <option value="55mm">55mm (Ticket compacto)</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {ticketPaperWidth === '55mm' ? '55mm: el mas compacto, ideal para impresoras con margen estrecho.' 
+                  : ticketPaperWidth === '57mm' ? '57mm: estandar en impresoras moviles/portatiles, ligeramente mas estrecho que 58mm.'
+                  : ticketPaperWidth === '58mm' ? '58mm: columna reducida, texto compacto.' 
+                  : '80mm: formato completo, ideal para tiendas grandes.'}
+              </p>
+            </div>
+            <div>
+              <Label>Tamano de letra (px)</Label>
+              <select
+                value={ticketFontSize}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  const preset = getPreset(ticketPaperWidth);
+                  const clamped = Math.min(val, preset.maxFontSize);
+                  setTicketFontSize(clamped);
+                }}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {(() => {
+                  const preset = getPreset(ticketPaperWidth);
+                  const opts: { value: number; label: string }[] = [];
+                  for (let s = 5; s <= 20; s++) {
+                    const enabled = s <= preset.maxFontSize;
+                    opts.push({ value: s, label: `${s}px${enabled ? '' : ' (no disponible)'}` });
+                  }
+                  return opts.map(o => (
+                    <option key={o.value} value={o.value} disabled={o.value > preset.maxFontSize}>
+                      {o.label}
+                    </option>
+                  ));
+                })()}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Maximo para {ticketPaperWidth}: <strong>{getPreset(ticketPaperWidth).maxFontSize}px</strong>.
+                Ancho util: {getPreset(ticketPaperWidth).contentMm}mm.
+                Rango: {getPreset(ticketPaperWidth).minFontSize}px - {getPreset(ticketPaperWidth).maxFontSize}px.
+                Ancho util: {getPreset(ticketPaperWidth).contentMm}mm.
+                ~{calcMaxChars(getPreset(ticketPaperWidth).contentMm, ticketFontSize)} chars por linea.
+              </p>
+            </div>
+            <div>
+              <Label>Tipo de letra</Label>
+              <select
+                value={ticketFontFamily}
+                onChange={(e) => setTicketFontFamily(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="monospace">Monospace (Clasico ticket)</option>
+                <option value="Arial, sans-serif">Arial (Sans-serif)</option>
+                <option value="Courier New, monospace">Courier New</option>
+                <option value="Tahoma, sans-serif">Tahoma</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Monospace es el formato clasico de impresoras termicas.
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Mensajes personalizados */}
+          <div className="space-y-3">
+            <div>
+              <Label>Mensaje de Encabezado (opcional)</Label>
+              <Textarea
+                value={ticketHeaderMsg}
+                onChange={(e) => setTicketHeaderMsg(e.target.value)}
+                placeholder='Ej: *** FACTURA DE VENTA *** o deje vacio para ocultar'
+                rows={2}
+                className="text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Aparece debajo del nombre de la tienda. Ideal para "FACTURA", "NOTA DE ENTREGA", etc.
+              </p>
+            </div>
+            <div>
+              <Label>Mensaje de Pie de Pagina</Label>
+              <Textarea
+                value={ticketFooterMsg}
+                onChange={(e) => setTicketFooterMsg(e.target.value)}
+                placeholder="Gracias por su compra!"
+                rows={2}
+                className="text-sm"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Mensaje al final del ticket. Puede incluir eslogan, redes sociales, promociones, etc.
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Modo de moneda en ticket */}
+          <div>
+            <Label>Moneda en Ticket</Label>
+            <select
+              value={ticketCurrencyMode}
+              onChange={(e) => setTicketCurrencyMode(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="dual">Bs y USD (ambos montos)</option>
+              <option value="bs_only">Solo Bolivares (Bs)</option>
+              <option value="usd_only">Solo Dolares ($)</option>
+              <option value="unit_bs_total_usd">Precio unit. en Bs, Total en $</option>
+              <option value="unit_usd_total_bs">Precio unit. en $, Total en Bs</option>
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {ticketCurrencyMode === 'dual' ? 'Muestra precios y totales en Bs, mas linea con USD y tasa.'
+                : ticketCurrencyMode === 'bs_only' ? 'Todo en bolivares: precios unitarios, totales de articulo y total final.'
+                : ticketCurrencyMode === 'usd_only' ? 'Todo en dolares: precios unitarios, totales de articulo y total final.'
+                : ticketCurrencyMode === 'unit_bs_total_usd' ? 'Precio unitario en Bs, total de cada articulo y total final en USD.'
+                : 'Precio unitario en USD, total de cada articulo y total final en Bs.'}
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Toggle switches */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Secciones del Ticket</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Mostrar Telefono</Label>
+                  <p className="text-xs text-muted-foreground">Telefono de la tienda en el ticket</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={ticketShowPhone} onChange={(e) => setTicketShowPhone(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Mostrar Vendedor</Label>
+                  <p className="text-xs text-muted-foreground">Nombre del cajero/vendedor</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={ticketShowSeller} onChange={(e) => setTicketShowSeller(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Mostrar Tasa de Cambio</Label>
+                  <p className="text-xs text-muted-foreground">Tasa BCV y equivalente en USD</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={ticketShowExchange} onChange={(e) => setTicketShowExchange(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Mensaje Destacado</Label>
+                  <p className="text-xs text-muted-foreground">Pie de pagina con bordes dobles</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={ticketShowSlogan} onChange={(e) => setTicketShowSlogan(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Imprimir en Negrita</Label>
+                  <p className="text-xs text-muted-foreground">Todo en negrita para impresoras que imprimen claro</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={ticketBold} onChange={(e) => setTicketBold(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* Margenes del ticket */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium">Margenes del Ticket (mm)</p>
+            <p className="text-xs text-muted-foreground">
+              Por defecto ambos margenes estan en <strong>0mm</strong> para que TODO el contenido entre en impresoras de 55/57/58mm. Si el texto se corta en los bordes del papel, aumente el margen correspondiente.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-sm">Margen Izquierdo</Label>
+                  <span className="text-sm font-bold text-primary">{ticketMarginLeft}mm</span>
+                </div>
+                <input
+                  type="range" min="0" max="5" step="0.5"
+                  value={ticketMarginLeft}
+                  onChange={(e) => setTicketMarginLeft(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+                  <span>0mm (recomendado)</span>
+                  <span>5mm</span>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-sm">Margen Derecho</Label>
+                  <span className="text-sm font-bold text-primary">{ticketMarginRight}mm</span>
+                </div>
+                <input
+                  type="range" min="0" max="5" step="0.5"
+                  value={ticketMarginRight}
+                  onChange={(e) => setTicketMarginRight(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                />
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+                  <span>0mm (recomendado)</span>
+                  <span>5mm</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700">
+              <strong>Recomendacion por ancho:</strong>
+              <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                <li><strong>55mm:</strong> margen izq 0mm, der 0mm. Si se corta el texto, subir a 0.5mm.</li>
+                <li><strong>57mm:</strong> margen izq 0mm, der 0mm. Igual que 55mm.</li>
+                <li><strong>58mm:</strong> margen izq 0mm, der 0mm. Si se corta, 1mm izq / 0.5mm der.</li>
+                <li><strong>80mm:</strong> margen izq 1-2mm, der 1mm. Espacio amplio, no se corta.</li>
+              </ul>
+            </div>
+            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+              <strong>Importante:</strong> los margenes solo aplican al modo de impresion HTML (fallback). En modo ESC/POS via agente local, la impresora maneja automaticamente el ancho de papel.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ====== Agente de Impresion ESC/POS ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg>
+            Agente de Impresion ESC/POS
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700">
+            <strong>Recomendado:</strong> El agente local envia comandos directos a la impresora termica via USB/COM. El nombre de la tienda se imprime en GRANDE, el TOTAL nunca se corta, y funciona igual en 55mm, 57mm, 58mm y 80mm sin depender del navegador.
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg border">
+            <div className="flex-1">
+              <Label className="font-medium text-sm">Usar agente de impresion local</Label>
+              <p className="text-xs text-muted-foreground">Imprime directamente via ESC/POS (recomendado)</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={ticketUseAgent} onChange={(e) => setTicketUseAgent(e.target.checked)} className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+            </label>
+          </div>
+
+          {ticketUseAgent && (
+            <div className="space-y-3">
+              <div>
+                <Label>Direccion del Agente</Label>
+                <input
+                  type="text"
+                  value={ticketAgentUrl}
+                  onChange={(e) => setTicketAgentUrl(e.target.value)}
+                  placeholder="http://localhost:9100"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  URL del agente local. Por defecto http://localhost:9100
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={checkAgent}
+                  disabled={agentStatus === 'unknown'}
+                >
+                  {agentStatus === 'unknown' ? 'Verificando...' : 'Probar Conexion'}
+                </Button>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${agentStatus === 'online' ? 'bg-green-500' : agentStatus === 'offline' ? 'bg-red-500' : 'bg-gray-300'}`}></div>
+                  <span className="text-sm">
+                    {agentStatus === 'online' ? 'Agente conectado' : agentStatus === 'offline' ? 'Agente no encontrado' : 'Sin verificar'}
+                  </span>
+                </div>
+              </div>
+
+              {agentStatus === 'online' && agentInfo && (
+                <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700 space-y-1">
+                  <strong>Info del agente:</strong>
+                  <p>Version: {agentInfo.version || 'N/A'}</p>
+                  <p>Impresora detectada: {agentInfo.autoPrinter || agentInfo.connectedPort || 'No detectada'}</p>
+                  <p>Impresiones realizadas: {agentInfo.printCount || 0}</p>
+                  <p>Serial disponible: {agentInfo.serialAvailable ? 'Si' : 'No (modo archivo)'}</p>
+                </div>
+              )}
+
+              {agentStatus === 'offline' && (
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+                  <strong>El agente no esta activo.</strong> Para instalarlo:
+                  <ol className="list-decimal pl-4 mt-1 space-y-0.5">
+                    <li>Ejecute <code className="bg-amber-100 px-1 rounded">DETENER-TODO.bat</code></li>
+                    <li>Ejecute <code className="bg-amber-100 px-1 rounded">INICIAR-TODO-OCULTO.vbs</code></li>
+                    <li>Espere 10 segundos</li>
+                    <li>El agente se activa automaticamente con INICIAR-TODO-OCULTO.vbs</li>
+                  </ol>
+                  <p className="mt-1">Mientras el agente no este activo, el sistema usara la impresion via navegador (fallback).</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!ticketUseAgent && (
+            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+              <strong>Modo navegador activo (fallback).</strong> La impresion dependera del driver de la impresora en el navegador. Puede que el TOTAL se corte o el nombre de la tienda no se vea correctamente en algunas impresoras. Se recomienda activar el agente local para mejor resultados.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ====== Respaldo Automatico ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            Respaldo Automatico
+            {!canAutoBackup && <Badge variant="destructive" className="text-[8px]">BASICA+</Badge>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {canAutoBackup ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                El sistema crea respaldos automaticos cada hora en la carpeta <code className="bg-muted px-1 rounded">respaldos/</code>.
+                Se conservan los ultimos 7 respaldos.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={loadBackupStatus}>
+                  Ver Estado
+                </Button>
+                <Button variant="outline" size="sm" onClick={forceBackup}>
+                  Forzar Respaldo Ahora
+                </Button>
+              </div>
+              {backupStatus && (
+                <div className="mt-2 p-3 rounded border bg-muted/50 text-sm">
+                  <p className="font-medium">Estado: {backupStatus.status === "active" ? "Activo" : "Inactivo"}</p>
+                  <p className="text-muted-foreground">{backupStatus.total} respaldos disponibles</p>
+                  {backupStatus.backups.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {backupStatus.backups.slice(0, 5).map((b) => (
+                        <p key={b} className="text-xs text-muted-foreground">{b}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="p-4 bg-muted/50 rounded text-center">
+              <p className="text-sm text-muted-foreground">
+                El respaldo automatico esta disponible en los planes BASICA y PROFESIONAL.
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Actualice su licencia para habilitar esta funcion.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ====== Exportar / Importar ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            Exportar / Importar Datos
+            {!canExportImport && <Badge variant="destructive" className="text-[8px]">BASICA+</Badge>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {canExportImport ? (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Exporta todos los datos del sistema o importa un respaldo previo.
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={exportData} disabled={exporting}>
+                  {exporting ? "Exportando..." : "Exportar Todo (JSON)"}
+                </Button>
+                <label className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background px-4 py-2 hover:bg-accent cursor-pointer">
+                  {importing ? "Importando..." : "Importar Respaldo"}
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={importData}
+                    className="hidden"
+                    disabled={importing}
+                  />
+                </label>
+              </div>
+            </>
+          ) : (
+            <div className="p-4 bg-muted/50 rounded text-center">
+              <p className="text-sm text-muted-foreground">
+                La exportacion e importacion de datos esta disponible en los planes BASICA y PROFESIONAL.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ====== Info del Sistema ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Informacion del Sistema</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="text-muted-foreground">Version:</div>
+            <div className="font-medium">MyeCommerce POS v2.9.16</div>
+            <div className="text-muted-foreground">Motor:</div>
+            <div className="font-medium">Next.js 15 + SQLite</div>
+            <div className="text-muted-foreground">Base de Datos:</div>
+            <div className="font-medium">prisma/dev.db</div>
+            <div className="text-muted-foreground">Tasa BCV:</div>
+            <div className="font-medium">{(settings.bcvRate ?? 36.5).toFixed(2)} Bs por $1</div>
+            <div className="text-muted-foreground">Tema:</div>
+            <div className="font-medium capitalize">{theme === 'blue' ? 'Azul' : theme === 'green' ? 'Verde' : theme === 'red' ? 'Rojo' : theme === 'purple' ? 'Purpura' : theme}</div>
+            <div className="text-muted-foreground">Stock en 0:</div>
+            <div className={`font-medium ${allowZeroStock ? "text-green-600" : "text-red-500"}`}>
+              {allowZeroStock ? "Permitido" : "Bloqueado"}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

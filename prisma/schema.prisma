@@ -1,0 +1,341 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Product {
+  id          String     @id @default(cuid())
+  name        String
+  description String     @default("")
+  barcode     String     @default("")
+  price       Float
+  cost        Float      @default(0)
+  stock       Float      @default(0)
+  minStock    Float      @default(5)
+  icon        String     @default("")
+  wholesalePrice  Float    @default(0)
+  minWholesaleQty Int     @default(0)
+  noStock     Boolean    @default(false)
+  vendePorPeso Boolean    @default(false)
+  unidadPeso  String     @default("")
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  saleItems       SaleItem[]
+  devolutionItems DevolutionItem[]
+  purchaseItems   PurchaseItem[]
+}
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  icon     String    @default("")
+  color    String    @default("#6366f1")
+  active   Boolean   @default(true)
+  products Product[]
+}
+
+model Client {
+  id             String   @id @default(cuid())
+  type           String   @default("natural")
+  docType        String   @default("V")
+  docNumber      String   @unique
+  fullName       String
+  firstName      String   @default("")
+  lastName       String   @default("")
+  businessName   String   @default("")
+  phone          String   @default("")
+  email          String   @default("")
+  address        String   @default("")
+  taxInfo        String   @default("")
+  isFinalClient  Boolean  @default(false)
+  creditBalance  Float    @default(0)
+  creditLimit    Float    @default(0)
+  isActive       Boolean  @default(true)
+  sales          Sale[]
+  creditPayments CreditPayment[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([docNumber])
+  @@index([fullName])
+  @@index([type])
+}
+
+model Sale {
+  id                String       @id @default(cuid())
+  date              DateTime
+  subtotal          Float
+  taxAmount         Float        @default(0)
+  discount          Float        @default(0)
+  total             Float
+  totalBs           Float
+  exchangeRate      Float
+  paymentMethod     String       @default("efectivo")
+  referenceNumber   String       @default("")
+  mixedPaymentJson  String       @default("")
+  customerName      String       @default("")
+  clientDocType     String       @default("")
+  clientDocNumber   String       @default("")
+  clientName        String       @default("")
+  clientAddress     String       @default("")
+  sellerName        String       @default("")
+  sellerRole        String       @default("")
+  isCredit          Boolean      @default(false)
+  creditPaid        Float        @default(0)
+  creditDays        Int        @default(30)
+  creditDueDate     DateTime?
+  notes             String       @default("")
+  invoiceNumber     String       @unique
+  items             SaleItem[]
+  devolutions       Devolution[]
+  creditPayments    CreditPayment[]
+  clientId          String?
+  client            Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdAt         DateTime     @default(now())
+
+  @@index([date])
+  @@index([clientId])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Float
+  unitPrice Float
+  total     Float
+  product   Product @relation(fields: [productId], references: [id])
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+}
+
+model Settings {
+  id              String @id @default(cuid())
+  storeName       String @default("Mi Tienda")
+  storeAddress    String @default("")
+  storePhone      String @default("")
+  storeRif        String @default("")
+  bcvRate         Float  @default(36.50)
+  taxRate         Float  @default(0)
+  currency        String @default("USD")
+  allowZeroStock  Boolean @default(false)
+  enableDiscount  Boolean @default(false)
+  maxDiscountPct  Int    @default(20)
+  theme           String @default("blue")
+  // Ticket printer settings
+  ticketFontSize       Int    @default(8)
+  ticketFontFamily     String @default("monospace")
+  ticketHeaderMsg      String @default("")
+  ticketFooterMsg      String @default("Gracias por su compra!")
+  ticketShowPhone      Boolean @default(true)
+  ticketShowSeller     Boolean @default(true)
+  ticketShowExchange   Boolean @default(true)
+  ticketCurrencyMode    String @default("dual")
+  ticketShowSlogan     Boolean @default(false)
+  ticketBold           Boolean @default(true)
+  ticketPaperWidth     String @default("58mm")
+  ticketMarginLeft     Float  @default(0)
+  ticketMarginRight    Float  @default(0)
+  ticketUseAgent       Boolean @default(true)
+  ticketAgentUrl       String @default("http://localhost:9100")
+  // Promo configurable
+  promoActive          Boolean @default(true)
+  promoLabel           String  @default("PRECIO EXCLUSIVO")
+  promoOldPrice        Float   @default(280)
+  promoCurrentPrice    Float   @default(180)
+  promoExpiryDate      String  @default("")
+  updatedAt       DateTime @updatedAt
+}
+
+model Devolution {
+  id           String   @id @default(cuid())
+  saleId       String
+  sale         Sale     @relation(fields: [saleId], references: [id])
+  date         DateTime @default(now())
+  reason       String
+  totalUsd     Float
+  totalBs      Float
+  exchangeRate Float
+  items        DevolutionItem[]
+  status       String   @default("completada")
+  createdAt    DateTime @default(now())
+
+  @@index([date])
+  @@index([saleId])
+}
+
+model DevolutionItem {
+  id           String     @id @default(cuid())
+  devolutionId String
+  productId    String
+  productName  String
+  quantity     Float
+  unitPrice    Float
+  total        Float
+  product      Product    @relation(fields: [productId], references: [id])
+  devolution   Devolution @relation(fields: [devolutionId], references: [id], onDelete: Cascade)
+}
+
+model License {
+  id                String   @id @default(cuid())
+  machineId         String   @unique
+  licenseKey        String   @default("")
+  licenseType       String   @default("trial")
+  activatedAt       DateTime @default(now())
+  expiresAt         DateTime
+  maxProducts       Int      @default(30)
+  maxDailySales     Int      @default(15)
+  maxUsers          Int      @default(1)
+  isActive          Boolean  @default(true)
+  maxActivations    Int      @default(1)
+  activationCount   Int      @default(1)
+  previousMachines  String   @default("")
+  blockedReason     String   @default("")
+  ownerName         String   @default("")
+  ownerEmail        String   @default("")
+  ownerPhone        String   @default("")
+  ownerRif          String   @default("")
+  notes             String   @default("")
+  updatedAt         DateTime @updatedAt
+}
+
+model CashClosing {
+  id              String   @id @default(cuid())
+  date            DateTime
+  closingType     String   @default("final")
+  sellerName      String   @default("")
+  sellerRole      String   @default("")
+  totalSalesUsd   Float    @default(0)
+  totalSalesBs    Float    @default(0)
+  totalReturnsUsd Float    @default(0)
+  totalReturnsBs  Float    @default(0)
+  netTotalUsd     Float    @default(0)
+  netTotalBs      Float    @default(0)
+  salesCount      Int      @default(0)
+  returnsCount    Int      @default(0)
+  cashUsd         Float    @default(0)
+  cashBs          Float    @default(0)
+  cardUsd         Float    @default(0)
+  cardBs          Float    @default(0)
+  checkUsd        Float    @default(0)
+  checkBs         Float    @default(0)
+  transferUsd     Float    @default(0)
+  transferBs      Float    @default(0)
+  mobileUsd       Float    @default(0)
+  mobileBs        Float    @default(0)
+  creditSalesUsd    Float    @default(0)
+  creditSalesBs     Float    @default(0)
+  creditSalesCount  Int      @default(0)
+  casheaSalesUsd    Float    @default(0)
+  casheaSalesBs     Float    @default(0)
+  casheaSalesCount  Int      @default(0)
+  zelleUsd          Float    @default(0)
+  zelleBs           Float    @default(0)
+  usdtUsd           Float    @default(0)
+  usdtBs            Float    @default(0)
+  breakdownJson     String   @default("{}")
+  exchangeRate    Float    @default(0)
+  observations    String   @default("")
+  createdAt       DateTime @default(now())
+
+  @@index([date])
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  password    String
+  fullName    String   @default("")
+  role        String   @default("cajero")
+  isActive    Boolean  @default(true)
+  permissions String   @default("")
+  avatar      String   @default("")
+  lastLogin   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RoleConfig {
+  id          String   @id @default(cuid())
+  roleName    String   @unique
+  label       String   @default("")
+  permissions String   @default("{}")
+  color       String   @default("#6366f1")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Supplier {
+  id         String     @id @default(cuid())
+  name       String
+  rif        String     @default("")
+  phone      String     @default("")
+  email      String     @default("")
+  address    String     @default("")
+  contact    String     @default("")
+  notes      String     @default("")
+  isActive   Boolean    @default(true)
+  purchases  Purchase[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([name])
+}
+
+model Purchase {
+  id           String         @id @default(cuid())
+  date         DateTime       @default(now())
+  number       String         @default("")
+  supplierId   String?
+  supplier     Supplier?      @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  totalUsd     Float          @default(0)
+  totalBs      Float          @default(0)
+  exchangeRate Float          @default(0)
+  notes        String         @default("")
+  items        PurchaseItem[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([date])
+  @@index([supplierId])
+}
+
+model PurchaseItem {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  productId   String?
+  productName String   @default("")
+  quantity    Float
+  unitCost    Float
+  total       Float
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model CreditPayment {
+  id           String   @id @default(cuid())
+  saleId       String
+  sale         Sale     @relation(fields: [saleId], references: [id])
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  date         DateTime @default(now())
+  amount       Float
+  exchangeRate Float
+  amountBs     Float
+  method       String   @default("efectivo")
+  reference    String   @default("")
+  notes        String   @default("")
+  createdBy    String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@index([date])
+  @@index([saleId])
+  @@index([clientId])
+}
