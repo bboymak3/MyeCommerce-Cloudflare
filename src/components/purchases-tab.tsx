@@ -8,12 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { ShoppingCart, Plus, Trash2, Search, Truck, ChevronDown, ChevronUp, Filter, Printer } from "lucide-react";
+import { ShoppingCart, Plus, Trash2, Search, Truck, ChevronDown, ChevronUp, Filter, Printer, Package, Box } from "lucide-react";
 
 interface Supplier { id: string; name: string; rif: string; phone?: string; }
-interface Product { id: string; name: string; cost: number; stock: number; }
+interface Product { id: string; name: string; cost: number; stock: number; price?: number; unitsPerBox?: number; boxPrice?: number; }
 interface PurchaseItem {
   productId: string; productName: string; quantity: number; unitCost: number; total: number;
+  isBox?: boolean; unitsPerBox?: number; boxQty?: number; boxCost?: number;
+  calcUnitCost?: number; calcMargin?: number; calcPrice?: number;
 }
 
 interface PurchaseRecord {
@@ -54,12 +56,10 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
     p.name.toLowerCase().includes(productSearch.toLowerCase())
   ).slice(0, 10);
 
-  // Filtrar compras por proveedor
   const filteredPurchases = filterSupplier
     ? purchases.filter(p => p.supplier?.id === filterSupplier || (!p.supplier && filterSupplier === '__none__'))
     : purchases;
 
-  // Agrupar totales por proveedor
   const supplierTotals: Record<string, { name: string; rif: string; totalUsd: number; count: number }> = {};
   for (const p of purchases) {
     const key = p.supplier?.id || '__none__';
@@ -71,23 +71,98 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
   }
   const sortedSupplierTotals = Object.entries(supplierTotals).sort((a, b) => b[1].totalUsd - a[1].totalUsd);
 
+  // Agregar producto — por defecto como unidad
   const addItem = (product: Product) => {
     setItems(prev => {
       const existing = prev.find(i => i.productId === product.id);
       if (existing) {
-        return prev.map(i => i.productId === product.id ? { ...i, quantity: i.quantity + 1, total: parseFloat(((i.quantity + 1) * i.unitCost).toFixed(2)) } : i);
+        if (existing.isBox) {
+          return prev.map(i => i.productId === product.id
+            ? { ...i, boxQty: (i.boxQty || 0) + 1, quantity: ((i.boxQty || 0) + 1) * (i.unitsPerBox || 0), total: parseFloat((((i.boxQty || 0) + 1) * (i.boxCost || 0)).toFixed(2)) }
+            : i);
+        }
+        return prev.map(i => i.productId === product.id
+          ? { ...i, quantity: i.quantity + 1, total: parseFloat(((i.quantity + 1) * i.unitCost).toFixed(2)) }
+          : i);
       }
-      return [...prev, { productId: product.id, productName: product.name, quantity: 1, unitCost: product.cost || 0, total: product.cost || 0 }];
+      return [...prev, {
+        productId: product.id, productName: product.name, quantity: 1,
+        unitCost: product.cost || 0, total: product.cost || 0,
+        isBox: false, unitsPerBox: product.unitsPerBox || 0, boxQty: 0,
+        boxCost: 0, calcUnitCost: 0, calcMargin: 0, calcPrice: 0,
+      }];
     });
     setProductSearch("");
     setShowProductDropdown(false);
   };
 
+  // Agregar producto como bulto
+  const addItemAsBox = (product: Product) => {
+    setItems(prev => {
+      const existing = prev.find(i => i.productId === product.id && i.isBox);
+      if (existing) {
+        return prev.map(i => i.productId === product.id && i.isBox
+          ? {
+            ...i,
+            boxQty: (i.boxQty || 0) + 1,
+            quantity: ((i.boxQty || 0) + 1) * (i.unitsPerBox || 1),
+            total: parseFloat((((i.boxQty || 0) + 1) * (i.boxCost || 0)).toFixed(2)),
+            calcUnitCost: (i.unitsPerBox || 1) > 0 ? parseFloat(((i.boxCost || 0) / (i.unitsPerBox || 1)).toFixed(4)) : 0,
+          }
+          : i);
+      }
+      const upb = product.unitsPerBox || 1;
+      const bxPrice = product.boxPrice || (product.cost ? product.cost * upb : 0);
+      return [...prev, {
+        productId: product.id, productName: product.name,
+        quantity: upb, unitCost: upb > 0 ? parseFloat((bxPrice / upb).toFixed(4)) : 0,
+        total: bxPrice,
+        isBox: true, unitsPerBox: upb, boxQty: 1, boxCost: bxPrice,
+        calcUnitCost: upb > 0 ? parseFloat((bxPrice / upb).toFixed(4)) : 0,
+        calcMargin: 0, calcPrice: 0,
+      }];
+    });
+    setProductSearch("");
+    setShowProductDropdown(false);
+  };
+
+  // Toggle entre bulto/unidad
+  const toggleBoxMode = (idx: number) => {
+    setItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item;
+      if (item.isBox) {
+        // Cambiar a unidad: qty se convierte a 1, costo = costo unitario calculado
+        return { ...item, isBox: false, quantity: 1, unitCost: item.calcUnitCost || item.unitCost, total: item.calcUnitCost || item.unitCost };
+      }
+      // Cambiar a bulto
+      const upb = item.unitsPerBox || 1;
+      return { ...item, isBox: true, boxQty: 1, boxCost: item.unitCost, quantity: upb, calcUnitCost: item.unitCost, total: item.unitCost * 1 };
+    }));
+  };
+
+  // Actualizar item
   const updateItem = (idx: number, field: string, value: any) => {
     setItems(prev => prev.map((item, i) => {
       if (i !== idx) return item;
       const updated = { ...item, [field]: parseFloat(value) || 0 };
-      updated.total = parseFloat((updated.quantity * updated.unitCost).toFixed(2));
+
+      if (updated.isBox) {
+        // Recalcular bulto
+        const upb = Math.max(1, updated.unitsPerBox || 1);
+        const bQty = Math.max(0, updated.boxQty || 0);
+        const bCost = Math.max(0, updated.boxCost || 0);
+        updated.quantity = parseFloat((bQty * upb).toFixed(2));
+        updated.total = parseFloat((bQty * bCost).toFixed(2));
+        updated.calcUnitCost = upb > 0 ? parseFloat((bCost / upb).toFixed(4)) : 0;
+        // Calcular precio de venta si hay margen
+        const margin = updated.calcMargin || 0;
+        updated.calcPrice = updated.calcUnitCost > 0 && margin > 0
+          ? parseFloat((updated.calcUnitCost / (1 - margin / 100)).toFixed(2))
+          : 0;
+        updated.unitCost = updated.calcUnitCost;
+      } else {
+        updated.total = parseFloat((updated.quantity * updated.unitCost).toFixed(2));
+      }
       return updated;
     }));
   };
@@ -109,9 +184,11 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success(`Compra registrada: $${totalUsd.toFixed(2)} (${items.length} productos)`);
       setItems([]); setNotes(""); setSupplierId("");
-      const pur = await fetch("/api/purchases").then(r => r.json());
+      const [pur, prods] = await Promise.all([
+        fetch("/api/purchases").then(r => r.json()),
+        fetch("/api/products").then(r => r.json()),
+      ]);
       setPurchases(Array.isArray(pur) ? pur : []);
-      const prods = await fetch("/api/products").then(r => r.json());
       setProducts(Array.isArray(prods) ? prods : []);
     } catch (e: any) { toast.error(e.message); }
     finally { setSaving(false); }
@@ -132,14 +209,25 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
     const timeStr = d.toLocaleTimeString('es-VE');
     const fmtN = (n: number) => n.toFixed(2).replace('.', ',');
 
-    const itemsHtml = purchase.items?.map((item: PurchaseItem) =>
-      `<tr style="border-bottom:1px dotted #ccc">
-        <td style="padding:2px 2px;width:15%;text-align:right;vertical-align:top">${item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(3)}</td>
-        <td style="padding:2px 2px;width:45%;vertical-align:top;word-wrap:break-word">${item.productName || 'N/A'}</td>
-        <td style="padding:2px 2px;width:20%;text-align:right;vertical-align:top">${fmtN(item.unitCost || 0)}</td>
-        <td style="padding:2px 2px;width:20%;text-align:right;vertical-align:top;font-weight:bold">${fmtN(item.total || 0)}</td>
-      </tr>`
-    ).join('');
+    const itemsHtml = purchase.items?.map((item: PurchaseItem) => {
+      const isBox = (item as any).isBox;
+      const qtyLabel = isBox
+        ? `${(item as any).boxQty} bulto(s) x ${(item as any).unitsPerBox} uds = ${item.quantity} uds`
+        : `${item.quantity % 1 === 0 ? item.quantity : item.quantity.toFixed(3)} uds`;
+      const costLabel = isBox
+        ? `$${fmtN((item as any).boxCost || 0)}/bulto ($${fmtN(item.unitCost || 0)}/ud)`
+        : `$${fmtN(item.unitCost || 0)}/ud`;
+      const marginInfo = isBox && (item as any).calcMargin > 0
+        ? ` → Precio venta ud: $${fmtN((item as any).calcPrice || 0)} (${(item as any).calcMargin}% margen)`
+        : '';
+
+      return `<tr style="border-bottom:1px dotted #ccc">
+        <td style="padding:2px;width:40%;vertical-align:top;word-wrap:break-word">${item.productName || 'N/A'}${marginInfo ? `<br><span style="font-size:9px;color:#666">${marginInfo}</span>` : ''}</td>
+        <td style="padding:2px;width:25%;text-align:right;vertical-align:top">${costLabel}</td>
+        <td style="padding:2px;width:15%;text-align:right;vertical-align:top">${qtyLabel}</td>
+        <td style="padding:2px;width:20%;text-align:right;vertical-align:top;font-weight:bold">$${fmtN(item.total || 0)}</td>
+      </tr>`;
+    }).join('');
 
     const w = window.open('', '_blank', 'width=380,height=700');
     if (!w) { toast.error('No se pudo abrir ventana de impresion'); return; }
@@ -147,7 +235,7 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
       <style>
         @page{size:80mm auto;margin:0}
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Courier New',monospace;font-size:12px;width:80mm;margin:0 auto;padding:3mm 4mm;color:#000}
+        body{font-family:'Courier New',monospace;font-size:11px;width:80mm;margin:0 auto;padding:3mm 4mm;color:#000}
         .c{text-align:center}.b{font-weight:bold}.s{font-size:10px}
         table{width:100%;border-collapse:collapse}
         .line{border-top:1px solid #000;margin:4px 0}
@@ -166,25 +254,23 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
       <div class="line"></div>
       <table>
         <tr style="border-bottom:1px solid #000">
-          <th style="text-align:right;padding:2px;font-size:10px">CANT.</th>
-          <th style="text-align:left;padding:2px;font-size:10px">ARTICULO</th>
-          <th style="text-align:right;padding:2px;font-size:10px">COSTO</th>
-          <th style="text-align:right;padding:2px;font-size:10px">TOTAL</th>
+          <th style="text-align:left;padding:2px;font-size:9px">ARTICULO</th>
+          <th style="text-align:right;padding:2px;font-size:9px">COSTO</th>
+          <th style="text-align:right;padding:2px;font-size:9px">CANT.</th>
+          <th style="text-align:right;padding:2px;font-size:9px">TOTAL</th>
         </tr>
         ${itemsHtml}
       </table>
       <div class="line-d"></div>
       <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:bold">
-        <span>TOTAL:</span>
-        <span>$ ${fmtN(purchase.totalUsd || 0)}</span>
+        <span>TOTAL:</span><span>$ ${fmtN(purchase.totalUsd || 0)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:12px">
-        <span class="s">En Bolivares:</span>
-        <span>Bs. ${fmtN(purchase.totalBs || 0)}</span>
+        <span class="s">En Bolivares:</span><span>Bs. ${fmtN(purchase.totalBs || 0)}</span>
       </div>
       ${purchase.notes ? `<div class="line" style="margin-top:6px"></div><div class="s" style="font-style:italic">Nota: ${purchase.notes}</div>` : ''}
       <div class="line" style="margin-top:8px"></div>
-      <div class="c s" style="margin-top:4px">MyeCommerce POS v2.9.5</div>
+      <div class="c s">MyeCommerce POS</div>
       <div class="c s">Comprobante de compra - No fiscal</div>
       <script>window.onload=function(){window.print()}</script>
     </body></html>`);
@@ -229,14 +315,21 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                 onFocus={() => setShowProductDropdown(true)} onBlur={() => setTimeout(() => setShowProductDropdown(false), 200)}
                 placeholder="Buscar producto por nombre..." className="pl-9" />
               {showProductDropdown && productSearch && (
-                <div className="absolute z-50 w-full mt-1 bg-card border rounded-lg shadow-lg max-h-48 overflow-auto">
+                <div className="absolute z-50 w-full mt-1 bg-card border rounded-lg shadow-lg max-h-56 overflow-auto">
                   {filteredProducts.length === 0 ? (
                     <p className="p-3 text-sm text-muted-foreground">No se encontraron productos</p>
                   ) : filteredProducts.map((p) => (
-                    <button key={p.id} onMouseDown={() => addItem(p)} className="w-full text-left p-2 hover:bg-muted/50 text-sm flex justify-between border-b last:border-0">
-                      <span>{p.name}</span>
-                      <span className="text-muted-foreground text-xs">Stock: {p.stock} | Costo: ${p.cost.toFixed(2)}</span>
-                    </button>
+                    <div key={p.id} className="border-b last:border-0">
+                      <button onMouseDown={() => addItem(p)} className="w-full text-left p-2 hover:bg-muted/50 text-sm flex justify-between">
+                        <span>{p.name}</span>
+                        <span className="text-muted-foreground text-xs">Stock: {p.stock} | $ {p.cost.toFixed(2)}</span>
+                      </button>
+                      <div className="flex justify-end px-2 pb-1">
+                        <button onMouseDown={() => addItemAsBox(p)} className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 flex items-center gap-1" title="Agregar como bulto">
+                          <Package className="h-3 w-3" /> Agregar como bulto
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -250,22 +343,64 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left p-2">Producto</th>
-                    <th className="text-center p-2 w-24">Cantidad</th>
-                    <th className="text-center p-2 w-28">Costo Unit.</th>
-                    <th className="text-right p-2 w-28">Total</th>
+                    <th className="text-center p-2 w-16">Modo</th>
+                    {items.some(i => i.isBox) && <th className="text-center p-2 w-16">Bultos</th>}
+                    {items.some(i => i.isBox) && <th className="text-center p-2 w-16">Uds/Caja</th>}
+                    {items.some(i => i.isBox) && <th className="text-center p-2 w-24">Costo Bulto</th>}
+                    {items.some(i => i.isBox) && <th className="text-center p-2 w-20">Margen %</th>}
+                    {items.some(i => i.isBox) && <th className="text-center p-2 w-20">Precio Ud</th>}
+                    <th className="text-center p-2 w-24">Costo Ud</th>
+                    <th className="text-center p-2 w-20">Total Uds</th>
+                    <th className="text-right p-2 w-24">Total $</th>
                     <th className="p-1 w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item, idx) => (
-                    <tr key={item.productId} className="border-t">
-                      <td className="p-2 font-medium">{item.productName}</td>
-                      <td className="p-2">
-                        <Input type="number" step="0.01" min="0.01" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', e.target.value)} className="h-8 text-center" />
+                    <tr key={`${item.productId}-${item.isBox ? 'box' : 'unit'}`} className="border-t">
+                      <td className="p-2 font-medium text-xs">
+                        {item.productName}
+                        {item.isBox && <Badge variant="secondary" className="ml-1 text-[10px]">BULTO</Badge>}
                       </td>
-                      <td className="p-2">
-                        <Input type="number" step="0.01" value={item.unitCost} onChange={(e) => updateItem(idx, 'unitCost', e.target.value)} className="h-8 text-center" />
+                      <td className="p-2 text-center">
+                        <button type="button" onClick={() => toggleBoxMode(idx)} className={`p-1 rounded text-xs transition-colors ${item.isBox ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'}`} title={item.isBox ? 'Cambiar a unidad' : 'Cambiar a bulto'}>
+                          {item.isBox ? <Package className="h-4 w-4" /> : <Box className="h-4 w-4" />}
+                        </button>
                       </td>
+                      {item.isBox ? (
+                        <>
+                          <td className="p-1">
+                            <Input type="number" step="1" min="1" value={item.boxQty || 0} onChange={(e) => updateItem(idx, 'boxQty', e.target.value)} className="h-8 text-center" />
+                          </td>
+                          <td className="p-1">
+                            <Input type="number" step="1" min="1" value={item.unitsPerBox || 0} onChange={(e) => updateItem(idx, 'unitsPerBox', e.target.value)} className="h-8 text-center" />
+                          </td>
+                          <td className="p-1">
+                            <Input type="number" step="0.01" min="0" value={item.boxCost || 0} onChange={(e) => updateItem(idx, 'boxCost', e.target.value)} className="h-8 text-center" />
+                          </td>
+                          <td className="p-1">
+                            <Input type="number" step="0.1" min="0" max="99" value={item.calcMargin || 0} onChange={(e) => updateItem(idx, 'calcMargin', e.target.value)} className="h-8 text-center" />
+                          </td>
+                          <td className="p-1 text-center">
+                            <span className={`text-xs font-bold ${item.calcPrice > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                              {item.calcPrice > 0 ? `$${item.calcPrice.toFixed(2)}` : '—'}
+                            </span>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          {items.some(i => i.isBox) && <td></td>}
+                          {items.some(i => i.isBox) && <td></td>}
+                          {items.some(i => i.isBox) && <td></td>}
+                          {items.some(i => i.isBox) && <td></td>}
+                          {items.some(i => i.isBox) && <td></td>}
+                        </>
+                      )}
+                      <td className="p-1">
+                        {!item.isBox && <Input type="number" step="0.0001" min="0" value={item.unitCost} onChange={(e) => updateItem(idx, 'unitCost', e.target.value)} className="h-8 text-center" />}
+                        {item.isBox && <span className="text-xs text-muted-foreground text-center block">$ {(item.calcUnitCost || 0).toFixed(4)}</span>}
+                      </td>
+                      <td className="p-1 text-center text-xs font-medium">{item.quantity}</td>
                       <td className="p-2 text-right font-bold">${item.total.toFixed(2)}</td>
                       <td className="p-1">
                         <Button variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-7 w-7 p-0 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -275,17 +410,33 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                 </tbody>
                 <tfoot className="bg-muted/30">
                   <tr>
-                    <td colSpan={3} className="p-2 text-right font-bold">TOTAL:</td>
+                    <td colSpan={8 + (items.some(i => i.isBox) ? 5 : 0)} className="p-2 text-right font-bold">TOTAL:</td>
                     <td className="p-2 text-right font-bold text-lg">${totalUsd.toFixed(2)}</td>
                     <td></td>
                   </tr>
                   <tr>
-                    <td colSpan={3} className="p-1 text-right text-xs text-muted-foreground">En Bolivares:</td>
+                    <td colSpan={8 + (items.some(i => i.isBox) ? 5 : 0)} className="p-1 text-right text-xs text-muted-foreground">En Bolivares:</td>
                     <td className="p-1 text-right text-xs font-bold text-muted-foreground">Bs. {totalBs.toFixed(2)}</td>
                     <td></td>
                   </tr>
                 </tfoot>
               </table>
+
+              {/* Resumen de bultos */}
+              {items.some(i => i.isBox) && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border-t text-xs space-y-1">
+                  <div className="font-medium text-amber-800 dark:text-amber-300 flex items-center gap-1"><Package className="h-3 w-3" /> Resumen de Bultos:</div>
+                  {items.filter(i => i.isBox).map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2 text-muted-foreground">
+                      <span>{item.productName}:</span>
+                      <span>{item.boxQty} bulto(s) x {item.unitsPerBox} uds = {item.quantity} uds</span>
+                      <span>• Costo ud: $ {(item.calcUnitCost || 0).toFixed(4)}</span>
+                      {item.calcPrice > 0 && <span className="text-green-600 dark:text-green-400">• Precio venta ud: $ {item.calcPrice.toFixed(2)}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="p-2">
                 <Button className="w-full" onClick={savePurchase} disabled={saving || items.length === 0}>
                   {saving ? "Registrando..." : `Registrar Compra — ${items.length} producto(s), $${totalUsd.toFixed(2)}`}
@@ -397,7 +548,6 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                           </div>
                         </td>
                       </tr>
-                      {/* Fila expandible con detalle de items */}
                       {isExpanded && p.items?.length > 0 && (
                         <tr key={`${p.id}-detail`} className="border-t bg-muted/10">
                           <td colSpan={7} className="p-0">
@@ -406,6 +556,7 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                                 <thead>
                                   <tr className="text-muted-foreground">
                                     <th className="text-left py-1">Producto</th>
+                                    <th className="text-center py-1 w-16">Modo</th>
                                     <th className="text-center py-1 w-20">Cantidad</th>
                                     <th className="text-center py-1 w-24">Costo Unit.</th>
                                     <th className="text-right py-1 w-24">Total</th>
@@ -415,8 +566,13 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                                   {p.items.map((item, idx) => (
                                     <tr key={idx} className="border-t border-muted/30">
                                       <td className="py-1">{item.productName || 'N/A'}</td>
-                                      <td className="py-1 text-center">{item.quantity}</td>
-                                      <td className="py-1 text-center">${(item.unitCost || 0).toFixed(2)}</td>
+                                      <td className="py-1 text-center">{(item as any).isBox ? <Badge variant="secondary" className="text-[9px]">BULTO</Badge> : 'Ud'}</td>
+                                      <td className="py-1 text-center">
+                                        {(item as any).isBox
+                                          ? <span>{(item as any).boxQty} x {(item as any).unitsPerBox} = {item.quantity}</span>
+                                          : item.quantity}
+                                      </td>
+                                      <td className="py-1 text-center">${(item.unitCost || 0).toFixed(4)}</td>
                                       <td className="py-1 text-right font-medium">${(item.total || 0).toFixed(2)}</td>
                                     </tr>
                                   ))}

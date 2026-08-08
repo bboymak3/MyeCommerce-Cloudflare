@@ -337,16 +337,23 @@ model ComboItem {
 }
 
 model PurchaseItem {
-  id          String   @id @default(cuid())
-  purchaseId  String
-  productId   String?
-  productName String   @default("")
-  quantity    Float
-  unitCost    Float
-  total       Float
-  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
-  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  purchaseId   String
+  productId    String?
+  productName  String   @default("")
+  quantity     Float
+  unitCost     Float
+  total        Float
+  isBox        Boolean  @default(false)
+  unitsPerBox  Float    @default(0)
+  boxQty       Float    @default(0)
+  boxCost      Float    @default(0)
+  calcUnitCost Float    @default(0)
+  calcMargin   Float    @default(0)
+  calcPrice    Float    @default(0)
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
 }
 
 model CreditPayment {

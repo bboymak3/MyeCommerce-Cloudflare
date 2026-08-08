@@ -531,7 +531,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
                 placeholder="0"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                0% si no aplica IVA
+                Coloca aqui el porcentaje actual de IVA. Si el Estado lo cambia, solo actualiza este valor y el sistema recalcula automaticamente en todas las ventas. 0% si no aplica.
               </p>
             </div>
           </div>

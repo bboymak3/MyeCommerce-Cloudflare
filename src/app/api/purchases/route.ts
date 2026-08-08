@@ -35,7 +35,13 @@ export async function POST(req: NextRequest) {
     const exchangeRate = parseFloat(body.exchangeRate) || settings?.bcvRate || 36.5;
 
     // Calculate total from items
-    const itemsTotal = body.items.reduce((sum: number, item: any) => sum + (parseFloat(item.unitCost) * parseFloat(item.quantity)), 0);
+    const itemsTotal = body.items.reduce((sum: number, item: any) => {
+      if (item.isBox) {
+        // Compra por bulto: total = boxQty * boxCost
+        return sum + (parseFloat(item.boxQty || 0) * parseFloat(item.boxCost || 0));
+      }
+      return sum + (parseFloat(item.unitCost || 0) * parseFloat(item.quantity || 0));
+    }, 0);
 
     // TRANSACTIONAL: create purchase + update stock
     const purchase = await db.$transaction(async (tx) => {
@@ -49,28 +55,92 @@ export async function POST(req: NextRequest) {
           exchangeRate,
           notes: body.notes || '',
           items: {
-            create: body.items.map((item: any) => ({
-              productId: item.productId,
-              productName: item.productName || '',
-              quantity: parseFloat(item.quantity),
-              unitCost: parseFloat(item.unitCost),
-              total: parseFloat((parseFloat(item.unitCost) * parseFloat(item.quantity)).toFixed(2)),
-            })),
+            create: body.items.map((item: any) => {
+              if (item.isBox) {
+                // Compra por bulto
+                const boxQty = parseFloat(item.boxQty || 0);
+                const unitsPerBox = parseFloat(item.unitsPerBox || 0);
+                const boxCost = parseFloat(item.boxCost || 0);
+                const totalUnits = boxQty * unitsPerBox;
+                const calcUnitCost = unitsPerBox > 0 ? boxCost / unitsPerBox : 0;
+                const calcMargin = parseFloat(item.calcMargin || 0);
+                const calcPrice = calcUnitCost > 0 && calcMargin > 0
+                  ? calcUnitCost / (1 - calcMargin / 100)
+                  : 0;
+
+                return {
+                  productId: item.productId,
+                  productName: item.productName || '',
+                  quantity: totalUnits,
+                  unitCost: parseFloat(calcUnitCost.toFixed(4)),
+                  total: parseFloat((boxQty * boxCost).toFixed(2)),
+                  isBox: true,
+                  unitsPerBox,
+                  boxQty,
+                  boxCost,
+                  calcUnitCost: parseFloat(calcUnitCost.toFixed(4)),
+                  calcMargin,
+                  calcPrice: parseFloat(calcPrice.toFixed(2)),
+                };
+              }
+              // Compra por unidad (normal)
+              const qty = parseFloat(item.quantity || 0);
+              const cost = parseFloat(item.unitCost || 0);
+              return {
+                productId: item.productId,
+                productName: item.productName || '',
+                quantity: qty,
+                unitCost: cost,
+                total: parseFloat((qty * cost).toFixed(2)),
+                isBox: false,
+              };
+            }),
           },
         },
         include: { items: true, supplier: true },
       });
 
-      // Auto-update product stock and cost
+      // Auto-update product stock, cost, and optionally price
       for (const item of body.items) {
         if (item.productId) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: parseFloat(item.quantity) },
-              ...(item.unitCost ? { cost: parseFloat(item.unitCost) } : {}),
-            },
-          });
+          if (item.isBox) {
+            const boxQty = parseFloat(item.boxQty || 0);
+            const unitsPerBox = parseFloat(item.unitsPerBox || 0);
+            const boxCost = parseFloat(item.boxCost || 0);
+            const totalUnits = boxQty * unitsPerBox;
+            const calcUnitCost = unitsPerBox > 0 ? boxCost / unitsPerBox : 0;
+            const calcMargin = parseFloat(item.calcMargin || 0);
+            const calcPrice = calcUnitCost > 0 && calcMargin > 0
+              ? calcUnitCost / (1 - calcMargin / 100) : 0;
+
+            const updateData: any = {
+              stock: { increment: totalUnits },
+              cost: parseFloat(calcUnitCost.toFixed(4)),
+            };
+            // Si se calculo precio de venta, actualizarlo tambien
+            if (calcPrice > 0) {
+              updateData.price = parseFloat(calcPrice.toFixed(2));
+              updateData.marginPercent = calcMargin;
+            }
+            // Actualizar unidades por caja si el producto tiene ese campo
+            if (unitsPerBox > 0) {
+              updateData.unitsPerBox = unitsPerBox;
+              updateData.boxPrice = boxCost;
+            }
+
+            await tx.product.update({
+              where: { id: item.productId },
+              data: updateData,
+            });
+          } else {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: { increment: parseFloat(item.quantity || 0) },
+                ...(item.unitCost ? { cost: parseFloat(item.unitCost) } : {}),
+              },
+            });
+          }
         }
       }
 
@@ -80,7 +150,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(purchase);
   } catch (error: any) {
     console.error('Error creating purchase:', error);
-    return NextResponse.json({ error: 'Error al registrar compra' }, { status: 500 });
+    return NextResponse.json({ error: 'Error al registrar compra: ' + (error.message || '') }, { status: 500 });
   }
 }
 
@@ -90,7 +160,6 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
-    // TRANSACTIONAL: restore stock + delete purchase
     await db.$transaction(async (tx) => {
       const purchase = await tx.purchase.findUnique({ where: { id }, include: { items: true } });
       if (purchase) {

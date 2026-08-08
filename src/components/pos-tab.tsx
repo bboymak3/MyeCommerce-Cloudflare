@@ -240,12 +240,13 @@ export default function PosTab({
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
 
-  // IVA por producto segun taxType (exento=0%, reducido=8%, general=16%)
+  // IVA por producto segun taxType y el valor global configurado (taxRate)
+  // taxType indica si el producto paga IVA, taxRate indica cuanto (%)
   const getTaxPct = (product: any) => {
     const tt = product?.taxType || 'exento';
     if (tt === 'exento' || tt === 'omitido') return 0;
-    if (tt === 'reducido') return 8;
-    if (tt === 'general') return 16;
+    if (tt === 'reducido') return Math.min(taxRate, 100); // usa el valor configurado, cap 100
+    if (tt === 'general') return Math.min(taxRate, 100); // usa el valor configurado
     return 0;
   };
 
@@ -979,13 +980,13 @@ export default function PosTab({
             {isUsdMethod ? (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div>
-                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA {taxMode === 'included' ? '(incluido)' : ''}:</span><span>${taxAmount.toFixed(2)}</span></div>}
+                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%{taxMode === 'included' ? ' incl.' : ''}):</span><span>${taxAmount.toFixed(2)}</span></div>}
                 {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-${effectiveDiscount.toFixed(2)}</span></div>}
               </>
             ) : (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">Bs {(subtotal * bcvRate).toFixed(2)}</span></div>
-                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA {taxMode === 'included' ? '(incluido)' : ''}:</span><span>Bs {(taxAmount * bcvRate).toFixed(2)}</span></div>}
+                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%{taxMode === 'included' ? ' incl.' : ''}):</span><span>Bs {(taxAmount * bcvRate).toFixed(2)}</span></div>}
                 {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-Bs {(effectiveDiscount * bcvRate).toFixed(2)}</span></div>}
               </>
             )}
