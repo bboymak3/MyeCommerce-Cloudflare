@@ -4,6 +4,7 @@ Cada subida aqui corresponde a una version estable lista para produccion.
 
 | Archivo | Version | Fecha | Cambios Principales |
 |---------|---------|-------|---------------------|
+| MyeCommerce-v2.9.27.zip | v2.9.27 | 2026-08-08 | **Ticket**: ID movido al final (antes de 'Gracias por su compra'). **Logo del negocio**: 16 tipos de negocio con iconos (panaderia, carniceria, farmacia, etc). Upload de logo personalizado (PNG/JPG, max 512KB). Logo/emoji se imprime centrado en ticket HTML y ESC/POS. |
 | MyeCommerce-v2.9.26.zip | v2.9.26 | 2026-08-08 | **REWRITE COMPLETO Modulo Producto**: Dialogo ancho con 6 bloques colapsables. SENIAT IVA (exento/reducido/general). Margen automatico costo+margen%=precio en caliente. Multi-empaque (bulto/caja). Foto con camara celular (capture=environment). QR/barcode scanner camara. Codigo barras secundario. Trazabilidad (vencimiento/lote/ubicacion). Combos/Kits con subtabla CRUD ingredientes. Puntos fidelidad. Modelo ComboItem en schema. |
 | MyeCommerce-v2.9.25.zip | v2.9.25 | 2026-08-08 | **Modulo Producto**: SENIAT IVA, margen auto, foto camara, trazabilidad, combos, puntos fidelidad, QR scanner, upload imagenes. |
 | MyeCommerce-v2.9.24.zip | v2.9.24 | 2026-08-07 | Alertas stock sin emoji garbled + campo minStock editable en productos. |
