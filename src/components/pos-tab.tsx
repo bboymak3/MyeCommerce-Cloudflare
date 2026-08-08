@@ -84,6 +84,8 @@ interface PosTabProps {
   ticketUseAgent?: boolean;
   ticketAgentUrl?: string;
   ticketCurrencyMode?: string;
+  storeLogo?: string;
+  businessType?: string;
   onSaleComplete?: () => void;
 }
 
@@ -98,6 +100,7 @@ export default function PosTab({
   ticketMarginLeft = 0, ticketMarginRight = 0,
   ticketUseAgent = true, ticketAgentUrl = "http://localhost:9100",
   ticketCurrencyMode = "dual",
+  storeLogo = "", businessType = "general",
   onSaleComplete,
 }: PosTabProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -535,6 +538,7 @@ export default function PosTab({
       ticketUseAgent: ticketUseAgent ?? true,
       ticketAgentUrl: ticketAgentUrl || 'http://localhost:9100',
       ticketCurrencyMode: ticketCurrencyMode || 'dual',
+      storeLogo, businessType,
     };
     try {
       const ok = await _printTicket({ receipt, settings: ticketSettings, currency, defaultSellerName: sellerName });

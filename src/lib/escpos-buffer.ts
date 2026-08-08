@@ -61,6 +61,8 @@ export interface EscposSettings {
   ticketPaperWidth: string;
   ticketHeaderMsg: string;
   ticketFooterMsg: string;
+  storeLogo?: string;
+  businessType?: string;
 }
 
 // ─── Etiquetas de metodos de pago ────────────────────────────────
@@ -252,6 +254,7 @@ export function generateEscposBuffer(params: {
     ticketShowPhone, ticketShowSeller, ticketShowExchange, ticketShowSlogan,
     ticketPaperWidth, ticketHeaderMsg, ticketFooterMsg,
     ticketCurrencyMode = 'dual',
+    storeLogo, businessType,
   } = settings;
 
   const maxChars = PAPER_CHARS[ticketPaperWidth] || PAPER_CHARS['58mm'];
@@ -293,6 +296,32 @@ export function generateEscposBuffer(params: {
   // ═══ INICIALIZAR IMPRESORA ═══
   parts.push(cmdInit());
   parts.push(cmdFeed(1));
+
+  // ═══ LOGO / ICONO DEL NEGOCIO ═══
+  // Las impresoras termicas ESC/POS no soportan emojis nativamente.
+  // Si hay un logo subido, se indica con [LOGO] como placeholder.
+  // El agente de impresion puede ser extendido para soportar bitmaps.
+  if (storeLogo) {
+    parts.push(cmdAlign(1));
+    parts.push(textLine('[LOGO]'));
+    parts.push(cmdAlign(0));
+  } else {
+    // Sin logo: imprimir indicador del tipo de negocio
+    const typeLabels: Record<string, string> = {
+      general: '* MI TIENDA *', panaderia: '* PANADERIA *', pasteleria: '* PASTELERIA *',
+      carniceria: '* CARNICERIA *', farmacia: '* FARMACIA *', supermercado: '* SUPERMERCADO *',
+      restaurante: '* RESTAURANTE *', cafe: '* CAFE *', ferreteria: '* FERRETERIA *',
+      ropa: '* ROPA *', zapateria: '* ZAPATERIA *', optica: '* OPTICA *',
+      licoreria: '* LICORERIA *', beauty: '* BELLEZA *', veterinaria: '* VETERINARIA *',
+      papelera: '* PAPELERIA *',
+    };
+    const typeLabel = typeLabels[businessType || 'general'] || '* MI TIENDA *';
+    parts.push(cmdAlign(1));
+    parts.push(cmdBold(true));
+    parts.push(textLine(centerText(typeLabel, maxChars)));
+    parts.push(cmdBold(false));
+    parts.push(cmdAlign(0));
+  }
 
   // ═══ NOMBRE TIENDA — Doble alto + doble ancho ═══
   // Con doble ancho, solo caben halfChars caracteres por linea
@@ -337,7 +366,6 @@ export function generateEscposBuffer(params: {
   parts.push(doubleLine(maxChars));
 
   // ═══ INFO VENTA — tamano normal ═══
-  parts.push(textLine('ID: ' + receipt.id.slice(0, 8)));
   parts.push(textLine('Fecha: ' + dateStr + ' ' + timeStr));
   // Número de factura / correlativo
   const invoiceNumber = (receipt as any).invoiceNumber || '';
@@ -546,6 +574,9 @@ export function generateEscposBuffer(params: {
       parts.push(textLine(ticketFooterMsg));
     }
   }
+
+  // ID al final (despues del mensaje footer)
+  parts.push(textLine('ID: ' + receipt.id.slice(0, 8)));
 
   parts.push(cmdFeed(3));
   parts.push(cmdCut());

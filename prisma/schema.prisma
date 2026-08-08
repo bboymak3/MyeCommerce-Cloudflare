@@ -158,6 +158,9 @@ model Settings {
   ticketMarginRight    Float  @default(0)
   ticketUseAgent       Boolean @default(true)
   ticketAgentUrl       String @default("http://localhost:9100")
+  // Logo del negocio
+  storeLogo            String  @default("")
+  businessType         String  @default("general")
   // Promo configurable
   promoActive          Boolean @default(true)
   promoLabel           String  @default("PRECIO EXCLUSIVO")

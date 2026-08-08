@@ -83,6 +83,9 @@ export interface TicketSettings {
   ticketUseAgent?: boolean;
   ticketAgentUrl?: string;
   ticketCurrencyMode?: string;
+  // Logo del negocio
+  storeLogo?: string;
+  businessType?: string;
 }
 
 export interface TicketReceipt {
@@ -115,6 +118,14 @@ export interface TicketReceipt {
 function escHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+// Emojis por tipo de negocio para el ticket
+const BUSINESS_EMOJIS: Record<string, string> = {
+  general: '🏪', panaderia: '🥖', pasteleria: '🧁', carniceria: '🥩',
+  farmacia: '💊', supermercado: '🛒', restaurante: '🍽️', cafe: '☕',
+  ferreteria: '🔧', ropa: '👕', zapateria: '👟', optica: '👓',
+  licoreria: '🍷', beauty: '💄', veterinaria: '🐾', papelera: '📝',
+};
 
 function padL(s: string, len: number): string {
   return s.length >= len ? s : ' '.repeat(len - s.length) + s;
@@ -287,6 +298,7 @@ function printViaHtml(params: {
     ticketShowPhone, ticketShowSeller, ticketShowExchange, ticketShowSlogan,
     ticketPaperWidth, ticketMarginLeft, ticketMarginRight,
     ticketHeaderMsg, ticketFooterMsg,
+    storeLogo, businessType,
   } = settings;
 
   const preset = getPreset(ticketPaperWidth);
@@ -401,7 +413,13 @@ function printViaHtml(params: {
     html,body{width:${contentMm}mm!important;margin:0 auto!important;padding:${pad}!important;overflow:visible!important}
   }
 </style></head><body>
-
+${(() => {
+  if (storeLogo) {
+    return `<div style="text-align:center;margin-bottom:2px"><img src="${storeLogo}" style="max-width:${Math.min(contentMm * 2.5, 120)}px;max-height:80px;object-fit:contain" /></div>`;
+  }
+  const bizEmoji = BUSINESS_EMOJIS[businessType || 'general'] || '\u{1F3EA}';
+  return `<div style="text-align:center;font-size:28px;margin-bottom:2px">${bizEmoji}</div>`;
+})()}
 <div class="b" style="font-size:${storeNameSize}px;white-space:pre-wrap">${escHtml(storeName)}</div>
 ${storeRif ? `<div class="s">RIF: ${escHtml(storeRif)}</div>` : ''}
 ${storeAddress ? `<div class="s" style="white-space:pre-wrap">${escHtml(storeAddress)}</div>` : ''}
@@ -409,7 +427,6 @@ ${ticketShowPhone && storePhone ? `<div class="s">Tel: ${escHtml(storePhone)}</d
 ${ticketHeaderMsg ? `<div class="b" style="font-size:${base}px;margin-top:1px;white-space:pre-wrap">${escHtml(ticketHeaderMsg)}</div>` : ''}
 <div class="ln2"></div>
 
-<div class="s">ID: ${escHtml(receipt.id.slice(0, 8))}</div>
 <div class="s">Fecha: ${dateStr} ${timeStr}</div>
 ${invoiceNumHtml ? `
 <div class="b" style="font-size:${base}px">FACTURA DE VENTA</div>
@@ -471,6 +488,8 @@ ${ticketFooterMsg ? (ticketShowSlogan
   ? `<div class="fb">${escHtml(ticketFooterMsg)}</div>`
   : `<div class="fc">${escHtml(ticketFooterMsg)}</div>`
 ) : ''}
+
+<div class="s" style="text-align:center;margin-top:2px">ID: ${escHtml(receipt.id.slice(0, 8))}</div>
 
 <script>window.onload=function(){window.print();window.close();}<\/script>
 </body></html>`);

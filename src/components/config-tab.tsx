@@ -39,6 +39,8 @@ interface Settings {
   ticketMarginRight: number;
   ticketUseAgent: boolean;
   ticketAgentUrl: string;
+  storeLogo: string;
+  businessType: string;
 }
 
 interface BackupStatus {
@@ -96,6 +98,9 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [ticketAgentUrl, setTicketAgentUrl] = useState(settings.ticketAgentUrl || 'http://localhost:9100');
   const [agentStatus, setAgentStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
   const [agentInfo, setAgentInfo] = useState<any>(null);
+  const [storeLogo, setStoreLogo] = useState(settings.storeLogo || '');
+  const [businessType, setBusinessType] = useState(settings.businessType || 'general');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Sync theme from settings
   useEffect(() => {
@@ -143,6 +148,58 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const canZeroStock = licenseFeatures?.allowZeroStockConfig || false;
   const canDiscount = licenseFeatures?.productDiscount || false;
 
+  // Tipos de negocio con iconos SVG embebidos
+  const BUSINESS_TYPES = [
+    { id: 'general', label: 'General', emoji: '🏪' },
+    { id: 'panaderia', label: 'Panaderia', emoji: '🥖' },
+    { id: 'pasteleria', label: 'Pasteleria', emoji: '🧁' },
+    { id: 'carniceria', label: 'Carniceria', emoji: '🥩' },
+    { id: 'farmacia', label: 'Farmacia', emoji: '💊' },
+    { id: 'supermercado', label: 'Supermercado', emoji: '🛒' },
+    { id: 'restaurante', label: 'Restaurante', emoji: '🍽️' },
+    { id: 'cafe', label: 'Cafe', emoji: '☕' },
+    { id: 'ferreteria', label: 'Ferreteria', emoji: '🔧' },
+    { id: 'ropa', label: 'Ropa', emoji: '👕' },
+    { id: 'zapateria', label: 'Zapateria', emoji: '👟' },
+    { id: 'optica', label: 'Optica', emoji: '👓' },
+    { id: 'licoreria', label: 'Licoreria', emoji: '🍷' },
+    { id: 'beauty', label: 'Belleza', emoji: '💄' },
+    { id: 'veterinaria', label: 'Veterinaria', emoji: '🐾' },
+    { id: 'papelera', label: 'Papeleria', emoji: '📝' },
+  ];
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tamano
+    if (file.size > 512 * 1024) {
+      toast.error('Imagen demasiado grande. Maximo 512KB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      const res = await fetch('/api/store-logo', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStoreLogo(data.url);
+        toast.success('Logo guardado correctamente');
+      } else {
+        toast.error(data.error || 'Error al subir logo');
+      }
+    } catch {
+      toast.error('Error al subir logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const saveSettings = async () => {
     setSaving(true);
     try {
@@ -173,6 +230,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         ticketMarginRight: parseFloat(String(ticketMarginRight)),
         ticketUseAgent,
         ticketAgentUrl: ticketAgentUrl.replace(/\/+$/, ''),
+        storeLogo,
+        businessType,
       };
 
       const res = await fetch("/api/settings", {
@@ -331,6 +390,90 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
               onChange={(e) => setStoreName(e.target.value)}
               placeholder="Nombre de tu negocio"
             />
+          </div>
+
+          {/* ====== Logo del Negocio + Tipo de Negocio ====== */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Logo Upload */}
+            <div className="space-y-2">
+              <Label>Logo del Negocio</Label>
+              <div className="flex items-center gap-3">
+                <div className="relative w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden bg-white dark:bg-gray-800 shrink-0">
+                  {storeLogo ? (
+                    <img
+                      src={storeLogo}
+                      alt="Logo"
+                      className="w-full h-full object-contain p-1"
+                    />
+                  ) : (
+                    <span className="text-3xl">
+                      {BUSINESS_TYPES.find(b => b.id === businessType)?.emoji || '🏪'}
+                    </span>
+                  )}
+                  {storeLogo && (
+                    <button
+                      type="button"
+                      onClick={() => setStoreLogo('')}
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600 shadow"
+                      title="Quitar logo"
+                    >
+                      x
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp,image/bmp"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                    <div className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      uploadingLogo
+                        ? 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500'
+                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50'
+                    }`}>
+                      {uploadingLogo ? 'Subiendo...' : 'Subir Logo'}
+                    </div>
+                  </label>
+                  <p className="text-xs text-gray-500">PNG, JPG, GIF o WEBP (max 512KB)</p>
+                  {!storeLogo && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Se usara el icono del tipo de negocio como logo en el ticket
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Tipo de Negocio */}
+            <div className="space-y-2">
+              <Label>Tipo de Negocio</Label>
+              <div className="grid grid-cols-4 gap-1.5 max-h-24 overflow-y-auto p-1 border rounded-md bg-gray-50 dark:bg-gray-900">
+                {BUSINESS_TYPES.map((bt) => (
+                  <button
+                    key={bt.id}
+                    type="button"
+                    onClick={() => setBusinessType(bt.id)}
+                    title={bt.label}
+                    className={`flex items-center justify-center w-full aspect-square rounded-md text-xl transition-all ${
+                      businessType === bt.id
+                        ? 'bg-blue-500 text-white ring-2 ring-blue-300 dark:ring-blue-700 scale-110 shadow-md'
+                        : 'bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-105'
+                    }`}
+                  >
+                    {bt.emoji}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">{BUSINESS_TYPES.find(b => b.id === businessType)?.emoji || '🏪'}</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {BUSINESS_TYPES.find(b => b.id === businessType)?.label || 'General'}
+                </span>
+              </div>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
