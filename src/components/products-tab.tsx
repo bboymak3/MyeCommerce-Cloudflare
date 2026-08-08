@@ -46,7 +46,7 @@ function Chevron({ open }: { open: boolean }) {
 }
 function MarginBar({ margin }: { margin: number }) {
   const c = margin >= 40 ? 'bg-green-500' : margin >= 20 ? 'bg-yellow-500' : margin > 0 ? 'bg-red-500' : 'bg-gray-300';
-  return <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${c}`} style={{ width: `${Math.min(Math.max(margin, 0), 100)}%` }} /></div>;
+  return <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${c}`} style={{ width: `${Math.min(Math.max(margin, 0), 100)}%` }} title={`${margin}%`} /></div>;
 }
 function Block({ title, icon, badge, defaultOpen = true, children }: { title: string; icon: string; badge?: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -129,8 +129,21 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const filtered = products.filter(p => (p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)) && (!filterCategory || p.categoryId === filterCategory));
 
   // ─── FINANCE TOTALS ───
-  const totals = products.reduce((a, p) => { a.val += p.price * p.stock; a.inv += p.cost * p.stock; a.units += p.stock; a.withStock += p.stock > 0 ? 1 : 0; a.noStock += p.stock <= 0 && !p.noStock ? 1 : 0; return a; }, { val: 0, inv: 0, units: 0, withStock: 0, noStock: 0 });
+  // Solo considerar productos con stock > 0 y con precio > 0
+  const activeProducts = products.filter(p => p.stock > 0 && p.price > 0);
+  const totals = activeProducts.reduce((a, p) => {
+    // Valor de inventario = precio de venta x stock (a cuanto puedo vender)
+    a.val += p.price * p.stock;
+    // Capital invertido = costo de compra x stock (cuanto me costo)
+    a.inv += (p.cost || 0) * p.stock;
+    a.units += p.stock;
+    a.withStock += 1;
+    return a;
+  }, { val: 0, inv: 0, units: 0, withStock: 0, noStock: 0 });
+  const noStockCount = products.filter(p => p.stock <= 0 && !p.noStock).length;
+  // Ganancia potencial = Valor de venta - Capital invertido
   const gain = totals.val - totals.inv;
+  // Margen promedio = Ganancia / Valor de venta (porcentaje sobre el precio)
   const avgMargin = totals.val > 0 ? (gain / totals.val) * 100 : 0;
 
   // ─── HANDLERS ───
@@ -230,17 +243,22 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
         <CardContent className="p-3">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-bold">Resumen del Inventario</span>
-            <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowFinance(!showFinance)}>{showFinance ? 'Ocultar' : 'Mostrar'}</Button>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">{totals.withStock} productos con stock • {noStockCount} sin stock</span>
+              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowFinance(!showFinance)}>{showFinance ? 'Ocultar' : 'Mostrar'}</Button>
+            </div>
           </div>
           {showFinance && (
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-white rounded border p-2 text-center">
                 <p className="text-[9px] text-muted-foreground uppercase">Valor Inventario</p>
                 <p className="text-sm font-bold text-blue-600">{currency} {totals.val.toFixed(2)}</p>
+                <p className="text-[8px] text-muted-foreground">Precio venta x {totals.units.toFixed(0)} uds</p>
               </div>
               <div className="bg-white rounded border p-2 text-center">
                 <p className="text-[9px] text-muted-foreground uppercase">Capital Invertido</p>
                 <p className="text-sm font-bold text-orange-600">{currency} {totals.inv.toFixed(2)}</p>
+                <p className="text-[8px] text-muted-foreground">Costo compra x {totals.units.toFixed(0)} uds</p>
               </div>
               <div className="bg-white rounded border p-2 text-center">
                 <p className="text-[9px] text-muted-foreground uppercase">Ganancia Potencial</p>
@@ -377,7 +395,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 </div>
                 <div>
                   <Label className="text-xs">Margen %</Label>
-                  <Input type="number" step="0.1" min="0" max="99" value={formData.marginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, marginPercent: m }; if (formData.cost && m) nf.price = calcPrice(formData.cost, m); setFormData(nf); }} placeholder="35" className="text-sm font-mono" />
+                  <Input type="number" step="0.1" min="0" value={formData.marginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, marginPercent: m }; if (formData.cost && m) nf.price = calcPrice(formData.cost, m); setFormData(nf); }} placeholder="35" className="text-sm font-mono" />
                 </div>
                 <div>
                   <Label className="text-xs">Precio ({currency}) *</Label>
@@ -405,7 +423,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
             <Block title="Venta por Bulto / Mayoristas" icon="📋" badge={formData.unitsPerBox && formData.unitsPerBox !== "0" ? "ACTIVO" : undefined} defaultOpen={false}>
               <div className="grid grid-cols-4 gap-2">
                 <div><Label className="text-[10px]">Unidades por Bulto</Label><Input type="number" min="0" value={formData.unitsPerBox} onChange={e => setFormData({ ...formData, unitsPerBox: e.target.value })} placeholder="Ej: 20" className="text-sm" /><p className="text-[8px] text-muted-foreground">Paca de N unidades</p></div>
-                <div><Label className="text-[10px]">Margen Bulto %</Label><Input type="number" step="0.1" min="0" max="99" value={formData.boxMarginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, boxMarginPercent: m }; if (formData.cost && m && formData.unitsPerBox) nf.boxPrice = calcBoxPrice(formData.cost, m, formData.unitsPerBox); setFormData(nf); }} placeholder="25" className="text-sm" /></div>
+                <div><Label className="text-[10px]">Margen Bulto %</Label><Input type="number" step="0.1" min="0" value={formData.boxMarginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, boxMarginPercent: m }; if (formData.cost && m && formData.unitsPerBox) nf.boxPrice = calcBoxPrice(formData.cost, m, formData.unitsPerBox); setFormData(nf); }} placeholder="25" className="text-sm" /></div>
                 <div><Label className="text-[10px]">Precio Bulto ({currency})</Label><Input type="number" step="0.01" min="0" value={autoBoxPrice || formData.boxPrice} onChange={e => setFormData({ ...formData, boxPrice: e.target.value })} className="text-sm font-bold text-emerald-600" />{autoBoxPrice && <p className="text-[8px] text-blue-600">Auto: (costo x {formData.unitsPerBox}) + margen</p>}</div>
                 <div><Label className="text-[10px]">Stock Minimo (alerta)</Label><Input type="number" min="0" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: e.target.value })} placeholder="5" className="text-sm" /></div>
               </div>

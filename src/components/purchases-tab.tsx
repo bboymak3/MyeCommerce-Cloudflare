@@ -379,7 +379,7 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                             <Input type="number" step="0.01" min="0" value={item.boxCost || 0} onChange={(e) => updateItem(idx, 'boxCost', e.target.value)} className="h-8 text-center" />
                           </td>
                           <td className="p-1">
-                            <Input type="number" step="0.1" min="0" max="99" value={item.calcMargin || 0} onChange={(e) => updateItem(idx, 'calcMargin', e.target.value)} className="h-8 text-center" />
+                            <Input type="number" step="0.1" min="0" value={item.calcMargin || 0} onChange={(e) => updateItem(idx, 'calcMargin', e.target.value)} className="h-8 text-center" />
                           </td>
                           <td className="p-1 text-center">
                             <span className={`text-xs font-bold ${item.calcPrice > 0 ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
