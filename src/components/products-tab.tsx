@@ -93,6 +93,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
     price: "",
     cost: "",
     stock: "",
+    minStock: "5",
     categoryId: "",
     icon: "",
     wholesalePrice: "",
@@ -389,7 +390,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
       return;
     }
     setEditingProduct(null);
-    setFormData({ name: "", description: "", barcode: "", price: "", cost: "", stock: "", categoryId: "", icon: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg" });
+    setFormData({ name: "", description: "", barcode: "", price: "", cost: "", stock: "", minStock: "5", categoryId: "", icon: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg" });
     setShowProductDialog(true);
   };
 
@@ -402,6 +403,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
       price: product.price.toString(),
       cost: product.cost.toString(),
       stock: product.stock.toString(),
+      minStock: (product.minStock || 5).toString(),
       categoryId: product.categoryId || "",
       icon: product.icon || "",
       wholesalePrice: (product.wholesalePrice || 0).toString(),
@@ -631,7 +633,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 {stockAlerts.zeroStock.map((p) => (
                   <div key={p.id} className="flex items-center justify-between text-xs bg-white rounded px-2 py-1.5 border border-red-100">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span>{p.icon || '&#128230;'}</span>
+                      <span dangerouslySetInnerHTML={{ __html: p.icon || '&#128230;' }} />
                       <span className="font-medium truncate">{p.name}</span>
                       {p.categoryName && <CatBadge categoryName={p.categoryName} categories={categories} />}
                     </div>
@@ -653,7 +655,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 {stockAlerts.lowStock.map((p) => (
                   <div key={p.id} className="flex items-center justify-between text-xs bg-white rounded px-2 py-1.5 border border-orange-100">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span>{p.icon || '&#128230;'}</span>
+                      <span dangerouslySetInnerHTML={{ __html: p.icon || '&#128230;' }} />
                       <span className="font-medium truncate">{p.name}</span>
                       {p.categoryName && <CatBadge categoryName={p.categoryName} categories={categories} />}
                     </div>
@@ -867,19 +869,29 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 />
               </div>
               <div>
-                <Label>Categoría</Label>
-                <Select
-                  value={formData.categoryId}
-                  onChange={(e: any) => setFormData({ ...formData, categoryId: e.target.value })}
-                >
-                  <option value="">Sin categoría</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </Select>
+                <Label>Stock Mínimo (alerta)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={formData.minStock}
+                  onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                  placeholder="5"
+                />
               </div>
+            </div>
+            <div>
+              <Label>Categoría</Label>
+              <Select
+                value={formData.categoryId}
+                onChange={(e: any) => setFormData({ ...formData, categoryId: e.target.value })}
+              >
+                <option value="">Sin categoría</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </Select>
             </div>
             {formData.price && bcvRate > 0 && (
               <p className="text-sm text-green-600">
