@@ -31,6 +31,9 @@ model Product {
   lotNumber         String     @default("")
   isCombo           Boolean    @default(false)
   loyaltyPoints     Int        @default(0)
+  unitsPerBox       Int        @default(0)
+  boxPrice          Float      @default(0)
+  boxMarginPercent  Float      @default(0)
   categoryId        String?
   category          Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   active            Boolean    @default(true)
@@ -39,6 +42,8 @@ model Product {
   saleItems         SaleItem[]
   devolutionItems   DevolutionItem[]
   purchaseItems     PurchaseItem[]
+  comboItems        ComboItem[]
+  comboItemsRef     ComboItem[] @relation("ProductComboItems")
 }
 
 model Category {
@@ -315,6 +320,15 @@ model Purchase {
 
   @@index([date])
   @@index([supplierId])
+}
+
+model ComboItem {
+  id        String  @id @default(cuid())
+  comboId   String
+  productId String
+  quantity  Int     @default(1)
+  combo     Product @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  product   Product @relation("ProductComboItems", fields: [productId], references: [id])
 }
 
 model PurchaseItem {

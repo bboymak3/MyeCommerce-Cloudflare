@@ -10,7 +10,11 @@ export async function GET() {
   try {
     const products = await db.product.findMany({
       where: { active: true },
-      include: { category: true },
+      include: {
+        category: true,
+        comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
+        comboItemsRef: { include: { combo: { select: { id: true, name: true } } } },
+      },
       orderBy: { name: 'asc' },
     });
     return NextResponse.json(products);
@@ -33,6 +37,9 @@ export async function POST(req: NextRequest) {
     const stock = safeFloat(body.stock, 0);
     const minStock = safeFloat(body.minStock, 5);
     const wholesalePrice = safeFloat(body.wholesalePrice, 0);
+    const unitsPerBox = Math.max(0, parseInt(body.unitsPerBox || 0));
+    const boxPrice = safeFloat(body.boxPrice, 0);
+    const boxMarginPercent = safeFloat(body.boxMarginPercent, 0);
 
     const product = await db.product.create({
       data: {
@@ -59,6 +66,13 @@ export async function POST(req: NextRequest) {
         lotNumber: body.lotNumber || '',
         isCombo: body.isCombo === true,
         loyaltyPoints: Math.max(0, parseInt(body.loyaltyPoints || 0)),
+        unitsPerBox,
+        boxPrice: Math.max(0, boxPrice),
+        boxMarginPercent: Math.max(0, boxMarginPercent),
+      },
+      include: {
+        category: true,
+        comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
       },
     });
     return NextResponse.json(product);
@@ -106,6 +120,13 @@ export async function PUT(req: NextRequest) {
         lotNumber: body.lotNumber !== undefined ? body.lotNumber : undefined,
         isCombo: body.isCombo !== undefined ? body.isCombo === true : undefined,
         loyaltyPoints: body.loyaltyPoints !== undefined ? Math.max(0, parseInt(body.loyaltyPoints || 0)) : undefined,
+        unitsPerBox: body.unitsPerBox !== undefined ? Math.max(0, parseInt(body.unitsPerBox || 0)) : undefined,
+        boxPrice: body.boxPrice !== undefined ? Math.max(0, safeFloat(body.boxPrice, 0)) : undefined,
+        boxMarginPercent: body.boxMarginPercent !== undefined ? Math.max(0, safeFloat(body.boxMarginPercent, 0)) : undefined,
+      },
+      include: {
+        category: true,
+        comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
       },
     });
     return NextResponse.json(product);
@@ -129,13 +150,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Porcentaje invalido' }, { status: 400 });
     }
 
-    // Construir filtro: toda la categoria o todo el inventario
     const where: any = { active: true };
     if (categoryId && categoryId !== 'ALL') {
       where.categoryId = categoryId;
     }
 
-    // Obtener productos afectados (para preview)
     const affected = await db.product.findMany({
       where,
       select: { id: true, name: true, price: true, cost: true, wholesalePrice: true, categoryId: true },
@@ -146,26 +165,18 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'No se encontraron productos con los filtros seleccionados' }, { status: 404 });
     }
 
-    // Calcular nuevos precios segun modo
     const applyToSale = applyTo === 'sale' || applyTo === 'both';
     const applyToCost = applyTo === 'cost' || applyTo === 'both';
-    const applyToWholesale = applyTo === 'both'; // aplicar a mayorista tambien cuando es ambos
+    const applyToWholesale = applyTo === 'both';
 
     const updates = affected.map(p => {
       const data: any = {};
-      if (applyToSale && p.price > 0) {
-        data.price = Math.round(p.price * (1 + pct / 100) * 10000) / 10000;
-      }
-      if (applyToCost && p.cost > 0) {
-        data.cost = Math.round(p.cost * (1 + pct / 100) * 10000) / 10000;
-      }
-      if (applyToWholesale && p.wholesalePrice > 0) {
-        data.wholesalePrice = Math.round(p.wholesalePrice * (1 + pct / 100) * 10000) / 10000;
-      }
+      if (applyToSale && p.price > 0) data.price = Math.round(p.price * (1 + pct / 100) * 10000) / 10000;
+      if (applyToCost && p.cost > 0) data.cost = Math.round(p.cost * (1 + pct / 100) * 10000) / 10000;
+      if (applyToWholesale && p.wholesalePrice > 0) data.wholesalePrice = Math.round(p.wholesalePrice * (1 + pct / 100) * 10000) / 10000;
       return { id: p.id, data };
     }).filter(u => Object.keys(u.data).length > 0);
 
-    // Aplicar en batch con transaction
     const result = await db.$transaction(
       updates.map(u => db.product.update({ where: { id: u.id }, data: u.data }))
     );
@@ -180,13 +191,7 @@ export async function PATCH(req: NextRequest) {
       preview: affected.map(p => {
         const newPrice = applyToSale && p.price > 0 ? Math.round(p.price * (1 + pct / 100) * 10000) / 10000 : p.price;
         const newCost = applyToCost && p.cost > 0 ? Math.round(p.cost * (1 + pct / 100) * 10000) / 10000 : p.cost;
-        return {
-          name: p.name,
-          oldPrice: p.price,
-          newPrice,
-          oldCost: p.cost,
-          newCost,
-        };
+        return { name: p.name, oldPrice: p.price, newPrice, oldCost: p.cost, newCost };
       }),
     });
   } catch (error) {
@@ -200,7 +205,6 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
-
     await db.product.update({ where: { id }, data: { active: false } });
     return NextResponse.json({ success: true });
   } catch (error) {
