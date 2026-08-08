@@ -25,8 +25,11 @@ interface Product {
   name: string;
   description: string;
   barcode: string;
+  secondaryBarcode: string;
   price: number;
   cost: number;
+  marginPercent: number;
+  taxType: string;
   stock: number;
   minStock: number;
   wholesalePrice: number;
@@ -35,6 +38,12 @@ interface Product {
   vendePorPeso?: boolean;
   unidadPeso?: string;
   icon: string;
+  image: string;
+  location: string;
+  expirationDate: string | null;
+  lotNumber: string;
+  isCombo: boolean;
+  loyaltyPoints: number;
   categoryId: string | null;
   category: { name: string } | null;
   active: boolean;
@@ -90,17 +99,26 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
     name: "",
     description: "",
     barcode: "",
+    secondaryBarcode: "",
     price: "",
     cost: "",
+    marginPercent: "",
+    taxType: "general",
     stock: "",
     minStock: "5",
     categoryId: "",
     icon: "",
+    image: "",
     wholesalePrice: "",
     minWholesaleQty: "",
     noStock: false,
     vendePorPeso: false,
     unidadPeso: "kg",
+    location: "",
+    expirationDate: "",
+    lotNumber: "",
+    isCombo: false,
+    loyaltyPoints: "",
   });
   const [categoryName, setCategoryName] = useState("");
     const [newCatIcon, setNewCatIcon] = useState("");
@@ -230,6 +248,39 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const [barcodeScannerError, setBarcodeScannerError] = useState("");
   const barcodeScannerRef = useRef<any>(null);
   const barcodeScannerDivId = useRef<string>("product-barcode-scanner-" + Date.now());
+
+  // ===== IMAGE UPLOAD =====
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file);
+    e.target.value = "";
+  };
+
+  const handleGallerySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleImageUpload(file);
+    e.target.value = "";
+  };
+
+  const handleImageUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await fetch("/api/products/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.imageUrl) {
+        setFormData(prev => ({ ...prev, image: data.imageUrl }));
+        toast.success("Imagen subida correctamente");
+      }
+    } catch { toast.error("Error al subir imagen"); }
+    finally { setUploading(false); }
+  };
+
 
   const openBarcodeScanner = async () => {
     setShowBarcodeScanner(true);
@@ -390,7 +441,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
       return;
     }
     setEditingProduct(null);
-    setFormData({ name: "", description: "", barcode: "", price: "", cost: "", stock: "", minStock: "5", categoryId: "", icon: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg" });
+    setFormData({ name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "" });
     setShowProductDialog(true);
   };
 
@@ -400,17 +451,26 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
       name: product.name,
       description: product.description,
       barcode: product.barcode,
+      secondaryBarcode: product.secondaryBarcode || "",
       price: product.price.toString(),
       cost: product.cost.toString(),
+      marginPercent: (product.marginPercent || 0).toString(),
+      taxType: product.taxType || "general",
       stock: product.stock.toString(),
       minStock: (product.minStock || 5).toString(),
       categoryId: product.categoryId || "",
       icon: product.icon || "",
+      image: product.image || "",
       wholesalePrice: (product.wholesalePrice || 0).toString(),
       minWholesaleQty: (product.minWholesaleQty || 0).toString(),
       noStock: product.noStock || false,
       vendePorPeso: product.vendePorPeso || false,
       unidadPeso: product.unidadPeso || "kg",
+      location: product.location || "",
+      expirationDate: product.expirationDate ? product.expirationDate.split("T")[0] : "",
+      lotNumber: product.lotNumber || "",
+      isCombo: product.isCombo || false,
+      loyaltyPoints: (product.loyaltyPoints || 0).toString(),
     });
     setShowProductDialog(true);
   };
@@ -736,6 +796,10 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                         </span>
                       ) : <span className="text-muted-foreground text-xs">-</span>}
                     </td>
+                    <td className="p-2 text-center">
+                      {product.taxType === 'exento' ? <span className="text-[10px] text-gray-500">Exento</span> : product.taxType === 'reducido' ? <span className="text-[10px] text-blue-600">8%</span> : <span className="text-[10px] text-orange-600">16%</span>}
+                      {product.isCombo && <Badge variant="outline" className="text-orange-600 text-[8px] px-1 py-0 ml-1">KIT</Badge>}
+                    </td>
                     <td className="p-2">{product.category?.name || "-"}</td>
                     <td className="p-2 text-center">
                       <div className="flex gap-1 justify-center">
@@ -751,7 +815,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 ))}
                 {filteredProducts.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="text-center p-8 text-muted-foreground">
+                    <td colSpan={11} className="text-center p-8 text-muted-foreground">
                       No se encontraron productos
                     </td>
                   </tr>
@@ -898,7 +962,33 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 Precio en Bs: Bs {(parseFloat(formData.price) * bcvRate).toFixed(2)}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-4">
+                        {/* ═══ TRAZABILIDAD Y COMERCIAL ═══ */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-[10px]">Fecha Vencimiento</Label>
+                <Input type="date" value={formData.expirationDate} onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })} />
+              </div>
+              <div>
+                <Label className="text-[10px]">Número de Lote</Label>
+                <Input value={formData.lotNumber} onChange={(e) => setFormData({ ...formData, lotNumber: e.target.value })} placeholder="Lote proveedor" />
+              </div>
+              <div>
+                <Label className="text-[10px]">Ubicación en Tienda</Label>
+                <Input value={formData.location} onChange={(e) => setFormData({ ...formData, location: e.target.value })} placeholder="Pasillo 4, Anaquel C" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="isCombo" checked={formData.isCombo} onChange={(e) => setFormData({ ...formData, isCombo: e.target.checked })} className="h-4 w-4 rounded border-input" />
+                <Label htmlFor="isCombo" className="text-sm font-normal cursor-pointer">Es Combo / Kit</Label>
+              </div>
+              <div>
+                <Label className="text-[10px]">Puntos Fidelidad</Label>
+                <Input type="number" min="0" value={formData.loyaltyPoints} onChange={(e) => setFormData({ ...formData, loyaltyPoints: e.target.value })} placeholder="0" />
+              </div>
+            </div>
+
+<div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"

@@ -58,3 +58,15 @@ printer-agent/spool/
 
 # Caddy data
 caddy/data/
+
+# Old working copies (NOT part of project)
+/ecomerce-repo/
+/github-push/
+/upload/
+/skills/
+/scripts/
+/download/
+/tool-results/
+
+# Session artifacts
+*.PNG

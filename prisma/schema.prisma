@@ -8,28 +8,37 @@ datasource db {
 }
 
 model Product {
-  id          String     @id @default(cuid())
-  name        String
-  description String     @default("")
-  barcode     String     @default("")
-  price       Float
-  cost        Float      @default(0)
-  stock       Float      @default(0)
-  minStock    Float      @default(5)
-  icon        String     @default("")
-  wholesalePrice  Float    @default(0)
-  minWholesaleQty Int     @default(0)
-  noStock     Boolean    @default(false)
-  vendePorPeso Boolean    @default(false)
-  unidadPeso  String     @default("")
-  categoryId  String?
-  category    Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  active      Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  saleItems       SaleItem[]
-  devolutionItems DevolutionItem[]
-  purchaseItems   PurchaseItem[]
+  id                String     @id @default(cuid())
+  name              String
+  description       String     @default("")
+  barcode           String     @default("")
+  secondaryBarcode  String     @default("")
+  price             Float
+  cost              Float      @default(0)
+  marginPercent     Float      @default(0)
+  taxType           String     @default("general")  // exento, reducido(8%), general(16%) SENIAT
+  stock             Float      @default(0)
+  minStock          Float      @default(5)
+  icon              String     @default("")
+  image             String     @default("")
+  wholesalePrice    Float      @default(0)
+  minWholesaleQty   Int        @default(0)
+  noStock           Boolean    @default(false)
+  vendePorPeso      Boolean    @default(false)
+  unidadPeso        String     @default("")
+  location          String     @default("")          // Ej: Pasillo 4, Anaquel C
+  expirationDate    DateTime?
+  lotNumber         String     @default("")
+  isCombo           Boolean    @default(false)
+  loyaltyPoints     Int        @default(0)
+  categoryId        String?
+  category          Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  active            Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  saleItems         SaleItem[]
+  devolutionItems   DevolutionItem[]
+  purchaseItems     PurchaseItem[]
 }
 
 model Category {
