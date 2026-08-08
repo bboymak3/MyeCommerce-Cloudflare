@@ -349,6 +349,8 @@ export async function GET(req: NextRequest) {
 
     const transferTotal = referenceDetails.filter(r => r.paymentType === 'Transferencia').reduce((sum, r) => sum + r.totalBs, 0);
     const mobileTotal = referenceDetails.filter(r => r.paymentType === 'Pago Movil').reduce((sum, r) => sum + r.totalBs, 0);
+    const zelleTotalUsd = referenceDetails.filter(r => r.paymentType === 'Zelle').reduce((sum, r) => sum + r.totalUsd, 0);
+    const usdtTotalUsd = referenceDetails.filter(r => r.paymentType === 'USDT').reduce((sum, r) => sum + r.totalUsd, 0);
 
     // ===== SELLER BREAKDOWN / RANKING (all sellers in period, without filters) =====
     const allSalesInPeriod = (sellerFilter || roleFilter)
@@ -420,6 +422,8 @@ export async function GET(req: NextRequest) {
       referenceDetails,
       transferTotal,
       mobileTotal,
+      zelleTotalUsd,
+      usdtTotalUsd,
       sellerBreakdown,
       sellerList,
       roleBreakdown,

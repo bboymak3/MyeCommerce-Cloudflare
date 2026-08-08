@@ -175,6 +175,8 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
   const [referenceDetails, setReferenceDetails] = useState<ReferenceDetail[]>([]);
   const [transferTotal, setTransferTotal] = useState(0);
   const [mobileTotal, setMobileTotal] = useState(0);
+  const [zelleTotalUsd, setZelleTotalUsd] = useState(0);
+  const [usdtTotalUsd, setUsdtTotalUsd] = useState(0);
   const [sellerBreakdown, setSellerBreakdown] = useState<SellerInfo[]>([]);
   const [sellerList, setSellerList] = useState<string[]>([]);
   const [roleBreakdown, setRoleBreakdown] = useState<{ role: string; label: string; salesCount: number; totalUsd: number; totalBs: number }[]>([]);
@@ -226,6 +228,8 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
         setReferenceDetails(data.referenceDetails || []);
         setTransferTotal(data.transferTotal || 0);
         setMobileTotal(data.mobileTotal || 0);
+        setZelleTotalUsd(data.zelleTotalUsd || 0);
+        setUsdtTotalUsd(data.usdtTotalUsd || 0);
         setSellerBreakdown(data.sellerBreakdown || []);
         setSellerList(data.sellerList || []);
         setRoleBreakdown(data.roleBreakdown || []);
@@ -346,8 +350,11 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
     const sellerLabel = sellerFilter ? ` | Vendedor: ${sellerFilter}` : '';
     const roleLabel = roleFilter ? ` | Rol: ${roleFilter === "admin" ? "Administrador" : roleFilter === "vendedor" ? "Vendedor" : "Cajero"}` : '';
 
-    const refRows = referenceDetails.map((r) =>
+    const bsRefRows = referenceDetails.filter(r => r.paymentType === 'Transferencia' || r.paymentType === 'Pago Movil').map((r) =>
       `<tr><td>${r.saleTime}</td><td>${r.customerName}</td><td><strong>${r.paymentType}</strong></td><td class="ref">${r.reference}</td><td class="amount">Bs ${r.totalBs.toFixed(2)}</td></tr>`
+    ).join('');
+    const usdRefRows = referenceDetails.filter(r => r.paymentType === 'Zelle' || r.paymentType === 'USDT').map((r) =>
+      `<tr><td>${r.saleTime}</td><td>${r.customerName}</td><td><strong>${r.paymentType}</strong></td><td class="ref">${r.reference}</td><td class="amount">$ ${r.totalUsd.toFixed(2)}</td></tr>`
     ).join('');
 
     const payRows = Object.entries(paymentBreakdown).filter(([, v]) => v.count > 0)
@@ -437,7 +444,8 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
         ${payRows}
         <tr class="totals-row"><td>TOTAL BRUTO</td><td>${salesCount}</td><td>$ ${grossTotalSales.toFixed(2)}</td><td>Bs ${grossTotalBs.toFixed(2)}</td><td>100%</td></tr>
       </tbody></table>
-      ${referenceDetails.length > 0 ? `<h2>Transferencias y Pago Movil</h2><table><thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto (Bs)</th></tr></thead><tbody>${refRows}</tbody></table>` : ''}
+      ${bsRefRows ? `<h2>Bs Electronicos — Transferencia + Pago Movil</h2><table><thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto (Bs)</th></tr></thead><tbody>${bsRefRows}</tbody></table>` : ''}
+      ${usdRefRows ? `<h2>USD Electronicos — Zelle + USDT</h2><table><thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto ($)</th></tr></thead><tbody>${usdRefRows}</tbody></table>` : ''}
       ${topProducts.length > 0 ? `<h2>Top Productos</h2><table><thead><tr><th>#</th><th>Producto</th><th>Cant.</th><th>Total $</th><th>Total Bs</th></tr></thead><tbody>${topProducts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.productName || p.name || 'Producto'}</td><td>${p.quantity || 0}</td><td>$ ${(p.total || p.totalUsd || 0).toFixed(2)}</td><td>Bs ${((p.total || p.totalUsd || 0) * bcvRate).toFixed(2)}</td></tr>`).join('')}</tbody></table>` : ''}
       <div class="footer">Reporte generado por MyeCommerce POS v2.9.6</div>
       <script>window.onload=function(){window.print();}</script></body></html>`);
@@ -1210,62 +1218,131 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
       })()}
 
       {/* ====== REFERENCIAS ====== */}
-      {referenceDetails.length > 0 && (
-        <Card className="border-blue-200 bg-blue-50/30">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              Transferencias y Pago Movil <Badge variant="secondary" className="text-[9px]">{periodLabel}</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
-              <div className="p-2 rounded bg-blue-100/50 text-center">
-                <p className="text-[10px] text-muted-foreground">Transferencias</p>
-                <p className="text-sm font-bold text-blue-700">{referenceDetails.filter(r => r.paymentType === 'Transferencia').length} ops</p>
-                <p className="text-xs font-semibold text-blue-600">Bs {transferTotal.toFixed(2)}</p>
-              </div>
-              <div className="p-2 rounded bg-green-100/50 text-center">
-                <p className="text-[10px] text-muted-foreground">Pago Movil</p>
-                <p className="text-sm font-bold text-green-700">{referenceDetails.filter(r => r.paymentType === 'Pago Movil').length} ops</p>
-                <p className="text-xs font-semibold text-green-600">Bs {mobileTotal.toFixed(2)}</p>
-              </div>
-              <div className="p-2 rounded bg-amber-100/50 text-center col-span-2 sm:col-span-1">
-                <p className="text-[10px] text-muted-foreground">Total Digital</p>
-                <p className="text-sm font-bold text-amber-700">{referenceDetails.length} ops</p>
-                <p className="text-xs font-semibold text-amber-600">Bs {(transferTotal + mobileTotal).toFixed(2)}</p>
-              </div>
-            </div>
-            <div className="overflow-x-auto max-h-64 overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead className="bg-blue-100/70 sticky top-0">
-                  <tr>
-                    <th className="text-left p-2 font-medium">Fecha/Hora</th>
-                    <th className="text-left p-2 font-medium">Cliente</th>
-                    <th className="text-left p-2 font-medium">Tipo</th>
-                    <th className="text-left p-2 font-medium">Referencia</th>
-                    <th className="text-right p-2 font-medium">Monto (Bs)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {referenceDetails.map((ref, idx) => (
-                    <tr key={`${ref.saleId}-${idx}`} className="border-t hover:bg-blue-50/50">
-                      <td className="p-2 text-[11px]">{ref.saleTime}</td>
-                      <td className="p-2 text-[11px]">{ref.customerName}</td>
-                      <td className="p-2">
-                        <Badge variant="outline" className={`text-[9px] ${ref.paymentType === 'Transferencia' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-green-100 text-green-700 border-green-200'}`}>
-                          {ref.paymentType}
-                        </Badge>
-                      </td>
-                      <td className="p-2 font-mono text-[11px] font-semibold tracking-wide">{ref.reference}</td>
-                      <td className="p-2 text-right font-bold text-green-600">Bs {ref.totalBs.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {referenceDetails.length > 0 && (() => {
+        const bsRefs = referenceDetails.filter(r => r.paymentType === 'Transferencia' || r.paymentType === 'Pago Movil');
+        const usdRefs = referenceDetails.filter(r => r.paymentType === 'Zelle' || r.paymentType === 'USDT');
+        return (<>
+          {/* BS ELECTRONICOS */}
+          {bsRefs.length > 0 && (
+            <Card className="border-blue-200 bg-blue-50/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full bg-blue-500" />
+                  Bs Electronicos — Transferencia + Pago Movil
+                  <Badge variant="secondary" className="text-[9px]">{periodLabel}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+                  <div className="p-2 rounded bg-blue-100/50 text-center">
+                    <p className="text-[10px] text-muted-foreground">Transferencias</p>
+                    <p className="text-sm font-bold text-blue-700">{referenceDetails.filter(r => r.paymentType === 'Transferencia').length} ops</p>
+                    <p className="text-xs font-semibold text-blue-600">Bs {transferTotal.toFixed(2)}</p>
+                  </div>
+                  <div className="p-2 rounded bg-cyan-100/50 text-center">
+                    <p className="text-[10px] text-muted-foreground">Pago Movil</p>
+                    <p className="text-sm font-bold text-cyan-700">{referenceDetails.filter(r => r.paymentType === 'Pago Movil').length} ops</p>
+                    <p className="text-xs font-semibold text-cyan-600">Bs {mobileTotal.toFixed(2)}</p>
+                  </div>
+                  <div className="p-2 rounded bg-blue-200/50 text-center col-span-2 sm:col-span-1">
+                    <p className="text-[10px] text-muted-foreground">Total Bs Electronicos</p>
+                    <p className="text-sm font-bold text-blue-800">{bsRefs.length} ops</p>
+                    <p className="text-xs font-semibold text-blue-700">Bs {(transferTotal + mobileTotal).toFixed(2)}</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-blue-100/70 sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Fecha/Hora</th>
+                        <th className="text-left p-2 font-medium">Cliente</th>
+                        <th className="text-left p-2 font-medium">Tipo</th>
+                        <th className="text-left p-2 font-medium">Referencia</th>
+                        <th className="text-right p-2 font-medium">Monto (Bs)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bsRefs.map((ref, idx) => (
+                        <tr key={`bs-${ref.saleId}-${idx}`} className="border-t hover:bg-blue-50/50">
+                          <td className="p-2 text-[11px]">{ref.saleTime}</td>
+                          <td className="p-2 text-[11px]">{ref.customerName}</td>
+                          <td className="p-2">
+                            <Badge variant="outline" className={`text-[9px] ${ref.paymentType === 'Transferencia' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-cyan-100 text-cyan-700 border-cyan-200'}`}>
+                              {ref.paymentType}
+                            </Badge>
+                          </td>
+                          <td className="p-2 font-mono text-[11px] font-semibold tracking-wide">{ref.reference}</td>
+                          <td className="p-2 text-right font-bold text-blue-600">Bs {ref.totalBs.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* USD ELECTRONICOS */}
+          {usdRefs.length > 0 && (
+            <Card className="border-purple-200 bg-purple-50/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full bg-purple-500" />
+                  USD Electronicos — Zelle + USDT
+                  <Badge variant="secondary" className="text-[9px]">{periodLabel}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
+                  <div className="p-2 rounded bg-purple-100/50 text-center">
+                    <p className="text-[10px] text-muted-foreground">Zelle</p>
+                    <p className="text-sm font-bold text-purple-700">{referenceDetails.filter(r => r.paymentType === 'Zelle').length} ops</p>
+                    <p className="text-xs font-semibold text-purple-600">${zelleTotalUsd.toFixed(2)}</p>
+                  </div>
+                  <div className="p-2 rounded bg-fuchsia-100/50 text-center">
+                    <p className="text-[10px] text-muted-foreground">USDT</p>
+                    <p className="text-sm font-bold text-fuchsia-700">{referenceDetails.filter(r => r.paymentType === 'USDT').length} ops</p>
+                    <p className="text-xs font-semibold text-fuchsia-600">${usdtTotalUsd.toFixed(2)}</p>
+                  </div>
+                  <div className="p-2 rounded bg-purple-200/50 text-center col-span-2 sm:col-span-1">
+                    <p className="text-[10px] text-muted-foreground">Total USD Electronicos</p>
+                    <p className="text-sm font-bold text-purple-800">{usdRefs.length} ops</p>
+                    <p className="text-xs font-semibold text-purple-700">${(zelleTotalUsd + usdtTotalUsd).toFixed(2)}</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-purple-100/70 sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-medium">Fecha/Hora</th>
+                        <th className="text-left p-2 font-medium">Cliente</th>
+                        <th className="text-left p-2 font-medium">Tipo</th>
+                        <th className="text-left p-2 font-medium">Referencia</th>
+                        <th className="text-right p-2 font-medium">Monto ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usdRefs.map((ref, idx) => (
+                        <tr key={`usd-${ref.saleId}-${idx}`} className="border-t hover:bg-purple-50/50">
+                          <td className="p-2 text-[11px]">{ref.saleTime}</td>
+                          <td className="p-2 text-[11px]">{ref.customerName}</td>
+                          <td className="p-2">
+                            <Badge variant="outline" className={`text-[9px] ${ref.paymentType === 'Zelle' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200'}`}>
+                              {ref.paymentType}
+                            </Badge>
+                          </td>
+                          <td className="p-2 font-mono text-[11px] font-semibold tracking-wide">{ref.reference}</td>
+                          <td className="p-2 text-right font-bold text-purple-600">${ref.totalUsd.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>);
+      })()}
 
       {/* ====== PRODUCTOS + PAGO BAR ====== */}
       {sales.length > 0 && (

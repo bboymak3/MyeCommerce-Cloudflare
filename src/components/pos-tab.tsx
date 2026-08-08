@@ -123,11 +123,12 @@ export default function PosTab({
   interface MixedEntry {
     method: string;
     amountBs: number;
+    amountUsd: number;
     reference: string;
   }
   const [mixedPayments, setMixedPayments] = useState<MixedEntry[]>([
-    { method: "efectivo", amountBs: 0, reference: "" },
-    { method: "pago-movil", amountBs: 0, reference: "" },
+    { method: "efectivo", amountBs: 0, amountUsd: 0, reference: "" },
+    { method: "pago-movil", amountBs: 0, amountUsd: 0, reference: "" },
   ]);
 
   // Client state
@@ -478,7 +479,7 @@ export default function PosTab({
 
   const removeFromCart = (id: string) => setCart((prev) => prev.filter((item) => item.id !== id));
 
-  const clearCart = () => { setCart([]); setDiscount(0); setNotes(""); setReferenceNumber(""); setCashReceived(""); setCashReceivedUsd(""); setMixedPayments([{ method: "efectivo", amountBs: 0, reference: "" }, { method: "pago-movil", amountBs: 0, reference: "" }]); setPaymentMethod("efectivo"); setIsCredit(false); setCreditClientId(""); setCreditClientName(""); setCreditClientDebt(0); setCreditDays(30); };
+  const clearCart = () => { setCart([]); setDiscount(0); setNotes(""); setReferenceNumber(""); setCashReceived(""); setCashReceivedUsd(""); setMixedPayments([{ method: "efectivo", amountBs: 0, amountUsd: 0, reference: "" }, { method: "pago-movil", amountBs: 0, amountUsd: 0, reference: "" }]); setPaymentMethod("efectivo"); setIsCredit(false); setCreditClientId(""); setCreditClientName(""); setCreditClientDebt(0); setCreditDays(30); };
 
 
 
@@ -487,7 +488,7 @@ export default function PosTab({
   };
 
   const addMixedEntry = () => {
-    setMixedPayments(prev => [...prev, { method: "pago-movil", amountBs: 0, reference: "" }]);
+    setMixedPayments(prev => [...prev, { method: "pago-movil", amountBs: 0, amountUsd: 0, reference: "" }]);
   };
 
   const removeMixedEntry = (index: number) => {
@@ -600,7 +601,7 @@ export default function PosTab({
     let mixedJson = "";
     if (paymentMethod === "mixto") {
       const validEntries = mixedPayments.filter(e => e.amountBs > 0);
-      mixedJson = JSON.stringify(validEntries.map(e => ({ method: e.method, amountBs: e.amountBs, amountUsd: parseFloat((e.amountBs / bcvRate).toFixed(2)), reference: e.reference })))
+      mixedJson = JSON.stringify(validEntries.map(e => ({ method: e.method, amountBs: e.amountBs, amountUsd: e.amountUsd, reference: e.reference })))
         .replace(/'/g, "''");
     }
     // Build reference for non-mixed
@@ -826,11 +827,16 @@ export default function PosTab({
                     </select>
                     <div className="relative flex-1">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{['efectivo-usd', 'zelle', 'usdt'].includes(entry.method) ? '$' : 'Bs'}</span>
-                      <Input type="number" min="0" step="0.01" value={entry.amountBs || ""}
+                      <Input type="number" min="0" step="0.01" value={['efectivo-usd', 'zelle', 'usdt'].includes(entry.method) ? (entry.amountUsd || '') : (entry.amountBs || '')}
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
-                          const bsVal = ['efectivo-usd', 'zelle', 'usdt'].includes(entry.method) ? val * bcvRate : val;
-                          updateMixedEntry(idx, "amountBs", bsVal);
+                          if (['efectivo-usd', 'zelle', 'usdt'].includes(entry.method)) {
+                            updateMixedEntry(idx, "amountUsd", val);
+                            updateMixedEntry(idx, "amountBs", parseFloat((val * bcvRate).toFixed(2)));
+                          } else {
+                            updateMixedEntry(idx, "amountBs", val);
+                            updateMixedEntry(idx, "amountUsd", parseFloat((val / bcvRate).toFixed(2)));
+                          }
                         }}
                         placeholder="0.00" className="h-9 text-xs pl-8" />
                     </div>

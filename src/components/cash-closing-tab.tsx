@@ -82,6 +82,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
 
   // Arqueo de caja
   const [countedCashBs, setCountedCashBs] = useState("");
+  const [countedCashUsd, setCountedCashUsd] = useState("");
   const [arqueoPreview, setArqueoPreview] = useState<{cashBs: number; totalSalesBs: number} | null>(null);
 
   // Datos de detalle: ventas y referencias del cierre seleccionado
@@ -140,8 +141,9 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
       netUsd: acc.netUsd + c.netTotalUsd,
       netBs: acc.netBs + c.netTotalBs,
       salesCount: acc.salesCount + c.salesCount,
+      efectivoUsdUsd: acc.efectivoUsdUsd + (c.efectivoUsdUsd || 0),
     }),
-    { salesUsd: 0, salesBs: 0, returnsUsd: 0, returnsBs: 0, netUsd: 0, netBs: 0, salesCount: 0 }
+    { salesUsd: 0, salesBs: 0, returnsUsd: 0, returnsBs: 0, netUsd: 0, netBs: 0, salesCount: 0, efectivoUsdUsd: 0 }
   );
 
   const openConfirmClose = (type: "pre" | "final") => {
@@ -153,6 +155,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
     setObservations("");
     setSellerName("");
     setCountedCashBs("");
+    setCountedCashUsd("");
     setArqueoPreview(null);
     if (type === "final") {
       fetch(`/api/cash-closing?preview=true&date=${today}`).then(r => r.json()).then(data => setArqueoPreview(data)).catch(() => {});
@@ -194,6 +197,8 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
   const openDetail = async (closing: CashClosing) => {
     setSelectedClosing(closing);
     setDetailReferenceData(null);
+    setCountedCashBs("");
+    setCountedCashUsd("");
     setShowDetailDialog(true);
     setDetailLoading(true);
 
@@ -705,23 +710,52 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                     placeholder="Escriba el monto que conto en caja"
                     className="text-lg font-bold text-center" />
                 </div>
-                {countedCashBs && (() => {
-                  const counted = parseFloat(countedCashBs) || 0;
-                  const expected = arqueoPreview?.cashBs || todayFinalClosing?.cashBs || (todayPreClosings.length > 0 ? preClosingsTotal.salesBs : 0);
-                  const diff = counted - expected;
+                <div>
+                  <Label className="text-xs">Efectivo contado fisicamente en caja ($)</Label>
+                  <Input type="number" min="0" step="0.01" value={countedCashUsd}
+                    onChange={(e) => setCountedCashUsd(e.target.value)}
+                    placeholder="Escriba el monto en dolares que conto en caja"
+                    className="text-lg font-bold text-center" />
+                </div>
+                {(countedCashBs || countedCashUsd) && (() => {
+                  const countedBs = parseFloat(countedCashBs) || 0;
+                  const countedUsdVal = parseFloat(countedCashUsd) || 0;
+                  const expectedBs = arqueoPreview?.cashBs || todayFinalClosing?.cashBs || (todayPreClosings.length > 0 ? preClosingsTotal.salesBs : 0);
+                  const expectedUsd = todayFinalClosing?.efectivoUsdUsd || (todayPreClosings.length > 0 ? preClosingsTotal.efectivoUsdUsd : 0);
+                  const diffBs = countedBs - expectedBs;
+                  const diffUsd = countedUsdVal - expectedUsd;
                   return (
-                    <div className={`p-2 rounded border text-center ${Math.abs(diff) < 0.01 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Efectivo esperado:</span><span>Bs {expected.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Efectivo contado:</span><span>Bs {counted.toFixed(2)}</span>
-                      </div>
-                      <p className={`text-lg font-bold mt-1 ${Math.abs(diff) < 0.01 ? 'text-green-700' : 'text-red-600'}`}>
-                        {Math.abs(diff) < 0.01 ? 'Cuadra perfecto' :
-                          diff > 0 ? `Sobrante: Bs ${diff.toFixed(2)}` :
-                          `Faltante: Bs ${Math.abs(diff).toFixed(2)}`}
-                      </p>
+                    <div className="space-y-2">
+                      {countedCashBs && (
+                        <div className={`p-2 rounded border text-center ${Math.abs(diffBs) < 0.01 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Efectivo Bs esperado:</span><span>Bs {expectedBs.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Efectivo Bs contado:</span><span>Bs {countedBs.toFixed(2)}</span>
+                          </div>
+                          <p className={`text-lg font-bold mt-1 ${Math.abs(diffBs) < 0.01 ? 'text-green-700' : 'text-red-600'}`}>
+                            {Math.abs(diffBs) < 0.01 ? 'Cuadra perfecto' :
+                              diffBs > 0 ? `Sobrante: Bs ${diffBs.toFixed(2)}` :
+                              `Faltante: Bs ${Math.abs(diffBs).toFixed(2)}`}
+                          </p>
+                        </div>
+                      )}
+                      {countedCashUsd && (
+                        <div className={`p-2 rounded border text-center ${Math.abs(diffUsd) < 0.01 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Efectivo $ esperado:</span><span>${expectedUsd.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs mb-1">
+                            <span>Efectivo $ contado:</span><span>${countedUsdVal.toFixed(2)}</span>
+                          </div>
+                          <p className={`text-lg font-bold mt-1 ${Math.abs(diffUsd) < 0.01 ? 'text-green-700' : 'text-red-600'}`}>
+                            {Math.abs(diffUsd) < 0.01 ? 'Cuadra perfecto' :
+                              diffUsd > 0 ? `Sobrante: $ ${diffUsd.toFixed(2)}` :
+                              `Faltante: $ ${Math.abs(diffUsd).toFixed(2)}`}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
@@ -967,6 +1001,59 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                       </div>
                     </div>
                   </>);
+                })()}
+              </div>
+
+              {/* ===== ARQUEO DE CAJA EN DETALLE ===== */}
+              <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                <p className="text-sm font-medium flex items-center gap-2">&#128270; Arqueo de Caja</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Efectivo Bs contado</Label>
+                    <Input type="number" min="0" step="0.01" value={countedCashBs}
+                      onChange={(e) => setCountedCashBs(e.target.value)}
+                      placeholder="0.00" className="text-base font-bold text-center" />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Efectivo $ contado</Label>
+                    <Input type="number" min="0" step="0.01" value={countedCashUsd}
+                      onChange={(e) => setCountedCashUsd(e.target.value)}
+                      placeholder="0.00" className="text-base font-bold text-center" />
+                  </div>
+                </div>
+                {(countedCashBs || countedCashUsd) && (() => {
+                  const countedBsVal = parseFloat(countedCashBs) || 0;
+                  const countedUsdVal = parseFloat(countedCashUsd) || 0;
+                  const expectedBs = selectedClosing.cashBs || 0;
+                  const expectedUsd = selectedClosing.efectivoUsdUsd || 0;
+                  const diffBs = countedBsVal - expectedBs;
+                  const diffUsd = countedUsdVal - expectedUsd;
+                  return (
+                    <div className="grid grid-cols-2 gap-2">
+                      {countedCashBs && (
+                        <div className={`p-2 rounded border text-center ${Math.abs(diffBs) < 0.01 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <p className="text-[10px] text-muted-foreground">Esperado: Bs {expectedBs.toFixed(2)}</p>
+                          <p className="text-[10px] text-muted-foreground">Contado: Bs {countedBsVal.toFixed(2)}</p>
+                          <p className={`text-sm font-bold ${Math.abs(diffBs) < 0.01 ? 'text-green-700' : 'text-red-600'}`}>
+                            {Math.abs(diffBs) < 0.01 ? 'Cuadra' :
+                              diffBs > 0 ? `Sobrante Bs ${diffBs.toFixed(2)}` :
+                              `Faltante Bs ${Math.abs(diffBs).toFixed(2)}`}
+                          </p>
+                        </div>
+                      )}
+                      {countedCashUsd && (
+                        <div className={`p-2 rounded border text-center ${Math.abs(diffUsd) < 0.01 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <p className="text-[10px] text-muted-foreground">Esperado: ${expectedUsd.toFixed(2)}</p>
+                          <p className="text-[10px] text-muted-foreground">Contado: ${countedUsdVal.toFixed(2)}</p>
+                          <p className={`text-sm font-bold ${Math.abs(diffUsd) < 0.01 ? 'text-green-700' : 'text-red-600'}`}>
+                            {Math.abs(diffUsd) < 0.01 ? 'Cuadra' :
+                              diffUsd > 0 ? `Sobrante $ ${diffUsd.toFixed(2)}` :
+                              `Faltante $ ${Math.abs(diffUsd).toFixed(2)}`}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
                 })()}
               </div>
 
