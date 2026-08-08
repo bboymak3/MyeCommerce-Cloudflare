@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         price,
         cost: Math.max(0, cost),
         marginPercent: Math.max(0, safeFloat(body.marginPercent, 0)),
-        taxType: body.taxType || 'general',
+        taxType: body.taxType || 'exento',
         stock: Math.max(0, stock),
         minStock: Math.max(0, minStock),
         categoryId: body.categoryId || null,

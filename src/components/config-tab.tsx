@@ -41,6 +41,7 @@ interface Settings {
   ticketAgentUrl: string;
   storeLogo: string;
   businessType: string;
+  taxMode: string;
 }
 
 interface BackupStatus {
@@ -100,6 +101,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [agentInfo, setAgentInfo] = useState<any>(null);
   const [storeLogo, setStoreLogo] = useState(settings.storeLogo || '');
   const [businessType, setBusinessType] = useState(settings.businessType || 'general');
+  const [taxMode, setTaxMode] = useState(settings.taxMode || 'included');
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Sync theme from settings
@@ -232,6 +234,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         ticketAgentUrl: ticketAgentUrl.replace(/\/+$/, ''),
         storeLogo,
         businessType,
+        taxMode,
       };
 
       const res = await fetch("/api/settings", {
@@ -532,6 +535,80 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
               </p>
             </div>
           </div>
+
+          {/* ====== Configuracion de IVA ====== */}
+          <Card className="border-blue-200 dark:border-blue-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className="text-lg">🧾</span> Configuracion de IVA
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Como manejar el IVA al vender?</Label>
+                <p className="text-xs text-muted-foreground">
+                  Define si el IVA esta desglosado dentro del precio de venta o se suma al precio.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setTaxMode('included')}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      taxMode === 'included'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">Desglosado del precio</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      El IVA esta incluido en el precio de venta.
+                      <br />
+                      <strong>Ej:</strong> Producto a $1.00 → IVA 16% = $0.14 del precio, base imponible $0.86
+                    </div>
+                    {taxMode === 'included' && (
+                      <div className="mt-2 text-xs text-blue-600 dark:text-blue-400 font-medium">Seleccionado</div>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaxMode('added')}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      taxMode === 'added'
+                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm">Sumado al precio</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      El IVA se suma al precio de venta.
+                      <br />
+                      <strong>Ej:</strong> Producto a $1.00 + IVA 16% = Cliente paga $1.16
+                    </div>
+                    {taxMode === 'added' && (
+                      <div className="mt-2 text-xs text-green-600 dark:text-green-400 font-medium">Seleccionado</div>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+                <p className="text-xs text-amber-800 dark:text-amber-200">
+                  <strong>Nota:</strong> Esta configuracion aplica al momento de la venta. Los tipos de IVA por producto
+                  (Exento 0%, Reducido 8%, General 16%) se configuran individualmente en cada producto.
+                  Si el producto es "Exento", no se le aplicara IVA independientemente de esta configuracion.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">IVA por defecto al crear producto:</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  taxMode === 'included' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200' : 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200'
+                }`}>
+                  {taxMode === 'included' ? 'Desglosado' : 'Sumado'}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
           <div>
             <Label>Moneda Principal</Label>
             <select

@@ -68,7 +68,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [showBarcodePrint, setShowBarcodePrint] = useState(false);
-  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "" };
+  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "exento", stock: "", minStock: "5", categoryId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "" };
   const [formData, setFormData] = useState(emptyForm);
   const [categoryName, setCategoryName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");

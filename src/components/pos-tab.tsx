@@ -86,6 +86,7 @@ interface PosTabProps {
   ticketCurrencyMode?: string;
   storeLogo?: string;
   businessType?: string;
+  taxMode?: string;
   onSaleComplete?: () => void;
 }
 
@@ -100,7 +101,7 @@ export default function PosTab({
   ticketMarginLeft = 0, ticketMarginRight = 0,
   ticketUseAgent = true, ticketAgentUrl = "http://localhost:9100",
   ticketCurrencyMode = "dual",
-  storeLogo = "", businessType = "general",
+  storeLogo = "", businessType = "general", taxMode = "included",
   onSaleComplete,
 }: PosTabProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -238,10 +239,41 @@ export default function PosTab({
   });
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
-  const taxAmount = subtotal * (taxRate / 100);
+
+  // IVA por producto segun taxType (exento=0%, reducido=8%, general=16%)
+  const getTaxPct = (product: any) => {
+    const tt = product?.taxType || 'exento';
+    if (tt === 'exento' || tt === 'omitido') return 0;
+    if (tt === 'reducido') return 8;
+    if (tt === 'general') return 16;
+    return 0;
+  };
+
+  // Calcular IVA total del carrito
+  let taxAmount = 0;
+  if (taxMode === 'included') {
+    // Desglosado: el precio ya incluye IVA, se calcula la porcion de IVA
+    // formula: iva = precio * (taxPct / (100 + taxPct))
+    for (const item of cart) {
+      const tp = getTaxPct(item);
+      if (tp > 0) {
+        taxAmount += item.total * (tp / (100 + tp));
+      }
+    }
+  } else {
+    // Sumado: el IVA se agrega al precio de venta
+    for (const item of cart) {
+      const tp = getTaxPct(item);
+      if (tp > 0) {
+        taxAmount += item.total * (tp / 100);
+      }
+    }
+  }
+
   const discountPct = subtotal > 0 ? (discount / subtotal) * 100 : 0;
   const effectiveDiscount = discountPct > maxDiscountPct ? (subtotal * maxDiscountPct) / 100 : discount;
-  const total = subtotal + taxAmount - effectiveDiscount;
+  // Si IVA sumado, el total incluye el IVA extra. Si desglosado, el subtotal ya lo tiene.
+  const total = taxMode === 'added' ? subtotal + taxAmount - effectiveDiscount : subtotal - effectiveDiscount;
   const totalBs = total * bcvRate;
 
   // USD payment methods (electronic dollars: zelle, usdt)
@@ -947,13 +979,13 @@ export default function PosTab({
             {isUsdMethod ? (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div>
-                {taxRate > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%):</span><span>${taxAmount.toFixed(2)}</span></div>}
+                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA {taxMode === 'included' ? '(incluido)' : ''}:</span><span>${taxAmount.toFixed(2)}</span></div>}
                 {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-${effectiveDiscount.toFixed(2)}</span></div>}
               </>
             ) : (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">Bs {(subtotal * bcvRate).toFixed(2)}</span></div>
-                {taxRate > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%):</span><span>Bs {(taxAmount * bcvRate).toFixed(2)}</span></div>}
+                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA {taxMode === 'included' ? '(incluido)' : ''}:</span><span>Bs {(taxAmount * bcvRate).toFixed(2)}</span></div>}
                 {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-Bs {(effectiveDiscount * bcvRate).toFixed(2)}</span></div>}
               </>
             )}

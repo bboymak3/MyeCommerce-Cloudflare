@@ -47,6 +47,7 @@ interface Settings {
 ticketCurrencyMode: string;
   storeLogo: string;
   businessType: string;
+  taxMode: string;
 }
 interface LicenseInfo {
   isValid: boolean; licenseType: "trial" | "basica" | "profesional"; machineId: string;
@@ -90,7 +91,7 @@ export default function Home() {
     ticketMarginLeft: 0, ticketMarginRight: 0,
     ticketUseAgent: true, ticketAgentUrl: 'http://localhost:9100',
     ticketCurrencyMode: 'dual',
-    storeLogo: '', businessType: 'general',
+    storeLogo: '', businessType: 'general', taxMode: 'included',
   });
   const [license, setLicense] = useState<LicenseInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -502,6 +503,7 @@ export default function Home() {
               ticketCurrencyMode={settings.ticketCurrencyMode || 'dual'}
               storeLogo={settings.storeLogo || ''}
               businessType={settings.businessType || 'general'}
+              taxMode={settings.taxMode || 'included'}
               onSaleComplete={loadData}
             />
           </ErrorBoundary>

@@ -161,6 +161,8 @@ model Settings {
   // Logo del negocio
   storeLogo            String  @default("")
   businessType         String  @default("general")
+  // IVA global
+  taxMode              String  @default("included")
   // Promo configurable
   promoActive          Boolean @default(true)
   promoLabel           String  @default("PRECIO EXCLUSIVO")
