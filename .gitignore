@@ -70,3 +70,7 @@ caddy/data/
 
 # Session artifacts
 *.PNG
+
+# ZIP files (too large for GitHub)
+/zip/
+/upload/
