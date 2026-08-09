@@ -168,6 +168,22 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     { id: 'beauty', label: 'Belleza', emoji: '💄' },
     { id: 'veterinaria', label: 'Veterinaria', emoji: '🐾' },
     { id: 'papelera', label: 'Papeleria', emoji: '📝' },
+    { id: 'moto', label: 'Moto/Taller', emoji: '🏍️' },
+    { id: 'computadora', label: 'Computacion', emoji: '💻' },
+    { id: 'celular', label: 'Celulares', emoji: '📱' },
+    { id: 'electricidad', label: 'Electricidad', emoji: '⚡' },
+    { id: 'gasolina', label: 'Gasolina', emoji: '⛽' },
+    { id: 'verdura', label: 'Verduleria', emoji: '🥬' },
+    { id: 'polleria', label: 'Polleria', emoji: '🍗' },
+    { id: 'pescaderia', label: 'Pescaderia', emoji: '🐟' },
+    { id: 'fruteria', label: 'Fruteria', emoji: '🍎' },
+    { id: 'jugueria', label: 'Jugueria', emoji: '🧃' },
+    { id: 'panchos', label: 'Panchos/Hamburguesas', emoji: '🌭' },
+    { id: 'pizza', label: 'Pizza', emoji: '🍕' },
+    { id: 'repuestos', label: 'Repuestos', emoji: '🔩' },
+    { id: 'transporte', label: 'Transporte', emoji: '🚗' },
+    { id: 'boutique', label: 'Boutique', emoji: '👗' },
+    { id: 'joyeria', label: 'Joyeria', emoji: '💍' },
   ];
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -453,17 +469,17 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
             {/* Tipo de Negocio */}
             <div className="space-y-2">
               <Label>Tipo de Negocio</Label>
-              <div className="grid grid-cols-4 gap-1.5 max-h-24 overflow-y-auto p-1 border rounded-md bg-gray-50 dark:bg-gray-900">
+              <div className="grid grid-cols-8 gap-1 max-h-20 overflow-y-auto p-1 border rounded-md bg-gray-50 dark:bg-gray-900">
                 {BUSINESS_TYPES.map((bt) => (
                   <button
                     key={bt.id}
                     type="button"
                     onClick={() => setBusinessType(bt.id)}
                     title={bt.label}
-                    className={`flex items-center justify-center w-full aspect-square rounded-md text-xl transition-all ${
+                    className={`flex items-center justify-center w-full aspect-square rounded text-sm transition-all ${
                       businessType === bt.id
-                        ? 'bg-blue-500 text-white ring-2 ring-blue-300 dark:ring-blue-700 scale-110 shadow-md'
-                        : 'bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 hover:scale-105'
+                        ? 'bg-blue-500 text-white ring-2 ring-blue-300 dark:ring-blue-700 scale-105 shadow-sm'
+                        : 'bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                   >
                     {bt.emoji}
@@ -471,7 +487,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
                 ))}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-2xl">{BUSINESS_TYPES.find(b => b.id === businessType)?.emoji || '🏪'}</span>
+                <span className="text-xl">{BUSINESS_TYPES.find(b => b.id === businessType)?.emoji || '🏪'}</span>
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {BUSINESS_TYPES.find(b => b.id === businessType)?.label || 'General'}
                 </span>

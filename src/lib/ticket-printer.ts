@@ -86,6 +86,9 @@ export interface TicketSettings {
   // Logo del negocio
   storeLogo?: string;
   businessType?: string;
+  // IVA
+  taxMode?: string;
+  taxRate?: number;
 }
 
 export interface TicketReceipt {
@@ -125,6 +128,10 @@ const BUSINESS_EMOJIS: Record<string, string> = {
   farmacia: '💊', supermercado: '🛒', restaurante: '🍽️', cafe: '☕',
   ferreteria: '🔧', ropa: '👕', zapateria: '👟', optica: '👓',
   licoreria: '🍷', beauty: '💄', veterinaria: '🐾', papelera: '📝',
+  moto: '🏍️', computadora: '💻', celular: '📱', electricidad: '⚡',
+  gasolina: '⛽', verdura: '🥬', polleria: '🍗', pescaderia: '🐟',
+  fruteria: '🍎', jugueria: '🧃', panchos: '🌭', pizza: '🍕',
+  repuestos: '🔩', transporte: '🚗', boutique: '👗', joyeria: '💍',
 };
 
 function padL(s: string, len: number): string {
@@ -299,6 +306,7 @@ function printViaHtml(params: {
     ticketPaperWidth, ticketMarginLeft, ticketMarginRight,
     ticketHeaderMsg, ticketFooterMsg,
     storeLogo, businessType,
+    taxMode, taxRate,
   } = settings;
 
   const preset = getPreset(ticketPaperWidth);
@@ -461,14 +469,15 @@ ${itemLinesHtml}
 
 <div class="ln"></div>
 
-${receipt.discount > 0 ? `<div class="r"><span class="k">Desc:</span><span class="v">-${currency} ${fmtN(receipt.discount)}</span></div>` : ''}
+${receipt.discount > 0 ? `<div class="r"><span class="k">Desc:</span><span class="v">-$ ${fmtN(receipt.discount)}</span></div>` : ''}
+${(receipt.taxAmount ?? 0) > 0 ? `<div class="r"><span class="k">IVA${taxMode === 'included' ? ' incl.' : '+'} (${taxRate || 0}%):</span><span class="v">$ ${fmtN(receipt.taxAmount || 0)}</span></div>` : ''}
 <div class="r" style="margin-top:1px">
   <span class="k b" style="font-size:${totalSize}px">TOTAL(Bs):</span>
   <span class="v b" style="font-size:${totalSize}px">${fmtN(receipt.totalBs)}</span>
 </div>
 
 ${ticketShowExchange ? `
-  <div class="s" style="margin-top:1px">USD: ${fmtN(receipt.total)} | Tasa: 1$=${receipt.exchangeRate}Bs</div>
+  <div class="s" style="margin-top:1px">$: ${fmtN(receipt.total)} | Tasa: 1$=${receipt.exchangeRate}Bs</div>
 ` : ''}
 
 ${!isCreditSale && (receipt.paymentMethod === 'efectivo' || receipt.paymentMethod === 'efectivo-usd') && (receipt.cashReceived ?? 0) > 0 ? `

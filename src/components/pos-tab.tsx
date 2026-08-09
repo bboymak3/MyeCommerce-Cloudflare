@@ -572,6 +572,7 @@ export default function PosTab({
       ticketAgentUrl: ticketAgentUrl || 'http://localhost:9100',
       ticketCurrencyMode: ticketCurrencyMode || 'dual',
       storeLogo, businessType,
+      taxMode, taxRate,
     };
     try {
       const ok = await _printTicket({ receipt, settings: ticketSettings, currency, defaultSellerName: sellerName });

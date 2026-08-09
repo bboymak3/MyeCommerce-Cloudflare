@@ -63,6 +63,8 @@ export interface EscposSettings {
   ticketFooterMsg: string;
   storeLogo?: string;
   businessType?: string;
+  taxMode?: string;
+  taxRate?: number;
 }
 
 // ─── Etiquetas de metodos de pago ────────────────────────────────
@@ -254,7 +256,7 @@ export function generateEscposBuffer(params: {
     ticketShowPhone, ticketShowSeller, ticketShowExchange, ticketShowSlogan,
     ticketPaperWidth, ticketHeaderMsg, ticketFooterMsg,
     ticketCurrencyMode = 'dual',
-    storeLogo, businessType,
+    storeLogo, businessType, taxMode, taxRate,
   } = settings;
 
   const maxChars = PAPER_CHARS[ticketPaperWidth] || PAPER_CHARS['58mm'];
@@ -305,23 +307,8 @@ export function generateEscposBuffer(params: {
     parts.push(cmdAlign(1));
     parts.push(textLine('[LOGO]'));
     parts.push(cmdAlign(0));
-  } else {
-    // Sin logo: imprimir indicador del tipo de negocio
-    const typeLabels: Record<string, string> = {
-      general: '* MI TIENDA *', panaderia: '* PANADERIA *', pasteleria: '* PASTELERIA *',
-      carniceria: '* CARNICERIA *', farmacia: '* FARMACIA *', supermercado: '* SUPERMERCADO *',
-      restaurante: '* RESTAURANTE *', cafe: '* CAFE *', ferreteria: '* FERRETERIA *',
-      ropa: '* ROPA *', zapateria: '* ZAPATERIA *', optica: '* OPTICA *',
-      licoreria: '* LICORERIA *', beauty: '* BELLEZA *', veterinaria: '* VETERINARIA *',
-      papelera: '* PAPELERIA *',
-    };
-    const typeLabel = typeLabels[businessType || 'general'] || '* MI TIENDA *';
-    parts.push(cmdAlign(1));
-    parts.push(cmdBold(true));
-    parts.push(textLine(centerText(typeLabel, maxChars)));
-    parts.push(cmdBold(false));
-    parts.push(cmdAlign(0));
   }
+  // Si no hay logo, no se imprime indicador de tipo de negocio (solo nombre tienda)
 
   // ═══ NOMBRE TIENDA — Doble alto + doble ancho ═══
   // Con doble ancho, solo caben halfChars caracteres por linea
@@ -491,8 +478,15 @@ export function generateEscposBuffer(params: {
 
   // ═══ DESCUENTO — tamano normal ═══
   if (receipt.discount > 0) {
-    const descVal = '-' + currency + ' ' + fmtN(receipt.discount);
+    const descVal = '-$ ' + fmtN(receipt.discount);
     parts.push(textLine(padR('Desc:', 12) + padL(descVal, maxChars - 12)));
+  }
+
+  // ═══ IVA — tamano normal ═══
+  if ((receipt.taxAmount ?? 0) > 0) {
+    const ivaLabel = 'IVA' + (taxMode === 'included' ? ' incl.' : '+') + ' (' + (taxRate || 0) + '%):';
+    const ivaVal = '$ ' + fmtN(receipt.taxAmount || 0);
+    parts.push(textLine(padR(ivaLabel, 16) + padL(ivaVal, maxChars - 16)));
   }
 
   // ═══ TOTAL ═══
@@ -506,7 +500,7 @@ export function generateEscposBuffer(params: {
     {
       const label = 'TOTAL:';
       const totalVal = useBsTotal ? receipt.totalBs : receipt.total;
-      const totalSuffix = useBsTotal ? 'Bs' : currency;
+      const totalSuffix = useBsTotal ? 'Bs' : '$';
       const val = fmtN(totalVal) + totalSuffix;
       const totalStr = padR(label, 7) + padL(val, halfChars - 7);
       parts.push(textLine(truncate(totalStr, halfChars)));
@@ -517,7 +511,7 @@ export function generateEscposBuffer(params: {
     {
       const label = 'TOTAL:';
       const totalVal = useBsTotal ? receipt.totalBs : receipt.total;
-      const totalSuffix = useBsTotal ? 'Bs' : currency;
+      const totalSuffix = useBsTotal ? 'Bs' : '$';
       const val = fmtN(totalVal) + totalSuffix;
       const totalStr = padR(label, 7) + padL(val, maxChars - 7);
       parts.push(textLine(totalStr));
@@ -527,7 +521,7 @@ export function generateEscposBuffer(params: {
 
   // ═══ TASA DE CAMBIO — tamano normal ═══
   if (ticketShowExchange && cMode !== 'bs_only') {
-    parts.push(textLine('USD: ' + fmtN(receipt.total) + ' | Tasa: 1$=' + receipt.exchangeRate + 'Bs'));
+    parts.push(textLine('$: ' + fmtN(receipt.total) + ' | Tasa: 1$=' + receipt.exchangeRate + 'Bs'));
   }
 
   // ═══ EFECTIVO / VUELTO ═══
