@@ -28,3 +28,9 @@ Para actualizar desde una version anterior:
 1. Respaldar BD con RESPALDAR-BD.bat
 2. Reemplazar todos los archivos
 3. Ejecutar INSTALAR.bat (migra la BD automaticamente)
+
+## v2.9.31 - 2026-08-09
+- Venta por peso: badge visual (kg/g/lb) en tabla de productos
+- Grid de iconos de negocio mas compacta (gap-0.5, grid-cols-10)
+- 48 tipos de negocio disponibles (antes 32)
+- Nuevos: Abarrotes, Dulceria, Fotografia, Heladeria, Imprenta, Libreria, Loteria, Lubricentro, Market, Muebles, Musica, Nutricion, Peluqueria, Regalos, Smartphone, Tacos, Tintoreria, Videojuegos
