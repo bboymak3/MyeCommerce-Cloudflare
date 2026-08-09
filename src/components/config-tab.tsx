@@ -178,12 +178,32 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     { id: 'pescaderia', label: 'Pescaderia', emoji: '🐟' },
     { id: 'fruteria', label: 'Fruteria', emoji: '🍎' },
     { id: 'jugueria', label: 'Jugueria', emoji: '🧃' },
-    { id: 'panchos', label: 'Panchos/Hamburguesas', emoji: '🌭' },
+    { id: 'panchos', label: 'Panchos', emoji: '🌭' },
     { id: 'pizza', label: 'Pizza', emoji: '🍕' },
     { id: 'repuestos', label: 'Repuestos', emoji: '🔩' },
     { id: 'transporte', label: 'Transporte', emoji: '🚗' },
     { id: 'boutique', label: 'Boutique', emoji: '👗' },
     { id: 'joyeria', label: 'Joyeria', emoji: '💍' },
+    { id: 'abarrotes', label: 'Abarrotes', emoji: '🛍️' },
+    { id: 'carnes', label: 'Carnes', emoji: '🥩' },
+    { id: 'dulceria', label: 'Dulceria', emoji: '🍬' },
+    { id: 'fotografia', label: 'Fotografia', emoji: '📸' },
+    { id: 'heladeria', label: 'Heladeria', emoji: '🍦' },
+    { id: 'imprenta', label: 'Imprenta', emoji: '🖨️' },
+    { id: 'libreria', label: 'Libreria', emoji: '📚' },
+    { id: 'loteria', label: 'Loteria', emoji: '🎰' },
+    { id: 'lubricentro', label: 'Lubricentro', emoji: '🛢️' },
+    { id: 'market', label: 'Market', emoji: '🏬' },
+    { id: 'muebles', label: 'Muebles', emoji: '🛋️' },
+    { id: 'musica', label: 'Musica', emoji: '🎵' },
+    { id: 'nutricion', label: 'Nutricion', emoji: '🥗' },
+    { id: 'paintball', label: 'Paintball', emoji: '🎯' },
+    { id: 'peluqueria', label: 'Peluqueria', emoji: '💇' },
+    { id: 'regalos', label: 'Regalos', emoji: '🎁' },
+    { id: 'smarthphone', label: 'Smartphone', emoji: '📲' },
+    { id: 'tacos', label: 'Tacos', emoji: '🌮' },
+    { id: 'tintoreria', label: 'Tintoreria', emoji: '👔' },
+    { id: 'videojuegos', label: 'Videojuegos', emoji: '🎮' },
   ];
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -469,7 +489,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
             {/* Tipo de Negocio */}
             <div className="space-y-2">
               <Label>Tipo de Negocio</Label>
-              <div className="grid grid-cols-8 gap-1 max-h-20 overflow-y-auto p-1 border rounded-md bg-gray-50 dark:bg-gray-900">
+              <div className="grid grid-cols-8 sm:grid-cols-10 gap-0.5 max-h-24 overflow-y-auto p-1 border rounded-md bg-gray-50 dark:bg-gray-900">
                 {BUSINESS_TYPES.map((bt) => (
                   <button
                     key={bt.id}

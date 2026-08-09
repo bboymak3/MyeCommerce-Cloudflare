@@ -350,6 +350,8 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                             {product.noStock && <Badge variant="secondary" className="text-[7px] px-1 py-0">S/Stock</Badge>}
                             {product.isCombo && <Badge variant="outline" className="text-[7px] px-1 py-0 text-orange-600">KIT</Badge>}
                             {product.unitsPerBox > 0 && <Badge variant="outline" className="text-[7px] px-1 py-0 text-purple-600">x{product.unitsPerBox}</Badge>}
+                            {product.vendePorPeso && <Badge variant="outline" className="text-[7px] px-1 py-0 text-emerald-600">{product.unidadPeso || 'kg'}</Badge>}
+
                           </div>
                         </div>
                       </td>

@@ -132,6 +132,11 @@ const BUSINESS_EMOJIS: Record<string, string> = {
   gasolina: '⛽', verdura: '🥬', polleria: '🍗', pescaderia: '🐟',
   fruteria: '🍎', jugueria: '🧃', panchos: '🌭', pizza: '🍕',
   repuestos: '🔩', transporte: '🚗', boutique: '👗', joyeria: '💍',
+  abarrotes: '🛍️', carnes: '🥩', dulceria: '🍬', fotografia: '📸',
+  heladeria: '🍦', imprenta: '🖨️', libreria: '📚', loteria: '🎰',
+  lubricentro: '🛢️', market: '🏬', muebles: '🛋️', musica: '🎵',
+  nutricion: '🥗', paintball: '🎯', peluqueria: '💇', regalos: '🎁',
+  smarthphone: '📲', tacos: '🌮', tintoreria: '👔', videojuegos: '🎮',
 };
 
 function padL(s: string, len: number): string {
