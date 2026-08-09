@@ -593,9 +593,10 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
 
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md p-3">
                 <p className="text-xs text-amber-800 dark:text-amber-200">
-                  <strong>Nota:</strong> Esta configuracion aplica al momento de la venta. Los tipos de IVA por producto
-                  (Exento 0%, Reducido 8%, General 16%) se configuran individualmente en cada producto.
-                  Si el producto es "Exento", no se le aplicara IVA independientemente de esta configuracion.
+                  <strong>Nota:</strong> Esta configuracion aplica al momento de la venta. El porcentaje de IVA
+                  se toma del campo "Impuesto IVA (%)" arriba. Si un producto esta marcado como "Exento",
+                  no se le aplicara IVA independientemente del valor configurado. Si el Estado cambia el impuesto,
+                  solo actualiza el valor y el sistema recalcula automaticamente.
                 </p>
               </div>
 

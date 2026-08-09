@@ -522,7 +522,7 @@ export default function Home() {
         <TabsContent value="products" activeTab={activeTab}>
           <ErrorBoundary name="Productos">
             <ProductsTab products={products} categories={categories} bcvRate={settings.bcvRate ?? 36.5}
-              currency={settings.currency} onRefresh={loadData} maxProducts={license?.maxProducts || 30} licenseType={license?.licenseType || "trial"} />
+              currency={settings.currency} onRefresh={loadData} maxProducts={license?.maxProducts || 30} licenseType={license?.licenseType || "trial"} taxRate={settings.taxRate ?? 0} />
           </ErrorBoundary>
         </TabsContent>
         <TabsContent value="devolutions" activeTab={activeTab}>

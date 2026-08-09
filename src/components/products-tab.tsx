@@ -29,17 +29,18 @@ interface Product {
 }
 interface StockAlert { id: string; name: string; barcode: string; stock: number; minStock: number; price: number; cost: number; icon: string; categoryName: string; deficit: number; }
 interface StockAlertsData { totalAlerts: number; zeroStockCount: number; lowStockCount: number; zeroStock: StockAlert[]; lowStock: StockAlert[]; }
-interface ProductsTabProps { products: Product[]; categories: Category[]; bcvRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; }
+interface ProductsTabProps { products: Product[]; categories: Category[]; bcvRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; taxRate?: number; }
 
 function CatBadge({ categoryName, categories }: { categoryName: string; categories: Category[] }) {
   const cat = categories.find(c => c.name === categoryName);
   if (cat?.color) return <Badge variant="secondary" className="text-[8px] px-1 py-0 flex-shrink-0" style={{ backgroundColor: cat.color + '20', color: cat.color, borderColor: cat.color }}>{cat.icon ? cat.icon + ' ' : ''}{categoryName}</Badge>;
   return <Badge variant="secondary" className="text-[8px] px-1 py-0 flex-shrink-0">{categoryName}</Badge>;
 }
-function TaxBadge({ taxType }: { taxType: string }) {
-  if (taxType === 'exento') return <Badge variant="outline" className="text-[9px] text-gray-500 border-gray-300">EXENTO 0%</Badge>;
-  if (taxType === 'reducido') return <Badge variant="outline" className="text-[9px] text-blue-600 border-blue-300">IVA 8%</Badge>;
-  return <Badge variant="outline" className="text-[9px] text-orange-600 border-orange-300">IVA 16%</Badge>;
+function TaxBadge({ taxType, taxRate }: { taxType: string; taxRate?: number }) {
+  if (taxType === 'exento' || taxType === 'omitido') return <Badge variant="outline" className="text-[9px] text-gray-500 border-gray-300">EXENTO</Badge>;
+  const rate = taxRate || 0;
+  if (taxType === 'reducido') return <Badge variant="outline" className="text-[9px] text-blue-600 border-blue-300">IVA {rate}%</Badge>;
+  return <Badge variant="outline" className="text-[9px] text-orange-600 border-orange-300">IVA {rate}%</Badge>;
 }
 function Chevron({ open }: { open: boolean }) {
   return <svg className={`w-4 h-4 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>;
@@ -61,7 +62,7 @@ function Block({ title, icon, badge, defaultOpen = true, children }: { title: st
   );
 }
 
-export default function ProductsTab({ products, categories, bcvRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional" }: ProductsTabProps) {
+export default function ProductsTab({ products, categories, bcvRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional", taxRate = 0 }: ProductsTabProps) {
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -349,7 +350,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                       <td className="p-2 text-right">{product.cost.toFixed(2)}</td>
                       <td className="p-2 text-right">{product.cost > 0 ? <span className={`font-medium ${mg >= 30 ? 'text-green-600' : mg >= 15 ? 'text-yellow-600' : 'text-red-600'}`}>{mg.toFixed(0)}%</span> : <span className="text-muted-foreground">-</span>}</td>
                       <td className="p-2 text-right"><Badge variant={product.stock > (product.minStock || 5) ? "secondary" : "destructive"} className="text-[10px]">{product.stock}</Badge></td>
-                      <td className="p-2"><TaxBadge taxType={product.taxType} /></td>
+                      <td className="p-2"><TaxBadge taxType={product.taxType} taxRate={taxRate} /></td>
                       <td className="p-2 text-center"><div className="flex gap-0.5 justify-center"><Button variant="ghost" size="sm" onClick={() => openEdit(product)} className="h-6 text-[10px]">Edit</Button><Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="h-6 text-[10px] text-destructive">X</Button></div></td>
                     </tr>
                   );
@@ -383,11 +384,11 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 <div>
                   <Label className="text-xs">Tipo IVA (SENIAT)</Label>
                   <Select value={formData.taxType} onChange={e => setFormData({ ...formData, taxType: (e.target as any).value })}>
-                    <option value="general">General (16%)</option>
-                    <option value="reducido">Reducido (8%)</option>
+                    <option value="general">Gravado (usa IVA configurado)</option>
                     <option value="exento">Exento (0%)</option>
+                    <option value="omitido">Omitido</option>
                   </Select>
-                  <p className="text-[8px] text-muted-foreground mt-0.5">Obligatorio para Aclas</p>
+                  <p className="text-[8px] text-muted-foreground mt-0.5">El % de IVA se configura globalmente en Configuracion</p>
                 </div>
                 <div>
                   <Label className="text-xs">Costo ({currency})</Label>
