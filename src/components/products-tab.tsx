@@ -69,7 +69,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [showBarcodePrint, setShowBarcodePrint] = useState(false);
-  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "exento", stock: "", minStock: "5", categoryId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "" };
+  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "exento", stock: "", minStock: "5", categoryId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
   const [formData, setFormData] = useState(emptyForm);
   const [categoryName, setCategoryName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");
@@ -125,6 +125,14 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const autoPrice = formData.cost && formData.marginPercent ? calcPrice(formData.cost, formData.marginPercent) : "";
   const autoMargin = formData.price && formData.cost ? calcMargin(formData.price, formData.cost) : "";
   const autoBoxPrice = formData.cost && formData.boxMarginPercent && formData.unitsPerBox ? calcBoxPrice(formData.cost, formData.boxMarginPercent, formData.unitsPerBox) : "";
+  // Calculos bulto: costo unitario del bulto, precio venta unitario, stock total
+  const boxUnitsPerBox = parseInt(formData.unitsPerBox) || 0;
+  const boxCostPerBox = parseFloat(formData.boxPrice) || 0;
+  const boxMarginPct = parseFloat(formData.boxMarginPercent) || 0;
+  const boxQtyBought = parseInt(formData.boxQty) || 0;
+  const boxCostPerUnit = boxUnitsPerBox > 0 && boxCostPerBox > 0 ? parseFloat((boxCostPerBox / boxUnitsPerBox).toFixed(4)) : 0;
+  const boxPricePerUnit = boxCostPerUnit > 0 && boxMarginPct > 0 ? parseFloat((boxCostPerUnit / (1 - boxMarginPct / 100)).toFixed(2)) : 0;
+  const boxTotalStock = boxQtyBought * boxUnitsPerBox;
 
   // ─── FILTERED PRODUCTS ───
   const filtered = products.filter(p => (p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)) && (!filterCategory || p.categoryId === filterCategory));
@@ -378,9 +386,29 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
               <div><Label className="text-xs">Descripcion</Label><Input value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Opcional" className="text-sm" /></div>
             </Block>
 
-            {/* BLOCK 2: SENIAT IVA + PRECIOS + MARGEN AUTO */}
-            <Block title="Clasificacion Fiscal SENIAT, Precios y Margen" icon="🏛️" defaultOpen={true}>
-              <div className="grid grid-cols-4 gap-2">
+            {/* BLOCK 2: IVA + COMO AGREGAS INVENTARIO + PRECIOS */}
+            <Block title="IVA, Inventario y Precios" icon="🏛️" defaultOpen={true}>
+              {/* Toggle: Como agregas el producto al inventario */}
+              <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <Label className="text-xs font-semibold text-blue-800 dark:text-blue-300 mb-2 block">Como agregas este producto al inventario?</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setFormData(f => ({ ...f, stockMode: 'unit' }))}
+                    className={`p-3 rounded-lg border-2 text-center transition-all ${formData.stockMode === 'unit' ? 'border-blue-500 bg-blue-100 dark:bg-blue-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
+                    <div className="text-xl mb-1">📦</div>
+                    <div className="font-semibold text-sm">Por Unidades</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">Conteo unitario. Ej: 10 latas, 5 botellas</div>
+                  </button>
+                  <button type="button" onClick={() => setFormData(f => ({ ...f, stockMode: 'box' }))}
+                    className={`p-3 rounded-lg border-2 text-center transition-all ${formData.stockMode === 'box' ? 'border-amber-500 bg-amber-100 dark:bg-amber-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'}`}>
+                    <div className="text-xl mb-1">📋</div>
+                    <div className="font-semibold text-sm">Por Bulto / Caja</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">Compra por bulto. Ej: 5 cajas x 24 uds</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* IVA */}
+              <div className="grid grid-cols-2 gap-2 mb-2">
                 <div>
                   <Label className="text-xs">Tipo IVA (SENIAT)</Label>
                   <Select value={formData.taxType} onChange={e => setFormData({ ...formData, taxType: (e.target as any).value })}>
@@ -388,45 +416,127 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                     <option value="exento">Exento (0%)</option>
                     <option value="omitido">Omitido</option>
                   </Select>
-                  <p className="text-[8px] text-muted-foreground mt-0.5">El % de IVA se configura globalmente en Configuracion</p>
+                  <p className="text-[8px] text-muted-foreground mt-0.5">El % de IVA se configura globalmente</p>
                 </div>
                 <div>
-                  <Label className="text-xs">Costo ({currency})</Label>
-                  <Input type="number" step="0.01" min="0" value={formData.cost} onChange={e => { const c = e.target.value, nf = { ...formData, cost: c }; if (c && formData.marginPercent) nf.price = calcPrice(c, formData.marginPercent); setFormData(nf); }} placeholder="0.00" className="text-sm font-mono" />
-                </div>
-                <div>
-                  <Label className="text-xs">Margen %</Label>
-                  <Input type="number" step="0.1" min="0" value={formData.marginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, marginPercent: m }; if (formData.cost && m) nf.price = calcPrice(formData.cost, m); setFormData(nf); }} placeholder="35" className="text-sm font-mono" />
-                </div>
-                <div>
-                  <Label className="text-xs">Precio ({currency}) *</Label>
-                  <Input type="number" step="0.01" min="0" value={autoPrice || formData.price} onChange={e => { const p = e.target.value, nf = { ...formData, price: p }; if (p && formData.cost) nf.marginPercent = calcMargin(p, formData.cost); setFormData(nf); }} className="text-sm font-mono font-bold text-green-600" />
+                  <Label className="text-xs">Stock Minimo (alerta)</Label>
+                  <Input type="number" min="0" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: e.target.value })} placeholder="5" className="text-sm" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 mt-1">
-                <div>
-                  <div className="flex justify-between text-[9px] text-muted-foreground mb-1"><span>Margen real</span><span className={`font-bold ${parseFloat(autoMargin) >= 30 ? 'text-green-600' : parseFloat(autoMargin) >= 15 ? 'text-yellow-600' : 'text-red-600'}`}>{autoMargin}%</span></div>
-                  <MarginBar margin={parseFloat(autoMargin) || 0} />
-                </div>
-                <div className="text-right">
-                  {formData.price && bcvRate > 0 && <p className="text-xs text-green-700 font-medium">Bs {(parseFloat(formData.price) * bcvRate).toFixed(2)}</p>}
-                  {autoPrice && <p className="text-[9px] text-blue-600">Auto: {currency} {autoPrice} (costo+margen)</p>}
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                <div><Label className="text-[10px]">P. Mayorista ({currency})</Label><Input type="number" step="0.01" min="0" value={formData.wholesalePrice} onChange={e => setFormData({ ...formData, wholesalePrice: e.target.value })} placeholder="0=off" className="text-sm" /></div>
-                <div><Label className="text-[10px]">Cant. Min. Mayorista</Label><Input type="number" min="0" value={formData.minWholesaleQty} onChange={e => setFormData({ ...formData, minWholesaleQty: e.target.value })} className="text-sm" /></div>
-                <div><Label className="text-[10px]">Stock</Label><Input type="number" min="0" value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} className="text-sm" /></div>
-              </div>
-            </Block>
 
-            {/* BLOCK 3: MULTI-EMPAQUE */}
-            <Block title="Venta por Bulto / Mayoristas" icon="📋" badge={formData.unitsPerBox && formData.unitsPerBox !== "0" ? "ACTIVO" : undefined} defaultOpen={false}>
-              <div className="grid grid-cols-4 gap-2">
-                <div><Label className="text-[10px]">Unidades por Bulto</Label><Input type="number" min="0" value={formData.unitsPerBox} onChange={e => setFormData({ ...formData, unitsPerBox: e.target.value })} placeholder="Ej: 20" className="text-sm" /><p className="text-[8px] text-muted-foreground">Paca de N unidades</p></div>
-                <div><Label className="text-[10px]">Margen Bulto %</Label><Input type="number" step="0.1" min="0" value={formData.boxMarginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, boxMarginPercent: m }; if (formData.cost && m && formData.unitsPerBox) nf.boxPrice = calcBoxPrice(formData.cost, m, formData.unitsPerBox); setFormData(nf); }} placeholder="25" className="text-sm" /></div>
-                <div><Label className="text-[10px]">Precio Bulto ({currency})</Label><Input type="number" step="0.01" min="0" value={autoBoxPrice || formData.boxPrice} onChange={e => setFormData({ ...formData, boxPrice: e.target.value })} className="text-sm font-bold text-emerald-600" />{autoBoxPrice && <p className="text-[8px] text-blue-600">Auto: (costo x {formData.unitsPerBox}) + margen</p>}</div>
-                <div><Label className="text-[10px]">Stock Minimo (alerta)</Label><Input type="number" min="0" value={formData.minStock} onChange={e => setFormData({ ...formData, minStock: e.target.value })} placeholder="5" className="text-sm" /></div>
+              {/* ── MODO POR UNIDADES ── */}
+              {formData.stockMode !== 'box' && (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <Label className="text-xs">Costo Unitario ({currency})</Label>
+                      <Input type="number" step="0.01" min="0" value={formData.cost} onChange={e => { const c = e.target.value, nf = { ...formData, cost: c }; if (c && formData.marginPercent) nf.price = calcPrice(c, formData.marginPercent); setFormData(nf); }} placeholder="0.00" className="text-sm font-mono" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Margen Ganancia %</Label>
+                      <Input type="number" step="0.1" min="0" value={formData.marginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, marginPercent: m }; if (formData.cost && m) nf.price = calcPrice(formData.cost, m); setFormData(nf); }} placeholder="35" className="text-sm font-mono" />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Precio Venta ({currency})</Label>
+                      <Input type="number" step="0.01" min="0" value={autoPrice || formData.price} onChange={e => { const p = e.target.value, nf = { ...formData, price: p }; if (p && formData.cost) nf.marginPercent = calcMargin(p, formData.cost); setFormData(nf); }} className="text-sm font-mono font-bold text-green-600" />
+                      {autoPrice && <p className="text-[8px] text-blue-600">Auto-calculado</p>}
+                    </div>
+                    <div>
+                      <Label className="text-xs">Cantidad (Stock)</Label>
+                      <Input type="number" min="0" value={formData.stock} onChange={e => setFormData({ ...formData, stock: e.target.value })} placeholder="0" className="text-sm" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground mb-1"><span>Margen real</span><span className={`font-bold ${parseFloat(autoMargin) >= 30 ? 'text-green-600' : parseFloat(autoMargin) >= 15 ? 'text-yellow-600' : 'text-red-600'}`}>{autoMargin}%</span></div>
+                      <MarginBar margin={parseFloat(autoMargin) || 0} />
+                    </div>
+                    <div className="text-right">
+                      {formData.price && bcvRate > 0 && <p className="text-xs text-green-700 font-medium">Bs {(parseFloat(formData.price) * bcvRate).toFixed(2)}</p>}
+                      {autoPrice && <p className="text-[9px] text-blue-600">Precio sugerido: {currency} {autoPrice}</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── MODO POR BULTO ── */}
+              {formData.stockMode === 'box' && (
+                <div className="space-y-2">
+                  <div className="p-2 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded text-[10px] text-amber-800 dark:text-amber-200 mb-1">
+                    <strong>Modo Bulto:</strong> Ingrese los datos de la compra por bulto. El sistema calcula automaticamente el precio de venta por unidad.
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <Label className="text-xs">Bultos Comprados</Label>
+                      <Input type="number" min="1" value={formData.boxQty} onChange={e => setFormData({ ...formData, boxQty: e.target.value })} placeholder="Ej: 5" className="text-sm font-mono" />
+                      <p className="text-[8px] text-muted-foreground">Cuantas cajas/bultos compro</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Uds por Bulto</Label>
+                      <Input type="number" min="1" value={formData.unitsPerBox} onChange={e => setFormData({ ...formData, unitsPerBox: e.target.value })} placeholder="Ej: 24" className="text-sm font-mono" />
+                      <p className="text-[8px] text-muted-foreground">Unidades dentro de 1 bulto</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Costo del Bulto ({currency})</Label>
+                      <Input type="number" step="0.01" min="0" value={formData.boxPrice} onChange={e => setFormData({ ...formData, boxPrice: e.target.value })} placeholder="Ej: 10.00" className="text-sm font-mono" />
+                      <p className="text-[8px] text-muted-foreground">Lo que pagaste por 1 bulto</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Margen Ganancia %</Label>
+                      <Input type="number" step="0.1" min="0" value={formData.boxMarginPercent} onChange={e => setFormData({ ...formData, boxMarginPercent: e.target.value })} placeholder="20" className="text-sm font-mono" />
+                      <p className="text-[8px] text-muted-foreground">Ganancia deseada</p>
+                    </div>
+                  </div>
+
+                  {/* Resumen automatico bulto */}
+                  <div className={`grid grid-cols-4 gap-2 p-2 rounded-lg border ${boxPricePerUnit > 0 ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-800/50'}`}>
+                    <div className="text-center">
+                      <p className="text-[8px] text-muted-foreground uppercase">Costo por Unidad</p>
+                      <p className="text-sm font-bold font-mono">{boxCostPerUnit > 0 ? `${currency} ${boxCostPerUnit.toFixed(4)}` : '—'}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[8px] text-muted-foreground uppercase">Precio Venta Ud</p>
+                      <p className={`text-sm font-bold font-mono ${boxPricePerUnit > 0 ? 'text-green-600' : 'text-muted-foreground'}`}>{boxPricePerUnit > 0 ? `${currency} ${boxPricePerUnit.toFixed(2)}` : '—'}</p>
+                      {boxPricePerUnit > 0 && <p className="text-[7px] text-green-600">Auto-calculado</p>}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[8px] text-muted-foreground uppercase">Stock Total</p>
+                      <p className="text-sm font-bold font-mono">{boxTotalStock > 0 ? `${boxTotalStock} uds` : '—'}</p>
+                      {boxTotalStock > 0 && <p className="text-[7px] text-muted-foreground">{boxQtyBought} bulto(s) x {boxUnitsPerBox}</p>}
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[8px] text-muted-foreground uppercase">Inversion Total</p>
+                      <p className="text-sm font-bold font-mono">{boxQtyBought > 0 && boxCostPerBox > 0 ? `${currency} ${(boxQtyBought * boxCostPerBox).toFixed(2)}` : '—'}</p>
+                    </div>
+                  </div>
+
+                  {/* Boton para aplicar los valores calculados al producto */}
+                  {boxPricePerUnit > 0 && (
+                    <button type="button" onClick={() => {
+                      setFormData(f => ({
+                        ...f,
+                        cost: boxCostPerUnit.toString(),
+                        price: boxPricePerUnit.toString(),
+                        marginPercent: boxMarginPct.toString(),
+                        stock: boxTotalStock.toString(),
+                      }));
+                      toast.success(`Aplicado: Costo ${currency} ${boxCostPerUnit.toFixed(4)} / Precio ${currency} ${boxPricePerUnit.toFixed(2)} / Stock ${boxTotalStock} uds`);
+                    }}
+                    className="w-full py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2">
+                      <span>✅</span> Aplicar al Producto: Vender a {currency} {boxPricePerUnit.toFixed(2)} c/u (Stock: {boxTotalStock} uds)
+                    </button>
+                  )}
+
+                  {boxPricePerUnit <= 0 && boxCostPerBox > 0 && (
+                    <p className="text-[10px] text-amber-600 bg-amber-50 rounded p-2">Coloca el margen de ganancia para ver el precio de venta sugerido.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Precio Mayorista (separado, tasa euro) */}
+              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t">
+                <div><Label className="text-[10px]">P. Mayorista ({currency})</Label><Input type="number" step="0.01" min="0" value={formData.wholesalePrice} onChange={e => setFormData({ ...formData, wholesalePrice: e.target.value })} placeholder="0=desactivado" className="text-sm" /><p className="text-[8px] text-muted-foreground">Precio al mayor (tasa euro BCV)</p></div>
+                <div><Label className="text-[10px]">Cant. Min. Mayorista</Label><Input type="number" min="0" value={formData.minWholesaleQty} onChange={e => setFormData({ ...formData, minWholesaleQty: e.target.value })} className="text-sm" /><p className="text-[8px] text-muted-foreground">A partir de cuantas uds aplica</p></div>
               </div>
             </Block>
 
