@@ -340,9 +340,11 @@ function printViaHtml(params: {
   if (receipt.paymentMethod === 'mixto' && receipt.mixedPaymentJson) {
     try {
       const entries = JSON.parse(receipt.mixedPaymentJson);
-      mixedBreakdown = entries.map((e: any) =>
-        `${TICKET_PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`
-      ).join(' | ');
+      mixedBreakdown = entries.map((e: any) => {
+        let line = `${TICKET_PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`;
+        if (e.reference) line += ` [Ref: ${e.reference}]`;
+        return line;
+      }).join(' | ');
     } catch { /* ignore */ }
   }
 
@@ -475,7 +477,7 @@ ${itemLinesHtml}
 <div class="ln"></div>
 
 ${receipt.discount > 0 ? `<div class="r"><span class="k">Desc:</span><span class="v">-$ ${fmtN(receipt.discount)}</span></div>` : ''}
-${(receipt.taxAmount ?? 0) > 0 ? `<div class="r"><span class="k">IVA${taxMode === 'included' ? ' incl.' : '+'} (${taxRate || 0}%):</span><span class="v">$ ${fmtN(receipt.taxAmount || 0)}</span></div>` : ''}
+${(receipt.taxAmount ?? 0) > 0 ? `<div class="r"><span class="k">IVA${taxMode === 'included' ? ' incl.' : '+'} (${taxRate || 0}%):</span><span class="v">Bs ${fmtN((receipt.taxAmount || 0) * (receipt.exchangeRate || 1))}</span></div>` : ''}
 <div class="r" style="margin-top:1px">
   <span class="k b" style="font-size:${totalSize}px">TOTAL(Bs):</span>
   <span class="v b" style="font-size:${totalSize}px">${fmtN(receipt.totalBs)}</span>

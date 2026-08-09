@@ -288,7 +288,7 @@ export default function PosTab({
   const mixedRemaining = Math.max(0, totalBs - mixedTotalBs);
   const mixedRemainingUsd = bcvRate > 0 ? mixedRemaining / bcvRate : 0;
   const isMixedValid = Math.abs(mixedTotalBs - totalBs) < 0.01;
-  const showRefField = ["transferencia", "pago-movil", "zelle", "usdt", "mixto"].includes(paymentMethod);
+  const showRefField = ["transferencia", "pago-movil", "punto-de-venta", "zelle", "usdt", "mixto"].includes(paymentMethod);
 
   // Cargar cliente final al inicio y lista de clientes para credito
   useEffect(() => {
@@ -981,7 +981,7 @@ export default function PosTab({
             {isUsdMethod ? (
               <>
                 <div className="flex justify-between"><span className="text-muted-foreground">Subtotal:</span><span className="font-semibold">${subtotal.toFixed(2)}</span></div>
-                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%{taxMode === 'included' ? ' incl.' : ''}):</span><span>${taxAmount.toFixed(2)}</span></div>}
+                {taxAmount > 0 && <div className="flex justify-between"><span className="text-muted-foreground">IVA ({taxRate}%{taxMode === 'included' ? ' incl.' : ''}):</span><span>Bs {(taxAmount * bcvRate).toFixed(2)}</span></div>}
                 {effectiveDiscount > 0 && <div className="flex justify-between text-destructive"><span>Descuento:</span><span>-${effectiveDiscount.toFixed(2)}</span></div>}
               </>
             ) : (
@@ -1066,8 +1066,8 @@ export default function PosTab({
                   <span className="text-xs font-medium leading-tight block truncate">{product.name}</span>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <span className="text-xs font-bold text-primary">{currency}{product.price.toFixed(2)}{product.vendePorPeso && product.unidadPeso ? `/${product.unidadPeso}` : ''}</span>
-                  <span className="text-[9px] text-muted-foreground block">Bs{(product.price * bcvRate).toFixed(0)}</span>
+                  <span className="text-xs font-bold text-primary">{currency} {product.price.toFixed(2)}{product.vendePorPeso && product.unidadPeso ? `/${product.unidadPeso}` : ''}</span>
+                  <span className="text-[9px] text-muted-foreground block">Bs {(product.price * bcvRate).toFixed(0)}</span>
                 </div>
                 <Badge variant={isOut ? "destructive" : isLow ? "warning" : "secondary"} className="flex-shrink-0 text-[9px] px-1.5 py-0">
                   {product.stock}
@@ -1100,8 +1100,8 @@ export default function PosTab({
                   <p className="text-xs font-medium truncate">{product.name}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-xs font-bold text-primary">{currency}{product.price.toFixed(2)}{product.vendePorPeso && product.unidadPeso ? `/${product.unidadPeso}` : ''}</p>
-                  <p className="text-[9px] text-muted-foreground">Bs{(product.price * bcvRate).toFixed(0)}</p>
+                  <p className="text-xs font-bold text-primary">{currency} {product.price.toFixed(2)}{product.vendePorPeso && product.unidadPeso ? `/${product.unidadPeso}` : ''}</p>
+                  <p className="text-[9px] text-muted-foreground">Bs {(product.price * bcvRate).toFixed(0)}</p>
                 </div>
                 <Badge variant={isOut ? "destructive" : isLow ? "warning" : "secondary"} className="flex-shrink-0 text-[9px] px-1.5 py-0">
                   {product.stock}

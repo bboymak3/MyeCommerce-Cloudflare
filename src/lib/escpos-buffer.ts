@@ -283,9 +283,11 @@ export function generateEscposBuffer(params: {
   if (receipt.paymentMethod === 'mixto' && receipt.mixedPaymentJson) {
     try {
       const entries = JSON.parse(receipt.mixedPaymentJson);
-      mixedBreakdown = entries.map((e: any) =>
-        `${PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`
-      ).join(' | ');
+      mixedBreakdown = entries.map((e: any) => {
+        let line = `${PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`;
+        if (e.reference) line += ` [Ref: ${e.reference}]`;
+        return line;
+      }).join(' | ');
     } catch { /* ignore */ }
   }
 
@@ -485,7 +487,7 @@ export function generateEscposBuffer(params: {
   // ═══ IVA — tamano normal ═══
   if ((receipt.taxAmount ?? 0) > 0) {
     const ivaLabel = 'IVA' + (taxMode === 'included' ? ' incl.' : '+') + ' (' + (taxRate || 0) + '%):';
-    const ivaVal = '$ ' + fmtN(receipt.taxAmount || 0);
+    const ivaVal = 'Bs ' + fmtN((receipt.taxAmount || 0) * (receipt.exchangeRate || 1));
     parts.push(textLine(padR(ivaLabel, 16) + padL(ivaVal, maxChars - 16)));
   }
 
