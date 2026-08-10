@@ -288,7 +288,7 @@ export default function PosTab({
   const mixedRemaining = Math.max(0, totalBs - mixedTotalBs);
   const mixedRemainingUsd = bcvRate > 0 ? mixedRemaining / bcvRate : 0;
   const isMixedValid = Math.abs(mixedTotalBs - totalBs) < 0.01;
-  const showRefField = ["transferencia", "pago-movil", "punto-de-venta", "zelle", "usdt", "mixto"].includes(paymentMethod);
+  const showRefField = ["transferencia", "pago-movil", "zelle", "usdt", "mixto"].includes(paymentMethod);
 
   // Cargar cliente final al inicio y lista de clientes para credito
   useEffect(() => {

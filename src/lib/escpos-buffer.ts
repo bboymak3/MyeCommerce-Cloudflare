@@ -283,11 +283,9 @@ export function generateEscposBuffer(params: {
   if (receipt.paymentMethod === 'mixto' && receipt.mixedPaymentJson) {
     try {
       const entries = JSON.parse(receipt.mixedPaymentJson);
-      mixedBreakdown = entries.map((e: any) => {
-        let line = `${PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`;
-        if (e.reference) line += ` [Ref: ${e.reference}]`;
-        return line;
-      }).join(' | ');
+      mixedBreakdown = entries.map((e: any) =>
+        `${PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`
+      ).join(' | ');
     } catch { /* ignore */ }
   }
 
@@ -402,7 +400,7 @@ export function generateEscposBuffer(params: {
   parts.push(textLine('Pago: ' + payLabel));
   parts.push(cmdBold(false));
   if (!isCreditSale && receipt.referenceNumber) {
-    parts.push(textLine('Ref: ' + String(receipt.referenceNumber)));
+    // No se imprime referencia en ticket
   }
   if (!isCreditSale && mixedBreakdown) {
     if (mixedBreakdown.length > maxChars) {

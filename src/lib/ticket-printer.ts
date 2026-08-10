@@ -340,11 +340,9 @@ function printViaHtml(params: {
   if (receipt.paymentMethod === 'mixto' && receipt.mixedPaymentJson) {
     try {
       const entries = JSON.parse(receipt.mixedPaymentJson);
-      mixedBreakdown = entries.map((e: any) => {
-        let line = `${TICKET_PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`;
-        if (e.reference) line += ` [Ref: ${e.reference}]`;
-        return line;
-      }).join(' | ');
+      mixedBreakdown = entries.map((e: any) =>
+        `${TICKET_PAYMENT_LABELS[e.method] || e.method}: ${parseFloat(e.amountBs).toFixed(2)}Bs`
+      ).join(' | ');
     } catch { /* ignore */ }
   }
 
@@ -462,7 +460,7 @@ ${isCreditSale ? (() => {
   return `<div class="s" style="margin-top:1px">Plazo: <b>${receipt.creditDays || 30}d</b>${dueStr ? ' Vence: <b>' + dueStr + '</b>' : ''}</div>`;
 })() : ''}
 <div style="margin-top:1px;font-size:${base}px;font-weight:bold">Pago: ${escHtml(payLabel)}</div>
-${!isCreditSale && receipt.referenceNumber ? `<div class="s">Ref: ${escHtml(String(receipt.referenceNumber))}</div>` : ''}
+
 ${!isCreditSale && mixedBreakdown ? `<div class="s" style="white-space:pre-wrap">${escHtml(mixedBreakdown)}</div>` : ''}
 ${ticketShowSeller && (receipt.sellerName || defaultSellerName) ? `<div style="font-size:${base}px;font-weight:bold">Vend: ${escHtml(receipt.sellerName || defaultSellerName || '')}</div>` : ''}
 
