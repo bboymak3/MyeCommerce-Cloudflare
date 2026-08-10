@@ -147,6 +147,17 @@ function padR(s: string, len: number): string {
   return s.length >= len ? s : s + ' '.repeat(len - s.length);
 }
 
+// ─── Utilidad: calcular precio base sin IVA (desglose) ─────────
+function getBasePrice(unitPrice: number, taxType: string, taxMode: string | undefined, taxRate: number): number {
+  if (taxMode !== 'included' || !taxRate || taxRate <= 0) return unitPrice;
+  if (taxType === 'exento' || taxType === 'omitido') return unitPrice;
+  return unitPrice / (1 + taxRate / 100);
+}
+
+function itemTaxType(item: any): string {
+  return item.taxType || item.product?.taxType || 'general';
+}
+
 // ─── Columnas dinamicas ───────────────────────────────────────────
 interface ColWidths {
   cantW: number;
@@ -155,14 +166,17 @@ interface ColWidths {
   nameW: number;
 }
 
-function calcColumnWidths(items: any[], maxChars: number): ColWidths {
+function calcColumnWidths(items: any[], maxChars: number, taxMode?: string, taxRate?: number): ColWidths {
   let maxQty = 0, maxPrice = 0, maxTotal = 0;
   for (const item of items) {
     const qty = item.quantity || 0;
     const unit = item.product?.vendePorPeso ? (' ' + (item.product.unidadPeso || 'kg')) : '';
     const qtyStr = qty % 1 === 0 ? String(qty) + unit : qty.toFixed(2) + unit;
-    const priceStr = ((item.unitPrice || 0).toFixed(2).replace('.', ',')).replace(',00', '');
-    const totalStr = ((item.total || 0).toFixed(2).replace('.', ',')).replace(',00', '');
+    const tt = itemTaxType(item);
+    const bp = getBasePrice(item.unitPrice || 0, tt, taxMode, taxRate || 0);
+    const bt = bp * qty;
+    const priceStr = (bp.toFixed(2).replace('.', ',')).replace(',00', '');
+    const totalStr = (bt.toFixed(2).replace('.', ',')).replace(',00', '');
     if (qtyStr.length > maxQty) maxQty = qtyStr.length;
     if (priceStr.length > maxPrice) maxPrice = priceStr.length;
     if (totalStr.length > maxTotal) maxTotal = totalStr.length;
@@ -356,18 +370,23 @@ function printViaHtml(params: {
   const invoiceNumHtml = invoiceNum;
 
   const items = receipt.items || [];
-  const cols = calcColumnWidths(items, maxLineChars);
+  const cols = calcColumnWidths(items, maxLineChars, taxMode, taxRate);
   const sepLine = '\u2500'.repeat(maxLineChars);
   const headerLine = padR('PRODUCTO', cols.nameW) + padL('CANT', cols.cantW) + padL('P.UNI', cols.priceW) + padL('TOTAL', cols.totalW);
 
   const itemTextLines: string[] = [];
+  let calcSubtotal = 0;
   for (const item of items) {
     const pName = item.product?.name || item.productName || 'Sin nombre';
     const qty = item.quantity || 0;
     const unit = item.product?.vendePorPeso ? (' ' + (item.product.unidadPeso || 'kg')) : '';
     const qtyStr = qty % 1 === 0 ? String(qty) + unit : qty.toFixed(2) + unit;
-    const priceStr = ((item.unitPrice || 0).toFixed(2).replace('.', ',')).replace(',00', '');
-    const totalStr = ((item.total || 0).toFixed(2).replace('.', ',')).replace(',00', '');
+    const tt = itemTaxType(item);
+    const bp = getBasePrice(item.unitPrice || 0, tt, taxMode, taxRate || 0);
+    const bt = bp * qty;
+    calcSubtotal += bt;
+    const priceStr = (bp.toFixed(2).replace('.', ',')).replace(',00', '');
+    const totalStr = (bt.toFixed(2).replace('.', ',')).replace(',00', '');
     const cantPart = padL(qtyStr, cols.cantW);
     const numPart = padL(priceStr, cols.priceW) + padL(totalStr, cols.totalW);
     const nameLines = wrapName(pName, cols.nameW);
@@ -474,11 +493,14 @@ ${itemLinesHtml}
 
 <div class="ln"></div>
 
-${receipt.discount > 0 ? `<div class="r"><span class="k">Desc:</span><span class="v">-$ ${fmtN(receipt.discount)}</span></div>` : ''}
-${(receipt.taxAmount ?? 0) > 0 ? `<div class="r"><span class="k">IVA${taxMode === 'included' ? ' incl.' : '+'} (${taxRate || 0}%):</span><span class="v">Bs ${fmtN((receipt.taxAmount || 0) * (receipt.exchangeRate || 1))}</span></div>` : ''}
+${receipt.discount > 0 ? `<div class="r"><span class="k">Desc:</span><span class="v">-Bs ${fmtN(receipt.discount * (receipt.exchangeRate || 1))}</span></div>` : ''}
+${(receipt.taxAmount ?? 0) > 0 ? `
+  <div class="r"><span class="k">Subtotal:</span><span class="v">Bs ${fmtN(calcSubtotal * (receipt.exchangeRate || 1))}</span></div>
+  <div class="r"><span class="k">IVA${taxMode === 'included' ? ' incl.' : '+'} (${taxRate || 0}%):</span><span class="v">Bs ${fmtN((receipt.taxAmount || 0) * (receipt.exchangeRate || 1))}</span></div>
+` : ''}
 <div class="r" style="margin-top:1px">
-  <span class="k b" style="font-size:${totalSize}px">TOTAL(Bs):</span>
-  <span class="v b" style="font-size:${totalSize}px">${fmtN(receipt.totalBs)}</span>
+  <span class="k b" style="font-size:${totalSize}px">TOTAL:</span>
+  <span class="v b" style="font-size:${totalSize}px">Bs ${fmtN(receipt.totalBs)}</span>
 </div>
 
 ${ticketShowExchange ? `

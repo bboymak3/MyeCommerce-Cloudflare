@@ -665,6 +665,7 @@ export default function PosTab({
           items: cart.map((item) => ({
             productId: item.id, productName: item.name,
             quantity: item.quantity, unitPrice: item.price, total: item.total,
+            taxType: item.taxType || 'general',
           })),
         }),
       });

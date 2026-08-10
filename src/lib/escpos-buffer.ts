@@ -107,6 +107,17 @@ function fmtN(n: number): string {
   return s;
 }
 
+// ─── Utilidad: calcular precio base sin IVA (desglose) ─────────
+function getBasePrice(unitPrice: number, taxType: string, taxMode: string | undefined, taxRate: number): number {
+  if (taxMode !== 'included' || !taxRate || taxRate <= 0) return unitPrice;
+  if (taxType === 'exento' || taxType === 'omitido') return unitPrice;
+  return unitPrice / (1 + taxRate / 100);
+}
+
+function itemTaxType(item: any): string {
+  return item.taxType || item.product?.taxType || 'general';
+}
+
 // ─── Columnas dinamicas ──────────────────────────────────────────
 interface ColWidths {
   cantW: number;
@@ -115,14 +126,17 @@ interface ColWidths {
   nameW: number;
 }
 
-function calcColumnWidths(items: any[], maxChars: number): ColWidths {
+function calcColumnWidths(items: any[], maxChars: number, taxMode?: string, taxRate?: number): ColWidths {
   let maxQty = 0, maxPrice = 0, maxTotal = 0;
   for (const item of items) {
     const qty = item.quantity || 0;
     const unit = item.product?.vendePorPeso ? (' ' + (item.product.unidadPeso || 'kg')) : '';
     const qtyStr = qty % 1 === 0 ? String(qty) + unit : qty.toFixed(2) + unit;
-    const priceStr = fmtN(item.unitPrice || 0);
-    const totalStr = fmtN(item.total || 0);
+    const tt = itemTaxType(item);
+    const bp = getBasePrice(item.unitPrice || 0, tt, taxMode, taxRate || 0);
+    const bt = bp * qty;
+    const priceStr = fmtN(bp);
+    const totalStr = fmtN(bt);
 
     if (qtyStr.length > maxQty) maxQty = qtyStr.length;
     if (priceStr.length > maxPrice) maxPrice = priceStr.length;
@@ -430,7 +444,7 @@ export function generateEscposBuffer(params: {
   // ═══ TABLA DE ITEMS — SIEMPRE tamano normal ═══
   // Orden: CANT | PRODUCTO | P.UNI | TOTAL
   const items = receipt.items || [];
-  const cols = calcColumnWidths(items, maxChars);
+  const cols = calcColumnWidths(items, maxChars, taxMode, taxRate);
 
   // safeNameW ya garantizado por calcColumnWidths
   const safeNameW = cols.nameW;
@@ -441,18 +455,22 @@ export function generateEscposBuffer(params: {
   parts.push(separatorLine(maxChars));
   parts.push(cmdBold(false));
 
+  let calcSubtotal = 0;
   for (const item of items) {
     const pName = item.product?.name || item.productName || 'Sin nombre';
     const qty = item.quantity || 0;
     const unit = item.product?.vendePorPeso ? (' ' + (item.product.unidadPeso || 'kg')) : '';
     const qtyStr = qty % 1 === 0 ? String(qty) + unit : qty.toFixed(2) + unit;
-    // Ajustar precio y total segun modo de moneda
-    const itemUnit = item.unitPrice || 0;
-    const itemTot = item.total || 0;
-    const pInBs = itemUnit * exRate;
-    const tInBs = itemTot * exRate;
-    const priceStr = fmtN(useBsUnit || (!useUsdUnit && cMode === 'dual') ? pInBs : itemUnit);
-    const totalStr = fmtN(cMode === 'unit_bs_total_usd' ? itemTot : (cMode === 'usd_only' ? itemTot : (cMode === 'unit_usd_total_bs' ? tInBs : (cMode === 'bs_only' ? tInBs : tInBs))));
+    // Calcular precio base (sin IVA si desglosado)
+    const tt = itemTaxType(item);
+    const bp = getBasePrice(item.unitPrice || 0, tt, taxMode, taxRate || 0);
+    const bt = bp * qty;
+    calcSubtotal += bt;
+    // Convertir a moneda del ticket
+    const bpDisplay = useBsUnit || (!useUsdUnit && cMode === 'dual') ? bp * exRate : bp;
+    const btDisplay = cMode === 'unit_bs_total_usd' ? bt : (cMode === 'usd_only' ? bt : (cMode === 'unit_usd_total_bs' ? bt * exRate : (cMode === 'bs_only' ? bt * exRate : bt * exRate)));
+    const priceStr = fmtN(bpDisplay);
+    const totalStr = fmtN(btDisplay);
 
     // Nueva orden: CANT + PRODUCTO + P.UNI + TOTAL
     const cantPart = padL(qtyStr, cols.cantW);
@@ -465,10 +483,8 @@ export function generateEscposBuffer(params: {
     }
     // La ultima linea lleva PRODUCTO + CANT + P.UNI + TOTAL
     const lastName = nameLines[nameLines.length - 1];
-    // Segurizar: truncar si por alguna razon excede maxChars
     const fullLine = lastName + cantPart + numPart;
     parts.push(textLine(fullLine.length > maxChars ? fullLine.substring(0, maxChars) : fullLine));
-    // Verificacion de seguridad: si la linea se truncó, registrar en consola
     if (fullLine.length > maxChars) {
       console.warn('[ESC/POS] Linea truncada:', fullLine.length, '>', maxChars);
     }
@@ -482,8 +498,12 @@ export function generateEscposBuffer(params: {
     parts.push(textLine(padR('Desc:', 12) + padL(descVal, maxChars - 12)));
   }
 
-  // ═══ IVA — tamano normal ═══
+  // ═══ IVA + SUBTOTAL — tamano normal ═══
   if ((receipt.taxAmount ?? 0) > 0) {
+    const subLabel = 'Subtotal:';
+    const subVal = fmtN(calcSubtotal * exRate) + 'Bs';
+    parts.push(textLine(padR(subLabel, 12) + padL(subVal, maxChars - 12)));
+
     const ivaLabel = 'IVA' + (taxMode === 'included' ? ' incl.' : '+') + ' (' + (taxRate || 0) + '%):';
     const ivaVal = 'Bs ' + fmtN((receipt.taxAmount || 0) * (receipt.exchangeRate || 1));
     parts.push(textLine(padR(ivaLabel, 16) + padL(ivaVal, maxChars - 16)));
