@@ -111,6 +111,18 @@ export default function Home() {
   // Credito vencido alerts
   const [overdueCreditCount, setOverdueCreditCount] = useState(0);
 
+  // Cart data to pass between POS <-> HeldSales <-> Quotes
+  const [pendingCartData, setPendingCartData] = useState<any>(null);
+  const [pendingCartClient, setPendingCartClient] = useState<any>(null);
+
+  // Clear pending cart data after it's been consumed by POS
+  useEffect(() => {
+    if (pendingCartData && activeTab === 'pos') {
+      const timer = setTimeout(() => setPendingCartData(null), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingCartData, activeTab]);
+
   // BCV inline editor
   const [editingBcv, setEditingBcv] = useState(false);
   const [inlineBcv, setInlineBcv] = useState("");
@@ -540,6 +552,33 @@ export default function Home() {
               businessType={settings.businessType || 'general'}
               taxMode={settings.taxMode || 'included'}
               onSaleComplete={loadData}
+              onHoldSale={async (heldData: any) => {
+                try {
+                  const res = await fetch('/api/held-sales', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      ...heldData,
+                      userId: currentUser.id,
+                      userName: currentUser.fullName || currentUser.username,
+                    }),
+                  });
+                  if (!res.ok) toast.error('Error al poner en espera');
+                } catch { toast.error('Error de conexion'); }
+              }}
+              initialCart={pendingCartData?.items?.length ? pendingCartData.items.map((item: any) => {
+                const prod = products.find((p) => p.id === item.productId);
+                return prod ? {
+                  ...prod,
+                  quantity: item.quantity,
+                  total: item.quantity * (item.unitPrice || item.total / item.quantity),
+                  isWholesale: false,
+                } : null;
+              }).filter(Boolean) : null}
+              initialClient={pendingCartData?.client}
+              initialNotes={pendingCartData?.notes || ''}
+              initialDiscount={pendingCartData?.discount || 0}
+              initialPaymentMethod={pendingCartData?.paymentMethod || 'efectivo'}
             />
           </ErrorBoundary>
         </TabsContent>
@@ -620,13 +659,23 @@ export default function Home() {
         </TabsContent>
         <TabsContent value="held-sales" activeTab={activeTab}>
           <ErrorBoundary name="Ventas en Espera">
-            <HeldSalesTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser} />
+            <HeldSalesTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser}
+              onRecoverSale={(heldSale: any) => {
+                // Load held sale items into POS cart
+                setPendingCartData(heldSale);
+                setActiveTab('pos');
+              }} />
           </ErrorBoundary>
         </TabsContent>
         <TabsContent value="quotes" activeTab={activeTab}>
           <ErrorBoundary name="Presupuestos">
             <QuotesTab products={products.map(p => ({ id: p.id, name: p.name, price: p.price, taxType: p.taxType || 'general' }))}
-              bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser} />
+              bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser}
+              onConvertToSale={(quote: any) => {
+                // Load quote items into POS cart
+                setPendingCartData(quote);
+                setActiveTab('pos');
+              }} />
           </ErrorBoundary>
         </TabsContent>
         <TabsContent value="delivery-notes" activeTab={activeTab}>

@@ -144,6 +144,29 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Register Kardex movements for each item (compra = entrada)
+      const pDate = body.date ? new Date(body.date) : new Date();
+      const pUser = req.headers.get('x-user-name') || '';
+      const pRole = req.headers.get('x-user-role') || '';
+      const pUserId = req.headers.get('x-user-id') || '';
+      for (const item of body.items) {
+        if (!item.productId) continue;
+        const qty = item.isBox ? (parseFloat(item.boxQty || 0) * parseFloat(item.unitsPerBox || 0)) : parseFloat(item.quantity || 0);
+        if (qty <= 0) continue;
+        const unitCost = item.isBox ? parseFloat(item.calcUnitCost || 0) : parseFloat(item.unitCost || 0);
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        const lastMove = await tx.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
+        const prevQty = lastMove?.balanceQty ?? (product?.stock ?? 0) - qty;
+        const prevTC = lastMove?.balanceTotalCost ?? (prevQty * (product?.cost || unitCost));
+        const entryTotalCost = qty * unitCost;
+        const balQty = prevQty + qty;
+        const balTC = prevTC + entryTotalCost;
+        const balAvg = balQty > 0 ? balTC / balQty : unitCost;
+        await tx.inventoryMovement.create({
+          data: { productId: item.productId, date: pDate, movementType: 'compra', concept: `Compra ${newPurchase.number || ''}`, quantity: qty, absQuantity: qty, unitCost, totalCost: entryTotalCost, balanceQty: balQty, balanceTotalCost: balTC, balanceAvgCost: balAvg, userId: String(pUserId), userName: pUser, userRole: pRole, referenceId: newPurchase.id },
+        });
+      }
+
       return newPurchase;
     });
 

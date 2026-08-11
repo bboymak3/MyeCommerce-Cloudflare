@@ -54,6 +54,22 @@ interface ClientData {
   creditLimit?: number;
 }
 
+interface HeldSaleData {
+  items: CartItem[];
+  clientName: string;
+  clientId: string | null;
+  subtotal: number;
+  taxAmount: number;
+  discount: number;
+  total: number;
+  totalBs: number;
+  exchangeRate: number;
+  paymentMethod: string;
+  notes: string;
+  sellerName: string;
+  sellerRole: string;
+}
+
 interface PosTabProps {
   products: Product[];
   bcvRate: number;
@@ -89,6 +105,12 @@ interface PosTabProps {
   businessType?: string;
   taxMode?: string;
   onSaleComplete?: () => void;
+  onHoldSale?: (data: HeldSaleData) => void;
+  initialCart?: CartItem[] | null;
+  initialClient?: ClientData | null;
+  initialNotes?: string;
+  initialDiscount?: number;
+  initialPaymentMethod?: string;
 }
 
 export default function PosTab({
@@ -104,6 +126,12 @@ export default function PosTab({
   ticketCurrencyMode = "dual",
   storeLogo = "", businessType = "general", taxMode = "included",
   onSaleComplete,
+  onHoldSale,
+  initialCart,
+  initialClient,
+  initialNotes,
+  initialDiscount,
+  initialPaymentMethod,
 }: PosTabProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
@@ -216,11 +244,28 @@ export default function PosTab({
       if (e.key === 'F6') { e.preventDefault(); setPaymentMethod('efectivo'); }
       if (e.key === 'F7') { e.preventDefault(); setPaymentMethod('pago-movil'); }
       if (e.key === 'F8' && cart.length > 0) { e.preventDefault(); completeSale(); }
+      if (e.key === 'F9' && cart.length > 0) { e.preventDefault(); holdCurrentSale(); }
       if (e.key === 'Escape' && cart.length > 0) { e.preventDefault(); clearCart(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cart, showReceipt, showScanner, showClientDialog, showNewClientDialog, showCreditConfirm, showStockWarning, showQrModal]);
+
+  useEffect(() => {
+    if (initialCart && initialCart.length > 0) {
+      setCart(initialCart);
+      if (initialClient) {
+        setSelectedClient(initialClient);
+        setCreditClientId(initialClient.id);
+        setCreditClientName(initialClient.fullName);
+      }
+      if (initialNotes) setNotes(initialNotes);
+      if (initialDiscount) setDiscount(initialDiscount);
+      if (initialPaymentMethod) setPaymentMethod(initialPaymentMethod);
+      toast.success("Carrito cargado desde factura en espera / presupuesto");
+    }
+  }, [initialCart]);
+
   const [scannerMode, setScannerMode] = useState<"product" | "client">("product");
   const [scannerLoading, setScannerLoading] = useState(false);
   const [scannerError, setScannerError] = useState("");
@@ -583,6 +628,28 @@ export default function PosTab({
     }
   };
 
+  const holdCurrentSale = () => {
+    if (cart.length === 0) { toast.error("El carrito esta vacio"); return; }
+    const heldData: HeldSaleData = {
+      items: cart,
+      clientName: selectedClient ? selectedClient.fullName : "Cliente Final",
+      clientId: selectedClient?.id || null,
+      subtotal,
+      taxAmount: 0,
+      discount: effectiveDiscount,
+      total,
+      totalBs: total * bcvRate,
+      exchangeRate: bcvRate,
+      paymentMethod,
+      notes,
+      sellerName,
+      sellerRole: propSellerRole || "",
+    };
+    onHoldSale?.(heldData);
+    clearCart();
+    toast.success("Factura puesta en espera");
+  };
+
   const completeSale = async () => {
     if (isSubmittingRef.current) return;
     if (cart.length === 0) { toast.error("El carrito esta vacio"); return; }
@@ -710,6 +777,7 @@ export default function PosTab({
             <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-green-100 text-green-800 font-bold text-xs border border-green-200 shadow-sm"><span className="text-[10px] opacity-70">F5</span> Efectivo$</kbd>
             <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 shadow-sm"><span className="text-[10px] opacity-70">F6</span> Efectivo</kbd>
             <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-100 text-purple-800 font-bold text-xs border border-purple-200 shadow-sm"><span className="text-[10px] opacity-70">F7</span> PMovil</kbd>
+            <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-orange-100 text-orange-800 font-bold text-xs border border-orange-200 shadow-sm cursor-pointer" onClick={cart.length > 0 ? holdCurrentSale : undefined} title="Poner en Espera"><span className="text-[10px] opacity-70">F9</span> Espera</kbd>
             <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-100 text-red-800 font-bold text-xs border border-red-200 shadow-sm"><span className="text-[10px] opacity-70">F8</span> COBRAR</kbd>
             <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 font-bold text-xs border border-gray-200 shadow-sm"><span className="text-[10px] opacity-70">Esc</span> Vaciar</kbd>
           </div>

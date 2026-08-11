@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileText,
   Plus,
@@ -161,6 +161,12 @@ export default function QuotesTab({
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [productSearch, setProductSearch] = useState("");
 
+  // Client selector state
+  const [clients, setClients] = useState<Array<{id: string; fullName: string; docType: string; docNumber: string; type: string}>>([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+
   // ── Fetch quotes ─────────────────────────────────────────────────────────
 
   const fetchQuotes = useCallback(async () => {
@@ -187,6 +193,17 @@ export default function QuotesTab({
     fetchQuotes();
   }, [fetchQuotes]);
 
+  // ── Fetch registered clients ──────────────────────────────────────────────
+  useEffect(() => {
+    authFetch("/api/clients?limit=1000")
+      .then(r => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        const list = Array.isArray(data) ? data : [];
+        setClients(list.map((c: any) => ({ id: c.id, fullName: c.fullName, docType: c.docType, docNumber: c.docNumber, type: c.type })));
+      })
+      .catch(() => {});
+  }, []);
+
   // ── Tab change resets page ───────────────────────────────────────────────
 
   function handleTabChange(tab: FilterTab) {
@@ -199,6 +216,8 @@ export default function QuotesTab({
 
   function resetCreateForm() {
     setClientName("");
+    setClientSearch("");
+    setSelectedClientId(null);
     setValidUntil("");
     setNotes("");
     setItems([]);
@@ -256,6 +275,22 @@ export default function QuotesTab({
   );
   const createTotal = createSubtotal + createTax;
 
+  // ── Client selector helpers ──────────────────────────────────────────────
+  const filteredClients = useMemo(() => {
+    if (!clientSearch.trim()) return clients.slice(0, 15);
+    const q = clientSearch.toLowerCase();
+    return clients.filter(c =>
+      c.fullName.toLowerCase().includes(q) || c.docNumber.includes(q)
+    ).slice(0, 15);
+  }, [clients, clientSearch]);
+
+  function selectClient(client: typeof clients[0]) {
+    setClientName(client.fullName);
+    setSelectedClientId(client.id);
+    setClientSearch(client.fullName);
+    setShowClientDropdown(false);
+  }
+
   async function handleCreateQuote() {
     if (!clientName.trim()) {
       toast.error("El nombre del cliente es obligatorio");
@@ -276,6 +311,7 @@ export default function QuotesTab({
         method: "POST",
         body: JSON.stringify({
           clientName: clientName.trim(),
+          clientId: selectedClientId,
           validUntil,
           notes: notes.trim(),
           items: items.map((i) => ({
@@ -738,12 +774,41 @@ export default function QuotesTab({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="q-client">Cliente *</Label>
-                <Input
-                  id="q-client"
-                  placeholder="Nombre del cliente"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    id="q-client"
+                    placeholder="Buscar cliente registrado o escribir nombre..."
+                    value={clientSearch}
+                    onChange={(e) => {
+                      setClientSearch(e.target.value);
+                      setClientName(e.target.value);
+                      setSelectedClientId(null);
+                      setShowClientDropdown(true);
+                    }}
+                    onFocus={() => setShowClientDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowClientDropdown(false), 200)}
+                  />
+                  {showClientDropdown && filteredClients.length > 0 && (
+                    <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-background shadow-lg">
+                      {filteredClients.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center justify-between border-b last:border-0 transition-colors cursor-pointer"
+                          onMouseDown={(e) => { e.preventDefault(); selectClient(c); }}
+                        >
+                          <div>
+                            <span className="font-medium">{c.fullName}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{c.docType}-{c.docNumber}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {selectedClientId && (
+                  <p className="text-xs text-muted-foreground">Cliente seleccionado: {clientName}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="q-valid">Válido hasta *</Label>

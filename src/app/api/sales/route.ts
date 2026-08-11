@@ -111,7 +111,27 @@ export async function POST(req: NextRequest) {
 
       // Decrement stock
       for (const item of body.items) {
-        await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: parseFloat(item.quantity) } } });
+        const qty = parseFloat(item.quantity);
+        await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: qty } } });
+      }
+
+      // Register Kardex movements for each item (venta = salida)
+      const sName = body.sellerName || '';
+      const sRole = body.sellerRole || '';
+      const uId = String(body.userId || '');
+      for (const item of body.items) {
+        const qty = parseFloat(item.quantity);
+        const product = await tx.product.findUnique({ where: { id: item.productId } });
+        const unitCost = product?.cost || 0;
+        const lastMove = await tx.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
+        const prevQty = lastMove?.balanceQty ?? (product?.stock ?? 0) + qty;
+        const prevTC = lastMove?.balanceTotalCost ?? (prevQty * unitCost);
+        const balQty = prevQty - qty;
+        const balTC = Math.max(0, prevTC - (qty * unitCost));
+        const balAvg = balQty > 0 ? balTC / balQty : 0;
+        await tx.inventoryMovement.create({
+          data: { productId: item.productId, date: now, movementType: 'venta', concept: `Venta ${invoiceNumber}`, quantity: -qty, absQuantity: qty, unitCost, totalCost: qty * unitCost, balanceQty: balQty, balanceTotalCost: balTC, balanceAvgCost: balAvg, userId: uId, userName: sName, userRole: sRole, referenceId: newSale.id },
+        });
       }
 
       // If credit sale, update client balance
