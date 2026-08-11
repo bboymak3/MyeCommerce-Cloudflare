@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Truck, Phone, Mail, MapPin, Search } from "lucide-react";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface Supplier {
   id: string;
@@ -37,7 +38,7 @@ export default function SuppliersTab() {
   const load = async (q?: string) => {
     try {
       const params = q ? `?search=${encodeURIComponent(q)}` : "";
-      const res = await fetch(`/api/suppliers${params}`);
+      const res = await authFetch(`/api/suppliers${params}`);
       setSuppliers(await res.json());
     } catch { toast.error("Error al cargar proveedores"); }
     finally { setLoading(false); }
@@ -67,7 +68,7 @@ export default function SuppliersTab() {
     if (!form.name.trim()) { toast.error("Nombre requerido"); return; }
     setSaving(true);
     try {
-      const res = await fetch("/api/suppliers", {
+      const res = await authFetch("/api/suppliers", {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editing ? { id: editing.id, ...form } : form),
@@ -83,7 +84,7 @@ export default function SuppliersTab() {
   const remove = async (s: Supplier) => {
     if (!confirm(`Desactivar proveedor "${s.name}"?`)) return;
     try {
-      await fetch(`/api/suppliers?id=${s.id}`, { method: "DELETE" });
+      await authFetch(`/api/suppliers?id=${s.id}`, { method: "DELETE" });
       toast.success("Proveedor desactivado");
       load(search);
     } catch { toast.error("Error al desactivar"); }

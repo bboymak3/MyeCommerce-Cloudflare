@@ -13,6 +13,7 @@ import {
 import { printTicket } from "@/lib/ticket-printer";
 import type { TicketSettings } from "@/lib/ticket-printer";
 import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface ReportsTabProps {
   bcvRate: number;
@@ -304,7 +305,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
       // Fetch sale with items if not already loaded
       let s = sale;
       if (!s.items || s.items.length === 0) {
-        const res = await fetch(`/api/sales?id=${s.id}`);
+        const res = await authFetch(`/api/sales?id=${s.id}`);
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) s = { ...s, ...data[0] };
         else if (data.id) s = { ...s, ...data };
@@ -312,7 +313,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
       }
 
       // Fetch store settings (LA MISMA config que usa el POS)
-      const stRes = await fetch("/api/settings");
+      const stRes = await authFetch("/api/settings");
       const st = await stRes.json();
       const ticketSettings: TicketSettings = {
         storeName: st.storeName || "Mi Tienda",

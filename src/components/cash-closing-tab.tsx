@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface CashClosing {
   id: string;
@@ -102,7 +103,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
 
   const loadClosings = useCallback(async () => {
     try {
-      const res = await fetch("/api/cash-closing?limit=50");
+      const res = await authFetch("/api/cash-closing?limit=50");
       if (!res.ok) {
         setClosings([]);
         return;
@@ -158,7 +159,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
     setCountedCashUsd("");
     setArqueoPreview(null);
     if (type === "final") {
-      fetch(`/api/cash-closing?preview=true&date=${today}`).then(r => r.json()).then(data => setArqueoPreview(data)).catch(() => {});
+      authFetch(`/api/cash-closing?preview=true&date=${today}`, {}).then(r => r.json()).then(data => setArqueoPreview(data)).catch(() => {});
     }
     setShowConfirmDialog(true);
   };
@@ -166,7 +167,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
   const performClosing = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/cash-closing", {
+      const res = await authFetch("/api/cash-closing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -204,7 +205,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
 
     // Cargar datos de ventas con referencias
     try {
-      const res = await fetch(`/api/cash-closing?closingId=${closing.id}`);
+      const res = await authFetch(`/api/cash-closing?closingId=${closing.id}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setDetailReferenceData({

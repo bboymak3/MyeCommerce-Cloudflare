@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { ShoppingCart, Plus, Trash2, Search, Truck, ChevronDown, ChevronUp, Filter, Printer, Package, Box } from "lucide-react";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface Supplier { id: string; name: string; rif: string; phone?: string; }
 interface Product { id: string; name: string; cost: number; stock: number; price?: number; unitsPerBox?: number; boxPrice?: number; }
@@ -41,9 +42,9 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/suppliers").then(r => r.json()),
-      fetch("/api/products").then(r => r.json()),
-      fetch("/api/purchases").then(r => r.json()),
+      authFetch("/api/suppliers", {}).then(r => r.json()),
+      authFetch("/api/products", {}).then(r => r.json()),
+      authFetch("/api/purchases", {}).then(r => r.json()),
     ]).then(([s, p, pur]) => {
       setSuppliers(Array.isArray(s) ? s : []);
       setProducts(Array.isArray(p) ? p : []);
@@ -176,7 +177,7 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
     if (items.length === 0) { toast.error("Agregue al menos un producto"); return; }
     setSaving(true);
     try {
-      const res = await fetch("/api/purchases", {
+      const res = await authFetch("/api/purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ supplierId: supplierId || null, items, notes, exchangeRate: bcvRate }),
@@ -185,8 +186,8 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
       toast.success(`Compra registrada: $${totalUsd.toFixed(2)} (${items.length} productos)`);
       setItems([]); setNotes(""); setSupplierId("");
       const [pur, prods] = await Promise.all([
-        fetch("/api/purchases").then(r => r.json()),
-        fetch("/api/products").then(r => r.json()),
+        authFetch("/api/purchases", {}).then(r => r.json()),
+        authFetch("/api/products", {}).then(r => r.json()),
       ]);
       setPurchases(Array.isArray(pur) ? pur : []);
       setProducts(Array.isArray(prods) ? prods : []);
@@ -197,7 +198,7 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
   const deletePurchase = async (id: string) => {
     if (!confirm("Eliminar esta compra? Se restaurara el stock.")) return;
     try {
-      await fetch(`/api/purchases?id=${id}`, { method: "DELETE" });
+      await authFetch(`/api/purchases?id=${id}`, { method: "DELETE" });
       toast.success("Compra eliminada, stock restaurado");
       setPurchases(prev => prev.filter(p => p.id !== id));
     } catch { toast.error("Error al eliminar"); }

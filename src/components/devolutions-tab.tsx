@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface Sale {
   id: string;
@@ -71,7 +72,7 @@ export default function DevolutionsTab({ bcvRate, currency }: DevolutionsTabProp
 
   const loadDevolutions = useCallback(async () => {
     try {
-      const res = await fetch("/api/devolutions?limit=50");
+      const res = await authFetch("/api/devolutions?limit=50");
       const data = await res.json();
       setDevolutions(data);
     } catch {
@@ -81,7 +82,7 @@ export default function DevolutionsTab({ bcvRate, currency }: DevolutionsTabProp
 
   const loadSales = useCallback(async () => {
     try {
-      const res = await fetch("/api/sales?limit=100");
+      const res = await authFetch("/api/sales?limit=100");
       const data = await res.json();
       setSales(data);
     } catch {
@@ -153,7 +154,7 @@ export default function DevolutionsTab({ bcvRate, currency }: DevolutionsTabProp
           total: returnItems.get(item.productId)! * item.unitPrice,
         }));
 
-      const res = await fetch("/api/devolutions", {
+      const res = await authFetch("/api/devolutions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

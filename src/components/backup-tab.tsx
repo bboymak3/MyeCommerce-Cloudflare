@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
 export default function BackupTab() {
   const [exporting, setExporting] = useState(false);
@@ -22,7 +23,7 @@ export default function BackupTab() {
 
   const loadStats = async () => {
     try {
-      const res = await fetch("/api/backup/stats");
+      const res = await authFetch("/api/backup/stats");
       if (res.ok) {
         const data = await res.json();
         setDbStats(data);
@@ -38,7 +39,7 @@ export default function BackupTab() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const res = await fetch("/api/backup");
+      const res = await authFetch("/api/backup");
       if (!res.ok) throw new Error("Error al exportar");
       const data = await res.json();
 
@@ -93,7 +94,7 @@ export default function BackupTab() {
         throw new Error("El archivo no parece un respaldo valido de MyeCommerce");
       }
 
-      const res = await fetch("/api/backup", {
+      const res = await authFetch("/api/backup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

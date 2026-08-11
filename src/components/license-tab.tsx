@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { FEATURE_LABELS } from "@/lib/license";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface LicenseInfo {
   isValid: boolean;
@@ -109,7 +110,7 @@ export default function LicenseTab({ license, onLicenseChange }: LicenseTabProps
     }
     setActivating(true);
     try {
-      const res = await fetch("/api/license", {
+      const res = await authFetch("/api/license", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

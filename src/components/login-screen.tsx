@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import type { CurrentUser } from "./users-tab";
 
 interface LoginScreenProps {
-  onLogin: (user: CurrentUser) => void;
+  onLogin: (user: CurrentUser & { token?: string }) => void;
   storeName?: string;
 }
 
@@ -85,7 +85,10 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
         return;
       }
 
-      // Store user in localStorage
+      // Store token JWT and user data
+      if (data.token) {
+        localStorage.setItem("myecommerce_token", data.token);
+      }
       localStorage.setItem("myecommerce_user", JSON.stringify(data));
       onLogin(data);
       toast.success(`Bienvenido, ${data.fullName || data.username}`);
@@ -131,8 +134,11 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
         return;
       }
 
-      // Contraseña cambiada — limpiar estado y dejar pasar al sistema
+      // Contraseña cambiada — guardar nuevo token si viene
       if (pendingUser) {
+        if (data.token) {
+          localStorage.setItem("myecommerce_token", data.token);
+        }
         localStorage.setItem("myecommerce_user", JSON.stringify(pendingUser));
         onLogin(pendingUser);
         toast.success("Contrasena actualizada correctamente");

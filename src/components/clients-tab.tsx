@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface Client {
   id: string;
@@ -84,7 +85,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
     setHistLoading(true);
     setDetailSale(null);
     try {
-      const res = await fetch(`/api/clients/${client.id}/purchases`);
+      const res = await authFetch(`/api/clients/${client.id}/purchases`);
       const data = await res.json();
       setHistSales(Array.isArray(data) ? data : []);
     } catch { setHistSales([]); }
@@ -98,7 +99,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
       const params = new URLSearchParams();
       if (histDateFrom) params.set('from', histDateFrom);
       if (histDateTo) params.set('to', histDateTo);
-      const res = await fetch(`/api/clients/${histClient.id}/purchases?${params}`);
+      const res = await authFetch(`/api/clients/${histClient.id}/purchases?${params}`);
       const data = await res.json();
       setHistSales(Array.isArray(data) ? data : []);
     } catch { setHistSales([]); }
@@ -127,7 +128,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
 
   const reprintFromHistory = async (sale: any) => {
     try {
-      const stRes = await fetch("/api/settings");
+      const stRes = await authFetch("/api/settings");
       const st = await stRes.json();
       const storeName = st.storeName || "Mi Tienda";
       const storeRif = st.storeRif || "";
@@ -297,7 +298,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
       const params = new URLSearchParams();
       if (searchTerm) params.set("search", searchTerm);
       if (filterType) params.set("type", filterType);
-      const res = await fetch(`/api/clients?${params}`);
+      const res = await authFetch(`/api/clients?${params}`);
       const data = await res.json();
       setClients(data);
     } catch {
@@ -389,7 +390,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
     }
     if (!confirm(`Desactivar al cliente "${client.fullName}"?`)) return;
     try {
-      await fetch(`/api/clients?id=${client.id}`, { method: "DELETE" });
+      await authFetch(`/api/clients?id=${client.id}`, { method: "DELETE" });
       toast.success("Cliente desactivado");
       loadClients(search);
     } catch {

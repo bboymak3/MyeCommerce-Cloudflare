@@ -29,6 +29,7 @@ import type { CurrentUser } from "@/components/users-tab";
 import AppNav from "@/components/app-nav";
 import { create } from "zustand";
 import { toast } from "sonner";
+import { authFetch, storeSession, clearSession, getStoredUser as getStoredUserFromLib } from "@/lib/auth-fetch";
 
 interface Product { id: string; name: string; description: string; barcode: string; price: number; cost: number; stock: number; minStock: number; wholesalePrice: number; minWholesaleQty: number; icon: string; noStock: boolean; categoryId: string | null; category: { name: string; icon?: string; color?: string } | null; active: boolean; }
 interface Category { id: string; name: string; icon?: string; color?: string; _count?: { products: number }; }
@@ -69,11 +70,7 @@ interface AppState { activeTab: string; setActiveTab: (tab: string) => void; }
 const useAppStore = create<AppState>((set) => ({ activeTab: "pos", setActiveTab: (tab) => set({ activeTab: tab }) }));
 
 function getStoredUser(): CurrentUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("myecommerce_user");
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  return getStoredUserFromLib<CurrentUser>();
 }
 
 export default function Home() {
@@ -127,25 +124,44 @@ export default function Home() {
     setAuthReady(true);
   }, []);
 
-  const handleLogin = (user: CurrentUser) => {
+  const handleLogin = (user: CurrentUser & { token?: string }) => {
+    // Guardar token JWT y datos del usuario
+    if (user.token) {
+      storeSession(user.token, user);
+    }
     setCurrentUser(user);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("myecommerce_user");
+    clearSession();
     setCurrentUser(null);
+    // Llamar API de logout para limpiar cookie
+    fetch("/api/auth", { method: "DELETE" }).catch(() => {});
     window.location.reload();
   };
 
   const handleUserUpdate = (updated: CurrentUser) => {
     setCurrentUser(updated);
-    localStorage.setItem("myecommerce_user", JSON.stringify(updated));
+    const token = localStorage.getItem("myecommerce_token");
+    if (token) {
+      storeSession(token, updated);
+    }
   };
+
+  const handleSessionExpired = useCallback(() => {
+    clearSession();
+    setCurrentUser(null);
+    toast.error("Sesion expirada. Inicie sesion nuevamente.");
+    setTimeout(() => window.location.reload(), 1500);
+  }, []);
 
   const loadData = useCallback(async () => {
     try {
       const [productsRes, categoriesRes, settingsRes, licenseRes] = await Promise.all([
-        fetch("/api/products"), fetch("/api/categories"), fetch("/api/settings"), fetch("/api/license"),
+        authFetch("/api/products", {}, handleSessionExpired),
+        authFetch("/api/categories", {}, handleSessionExpired),
+        authFetch("/api/settings", {}, handleSessionExpired),
+        authFetch("/api/license", {}, handleSessionExpired),
       ]);
       const [productsData, categoriesData, settingsData, licenseData] = await Promise.all([
         productsRes.json(), categoriesRes.json(), settingsRes.json(), licenseRes.json(),
@@ -159,10 +175,10 @@ export default function Home() {
       if (licenseData && !licenseData.error) setLicense(licenseData);
 
       // Inicializar Cliente Final si no existe
-      fetch("/api/clients", { method: "PATCH" }).catch(() => {});
+      authFetch("/api/clients", { method: "PATCH" }, handleSessionExpired).catch(() => {});
 
 // Cargar alertas de stock
-      fetch("/api/products/stock-alerts")
+      authFetch("/api/products/stock-alerts", {}, handleSessionExpired)
         .then(r => r.json())
         .then(data => {
           if (data && !data.error && data.totalAlerts > 0) {
@@ -186,7 +202,7 @@ export default function Home() {
         .catch(() => {});
 
 // Cargar alertas de credito vencido
-      fetch("/api/credit/overdue")
+      authFetch("/api/credit/overdue", {}, handleSessionExpired)
         .then(r => r.json())
         .then(data => {
           if (data && !data.error && data.count > 0) {
@@ -218,11 +234,10 @@ export default function Home() {
     const rate = parseFloat(inlineBcv);
     if (isNaN(rate) || rate <= 0) { toast.error("Ingrese una tasa valida mayor a 0"); setEditingBcv(false); return; }
     try {
-      const res = await fetch("/api/settings", {
+      const res = await authFetch("/api/settings", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...settings, bcvRate: rate }),
-      });
+      }, handleSessionExpired);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setSettings(data);
@@ -237,7 +252,7 @@ export default function Home() {
     if (!activateKey.trim()) { toast.error("Ingrese la clave de licencia"); return; }
     setActivating(true);
     try {
-      const res = await fetch("/api/license", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ licenseKey: activateKey.trim() }) });
+      const res = await authFetch("/api/license", { method: "POST", body: JSON.stringify({ licenseKey: activateKey.trim() }) }, handleSessionExpired);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success(data.message);
@@ -639,7 +654,7 @@ function UpgradePrompt({ feature, plan, desc }: { feature: string; plan: string;
   const [loading, setLoading] = useState(false);
   const activate = async () => {
     if (!key.trim()) return; setLoading(true);
-    try { const res = await fetch("/api/license", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ licenseKey: key.trim() }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error); toast.success(data.message); setShowActivate(false); setTimeout(() => window.location.reload(), 1000); } catch (e: any) { toast.error(e.message); } finally { setLoading(false); }
+    try { const res = await authFetch("/api/license", { method: "POST", body: JSON.stringify({ licenseKey: key.trim() }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error); toast.success(data.message); setShowActivate(false); setTimeout(() => window.location.reload(), 1000); } catch (e: any) { toast.error(e.message); } finally { setLoading(false); }
   };
   return (
     <div className="flex flex-col items-center justify-center py-12 space-y-4">

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { authFetch } from "@/lib/auth-fetch";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from "recharts";
@@ -59,7 +60,7 @@ export default function DashboardTab({ bcvRate, currency }: DashboardProps) {
 
   const loadDashboard = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await authFetch("/api/dashboard");
       const json = await res.json();
       if (!json.error) setData(json);
     } catch (e) { console.error(e); }

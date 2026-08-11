@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword, verifyPassword, needsRehash } from '@/lib/auth';
+import { createSessionToken } from '@/lib/session';
 
 // Rate limiting: max 5 intentos fallidos por IP en 5 minutos
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
@@ -123,7 +124,17 @@ export async function POST(req: NextRequest) {
     // Limpiar intentos fallidos al login exitoso
     clearFailedAttempts(ip);
 
-    const responseData: Record<string, unknown> = { ...serializeUser(updatedUser) };
+    // Generar token JWT de sesion
+    const token = createSessionToken({
+      id: updatedUser.id,
+      username: updatedUser.username,
+      role: updatedUser.role,
+    });
+
+    const responseData: Record<string, unknown> = {
+      ...serializeUser(updatedUser),
+      token, // Token JWT que el frontend debe guardar y enviar en cada request
+    };
 
     // Forzar cambio de contraseña si es la contraseña por defecto (admin/admin)
     const isDefaultPassword = password === 'admin' && user.username === 'admin';
@@ -131,11 +142,73 @@ export async function POST(req: NextRequest) {
       responseData.requirePasswordChange = true;
     }
 
-    return NextResponse.json(responseData);
+    // Configurar cookie httpOnly para mayor seguridad
+    const response = NextResponse.json(responseData);
+
+    // Cookie segura: httpOnly, SameSite=Strict, Path=/
+    response.cookies.set('session_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 24 * 60 * 60, // 24 horas
+    });
+
+    return response;
   } catch (error) {
     console.error('Auth error:', error);
     return NextResponse.json({ error: 'Error en el servidor' }, { status: 500 });
   }
+}
+
+// Endpoint para validar/renovar token
+export async function GET(req: NextRequest) {
+  try {
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    if (!token) {
+      return NextResponse.json({ error: 'Token no proporcionado' }, { status: 401 });
+    }
+
+    const { verifySessionToken } = await import('@/lib/session');
+    const session = verifySessionToken(token);
+
+    if (!session) {
+      return NextResponse.json({ error: 'Token invalido o expirado' }, { status: 401 });
+    }
+
+    // Token valido — retornar info del usuario
+    const user = await db.user.findUnique({
+      where: { id: session.userId },
+    });
+
+    if (!user || !user.isActive) {
+      return NextResponse.json({ error: 'Usuario no encontrado o inactivo' }, { status: 401 });
+    }
+
+    return NextResponse.json({
+      valid: true,
+      user: serializeUser(user),
+      expiresAt: session.exp,
+    });
+  } catch (error) {
+    console.error('Token validation error:', error);
+    return NextResponse.json({ error: 'Error al validar sesion' }, { status: 500 });
+  }
+}
+
+// Logout: invalidar token (client-side + clear cookie)
+export async function DELETE(req: NextRequest) {
+  const response = NextResponse.json({ message: 'Sesion cerrada correctamente' });
+  response.cookies.set('session_token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: 0, // Eliminar cookie
+  });
+  return response;
 }
 
 export async function PUT(req: NextRequest) {
@@ -173,7 +246,28 @@ export async function PUT(req: NextRequest) {
       data: { password: hashPassword(newPassword) },
     });
 
-    return NextResponse.json({ message: 'Contrasena actualizada correctamente', user: serializeUser(updated) });
+    // Generar nuevo token despues de cambio de contraseña
+    const newToken = createSessionToken({
+      id: updated.id,
+      username: updated.username,
+      role: updated.role,
+    });
+
+    const response = NextResponse.json({
+      message: 'Contrasena actualizada correctamente',
+      user: serializeUser(updated),
+      token: newToken,
+    });
+
+    response.cookies.set('session_token', newToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 24 * 60 * 60,
+    });
+
+    return response;
   } catch (error) {
     console.error('Password change error:', error);
     return NextResponse.json({ error: 'Error en el servidor' }, { status: 500 });

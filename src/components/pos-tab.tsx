@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface Product {
   id: string;
@@ -186,7 +187,7 @@ export default function PosTab({
 
   // Fetch local IP for QR mobile access
   useEffect(() => {
-    fetch('/api/local-ip')
+    authFetch('/api/local-ip', {})
       .then(r => r.json())
       .then(data => setLocalUrl(data.url || ''))
       .catch(() => setLocalUrl(''));
@@ -292,7 +293,7 @@ export default function PosTab({
 
   // Cargar cliente final al inicio y lista de clientes para credito
   useEffect(() => {
-    fetch("/api/clients").then(r => r.json()).then((data) => {
+    authFetch("/api/clients", {}).then(r => r.json()).then((data) => {
       setClients(data);
       const finalClient = data.find((c: ClientData) => c.isFinalClient);
       if (finalClient) setSelectedClient(finalClient);
@@ -303,7 +304,7 @@ export default function PosTab({
   const searchClients = useCallback(async (term: string) => {
     if (term.length < 1) { setClientResults([]); return; }
     try {
-      const res = await fetch(`/api/clients?search=${encodeURIComponent(term)}`);
+      const res = await authFetch(`/api/clients?search=${encodeURIComponent(term)}`);
       const data = await res.json();
       setClientResults(data.slice(0, 8));
     } catch { setClientResults([]); }
@@ -312,7 +313,7 @@ export default function PosTab({
   // Seleccionar cliente final
   const selectFinalClient = async () => {
     try {
-      const res = await fetch("/api/clients?search=CLIENTE+FINAL");
+      const res = await authFetch("/api/clients?search=CLIENTE+FINAL");
       const data = await res.json();
       const fc = data.find((c: ClientData) => c.isFinalClient);
       if (fc) {
@@ -343,7 +344,7 @@ export default function PosTab({
     const fullName = isJ ? newClientForm.businessName : `${newClientForm.firstName} ${newClientForm.lastName}`.trim();
     if (!fullName || !newClientForm.docNumber) { toast.error("Nombre y documento requeridos"); return; }
     try {
-      const res = await fetch("/api/clients", {
+      const res = await authFetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...newClientForm, fullName }),
@@ -646,7 +647,7 @@ export default function PosTab({
     const saleRef = paymentMethod === "mixto" ? "" : referenceNumber.trim();
     try {
       isSubmittingRef.current = true;
-      const res = await fetch("/api/sales", {
+      const res = await authFetch("/api/sales", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

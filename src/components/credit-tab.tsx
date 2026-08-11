@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { DollarSign, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, HandCoins } from "lucide-react";
+import { authFetch } from "@/lib/auth-fetch";
 
 // Safe number: converts null/undefined/NaN to 0
 function sn(v: any): number {
@@ -111,7 +112,7 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
     setLoading(true);
     setErrorMsg("");
     try {
-      const res = await fetch("/api/credit");
+      const res = await authFetch("/api/credit");
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         const msg = errData.error || `Error al cargar cuentas por cobrar (${res.status})`;
@@ -163,7 +164,7 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
     setSelectedClient(selectedClient?.id === client.id ? null : client);
     if (selectedClient?.id !== client.id) {
       try {
-        const res = await fetch(`/api/credit?clientId=${client.id}`);
+        const res = await authFetch(`/api/credit?clientId=${client.id}`);
         if (!res.ok) {
           console.error("Credit API error:", res.status, res.statusText);
           toast.error(`Error al cargar ventas a credito (${res.status})`);
@@ -214,7 +215,7 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
     }
     setExpandedSale(saleId);
     try {
-      const res = await fetch(`/api/credit?saleId=${saleId}`);
+      const res = await authFetch(`/api/credit?saleId=${saleId}`);
       if (!res.ok) { setSalePayments([]); return; }
       const data = await res.json();
       const payments = Array.isArray(data?.creditPayments) ? data.creditPayments : [];
@@ -260,7 +261,7 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
 
     setSaving(true);
     try {
-      const res = await fetch("/api/credit", {
+      const res = await authFetch("/api/credit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -283,13 +284,13 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
       setShowPayDialog(false);
       await loadClients();
       if (selectedClient) {
-        const res2 = await fetch(`/api/credit?clientId=${selectedClient.id}`);
+        const res2 = await authFetch(`/api/credit?clientId=${selectedClient.id}`);
         const data2 = await res2.json();
         setClientSales(Array.isArray(data2) ? data2 : []);
       }
       if (expandedSale) {
         try {
-          const res3 = await fetch(`/api/credit?payments=true&saleId=${expandedSale}`);
+          const res3 = await authFetch(`/api/credit?payments=true&saleId=${expandedSale}`);
           const data3 = await res3.json();
           setSalePayments(Array.isArray(data3) ? data3 : []);
         } catch { setSalePayments([]); }

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface Settings {
   id: string;
@@ -123,7 +124,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 2000);
-      const res = await fetch('/api/print-agent', {
+      const res = await authFetch('/api/print-agent', {
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -220,7 +221,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     try {
       const formData = new FormData();
       formData.append('logo', file);
-      const res = await fetch('/api/store-logo', {
+      const res = await authFetch('/api/store-logo', {
         method: 'POST',
         body: formData,
       });
@@ -273,7 +274,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         taxMode,
       };
 
-      const res = await fetch("/api/settings", {
+      const res = await authFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -293,7 +294,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
 
   const loadBackupStatus = async () => {
     try {
-      const res = await fetch("/api/backup/auto");
+      const res = await authFetch("/api/backup/auto");
       const data = await res.json();
       setBackupStatus(data);
     } catch {
@@ -303,7 +304,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
 
   const forceBackup = async () => {
     try {
-      const res = await fetch("/api/backup/auto", { method: "POST" });
+      const res = await authFetch("/api/backup/auto", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success("Respaldo creado: " + data.filename);
@@ -316,7 +317,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const exportData = async () => {
     setExporting(true);
     try {
-      const res = await fetch("/api/backup");
+      const res = await authFetch("/api/backup");
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -346,7 +347,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     try {
       const text = await file.text();
       const data = JSON.parse(text);
-      const res = await fetch("/api/backup", {
+      const res = await authFetch("/api/backup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),

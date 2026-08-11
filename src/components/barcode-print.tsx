@@ -32,7 +32,7 @@ export default function BarcodePrint({ products, bcvRate, currency }: BarcodePri
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/settings").then(r => r.json()).then(s => {
+    authFetch("/api/settings").then(r => r.json()).then(s => {
       if (s.storeName) setStoreName(s.storeName);
     }).catch(() => {});
   }, []);

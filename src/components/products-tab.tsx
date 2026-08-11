@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import BarcodePrint from "@/components/barcode-print";
+import { authFetch } from "@/lib/auth-fetch";
 
 interface Category { id: string; name: string; icon?: string; color?: string; _count?: { products: number }; }
 interface ComboItemProduct { id: string; name: string; barcode: string; price: number; stock: number; icon?: string; }
@@ -116,7 +117,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const [showFinance, setShowFinance] = useState(true);
 
   // ─── EFFECTS ───
-  useEffect(() => { (async () => { try { const r = await fetch('/api/products/stock-alerts'); const d = await r.json(); if (r.ok) { setStockAlerts(d); if (d.totalAlerts === 0) setShowAlerts(false); } } catch {} })(); }, []);
+  useEffect(() => { (async () => { try { const r = await authFetch('/api/products/stock-alerts'); const d = await r.json(); if (r.ok) { setStockAlerts(d); if (d.totalAlerts === 0) setShowAlerts(false); } } catch {} })(); }, []);
 
   // ─── CALC HELPERS ───
   const calcPrice = (cost: string, margin: string) => { const c = parseFloat(cost) || 0, m = parseFloat(margin) || 0; return c > 0 && m > 0 ? (c / (1 - m / 100)).toFixed(2) : ""; };
@@ -162,26 +163,26 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
     setEditingProduct(p);
     setFormData({ name: p.name, description: p.description, barcode: p.barcode, secondaryBarcode: p.secondaryBarcode || "", price: p.price.toString(), cost: p.cost.toString(), marginPercent: (p.marginPercent || 0).toString(), taxType: p.taxType || "general", stock: p.stock.toString(), minStock: (p.minStock || 5).toString(), categoryId: p.categoryId || "", icon: p.icon || "", image: p.image || "", wholesalePrice: (p.wholesalePrice || 0).toString(), minWholesaleQty: (p.minWholesaleQty || 0).toString(), noStock: p.noStock || false, vendePorPeso: p.vendePorPeso || false, unidadPeso: p.unidadPeso || "kg", location: p.location || "", expirationDate: p.expirationDate ? p.expirationDate.split("T")[0] : "", lotNumber: p.lotNumber || "", isCombo: p.isCombo || false, loyaltyPoints: (p.loyaltyPoints || 0).toString(), unitsPerBox: (p.unitsPerBox || 0).toString(), boxPrice: (p.boxPrice || 0).toString(), boxMarginPercent: (p.boxMarginPercent || 0).toString() });
     setShowProductDialog(true);
-    if (p.isCombo && p.id) { (async () => { try { const r = await fetch(`/api/products/combo-items?comboId=${p.id}`); if (r.ok) setComboItems(await r.json()); } catch { setComboItems([]); } })(); } else setComboItems([]);
+    if (p.isCombo && p.id) { (async () => { try { const r = await authFetch(`/api/products/combo-items?comboId=${p.id}`); if (r.ok) setComboItems(await r.json()); } catch { setComboItems([]); } })(); } else setComboItems([]);
   };
 
   const saveProduct = async () => {
     if (!formData.name || !formData.price) { toast.error("Nombre y precio requeridos"); return; }
     try {
-      const res = await fetch("/api/products", { method: editingProduct ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editingProduct ? { id: editingProduct.id, ...formData } : formData) });
+      const res = await authFetch("/api/products", { method: editingProduct ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editingProduct ? { id: editingProduct.id, ...formData } : formData) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       toast.success(editingProduct ? "Producto actualizado" : "Producto creado");
       setShowProductDialog(false); onRefresh();
     } catch (e: any) { toast.error(e.message); }
   };
 
-  const deleteProduct = async (id: string) => { if (!confirm("Desactivar producto?")) return; try { await fetch(`/api/products?id=${id}`, { method: "DELETE" }); toast.success("Desactivado"); onRefresh(); } catch { toast.error("Error"); } };
+  const deleteProduct = async (id: string) => { if (!confirm("Desactivar producto?")) return; try { await authFetch(`/api/products?id=${id}`, { method: "DELETE" }); toast.success("Desactivado"); onRefresh(); } catch { toast.error("Error"); } };
 
   const createCategory = async () => {
     if (!categoryName.trim()) return;
-    try { const r = await fetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: categoryName.trim(), icon: newCatIcon, color: newCatColor }) }); if (!r.ok) throw new Error((await r.json()).error); toast.success("Categoria creada"); setCategoryName(""); setShowCategoryDialog(false); onRefresh(); } catch (e: any) { toast.error(e.message); }
+    try { const r = await authFetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: categoryName.trim(), icon: newCatIcon, color: newCatColor }) }); if (!r.ok) throw new Error((await r.json()).error); toast.success("Categoria creada"); setCategoryName(""); setShowCategoryDialog(false); onRefresh(); } catch (e: any) { toast.error(e.message); }
   };
-  const deleteCategory = async (id: string) => { if (!confirm("Eliminar categoria?")) return; try { await fetch(`/api/categories?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
+  const deleteCategory = async (id: string) => { if (!confirm("Eliminar categoria?")) return; try { await authFetch(`/api/categories?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
 
   // Scanner
   const openScanner = async () => {
@@ -201,26 +202,26 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const stopScanner = async () => { try { if (scannerRef.current) { if (scannerRef.current.getState() === 2) await scannerRef.current.stop(); scannerRef.current.clear(); scannerRef.current = null; } } catch {} setShowScanner(false); setScannerError(""); };
 
   // Image
-  const uploadImage = async (file: File) => { setUploading(true); try { const fd = new FormData(); fd.append("image", file); const r = await fetch("/api/products/upload", { method: "POST", body: fd }); const d = await r.json(); if (d.imageUrl) { setFormData(p => ({ ...p, image: d.imageUrl })); toast.success("Imagen subida"); } } catch { toast.error("Error al subir"); } finally { setUploading(false); } };
+  const uploadImage = async (file: File) => { setUploading(true); try { const fd = new FormData(); fd.append("image", file); const r = await authFetch("/api/products/upload", { method: "POST", body: fd }); const d = await r.json(); if (d.imageUrl) { setFormData(p => ({ ...p, image: d.imageUrl })); toast.success("Imagen subida"); } } catch { toast.error("Error al subir"); } finally { setUploading(false); } };
 
   // Combo items
   const addComboItem = async () => {
     if (!editingProduct?.id || !addComboProductId) return;
     setComboLoading(true);
     try {
-      const r = await fetch("/api/products/combo-items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comboId: editingProduct.id, productId: addComboProductId, quantity: parseInt(addComboQty) || 1 }) });
+      const r = await authFetch("/api/products/combo-items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ comboId: editingProduct.id, productId: addComboProductId, quantity: parseInt(addComboQty) || 1 }) });
       if (r.ok) { const item = await r.json(); setComboItems(prev => [...prev, item]); setAddComboProductId(""); setAddComboQty("1"); toast.success("Agregado al combo"); } else { const err = await r.json(); toast.error(err.error); }
     } catch { toast.error("Error"); } finally { setComboLoading(false); }
   };
-  const removeComboItem = async (id: string) => { setComboLoading(true); try { await fetch(`/api/products/combo-items?id=${id}`, { method: "DELETE" }); setComboItems(prev => prev.filter(i => i.id !== id)); toast.success("Removido"); } catch {} setComboLoading(false); };
+  const removeComboItem = async (id: string) => { setComboLoading(true); try { await authFetch(`/api/products/combo-items?id=${id}`, { method: "DELETE" }); setComboItems(prev => prev.filter(i => i.id !== id)); toast.success("Removido"); } catch {} setComboLoading(false); };
 
   // Bulk
   const handleBulkPreview = () => { const pct = parseFloat(bulkPercentage); if (!pct) { toast.error("Porcentaje invalido"); return; } setBulkLoading(true); const tp = bulkTarget === "ALL" ? products : products.filter(p => p.categoryId === bulkTarget); const as = bulkApplyTo === "sale" || bulkApplyTo === "both"; const ac = bulkApplyTo === "cost" || bulkApplyTo === "both"; setBulkPreview(tp.map(p => { const f = 1 + pct / 100; return { name: p.name, oldPrice: p.price, newPrice: as && p.price > 0 ? +(p.price * f).toFixed(4) : p.price, oldCost: p.cost, newCost: ac && p.cost > 0 ? +(p.cost * f).toFixed(4) : p.cost }; })); setBulkLoading(false); };
-  const handleBulkApply = async () => { const pct = parseFloat(bulkPercentage); if (!pct) return; if (!confirm(`Aplicar ${pct > 0 ? '+' : ''}${pct}% a ${getBulkCount()} productos?`)) return; setBulkLoading(true); try { const r = await fetch('/api/products', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'bulk-price', categoryId: bulkTarget, percentage: pct, applyTo: bulkApplyTo }) }); const d = await r.json(); if (!r.ok) { toast.error(d.error); setBulkLoading(false); return; } toast.success(`${d.updatedCount} productos actualizados`); setBulkPreview(d.preview || []); setBulkApplied(true); onRefresh(); } catch { toast.error("Error"); } setBulkLoading(false); };
+  const handleBulkApply = async () => { const pct = parseFloat(bulkPercentage); if (!pct) return; if (!confirm(`Aplicar ${pct > 0 ? '+' : ''}${pct}% a ${getBulkCount()} productos?`)) return; setBulkLoading(true); try { const r = await authFetch('/api/products', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'bulk-price', categoryId: bulkTarget, percentage: pct, applyTo: bulkApplyTo }) }); const d = await r.json(); if (!r.ok) { toast.error(d.error); setBulkLoading(false); return; } toast.success(`${d.updatedCount} productos actualizados`); setBulkPreview(d.preview || []); setBulkApplied(true); onRefresh(); } catch { toast.error("Error"); } setBulkLoading(false); };
 
   // Import/Export
-  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; setImporting(true); try { const fd = new FormData(); fd.append('file', f); const r = await fetch('/api/products/import', { method: 'POST', body: fd }); const d = await r.json(); if (!r.ok) toast.error(d.error); else { const p: string[] = []; if (d.created > 0) p.push(`${d.created} creados`); if (d.updated > 0) p.push(`${d.updated} actualizados`); toast.success(p.join(', ')); onRefresh(); } } catch { toast.error("Error"); } setImporting(false); if (importFileRef.current) importFileRef.current.value = ''; };
-  const handleExport = async () => { setExporting(true); try { const r = await fetch('/api/products/export'); if (!r.ok) { toast.error("Error"); setExporting(false); return; } const b = await r.blob(); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `inventario_${new Date().toISOString().split('T')[0]}.xlsx`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); toast.success("Exportado"); } catch { toast.error("Error"); } setExporting(false); };
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (!f) return; setImporting(true); try { const fd = new FormData(); fd.append('file', f); const r = await authFetch('/api/products/import', { method: 'POST', body: fd }); const d = await r.json(); if (!r.ok) toast.error(d.error); else { const p: string[] = []; if (d.created > 0) p.push(`${d.created} creados`); if (d.updated > 0) p.push(`${d.updated} actualizados`); toast.success(p.join(', ')); onRefresh(); } } catch { toast.error("Error"); } setImporting(false); if (importFileRef.current) importFileRef.current.value = ''; };
+  const handleExport = async () => { setExporting(true); try { const r = await authFetch('/api/products/export'); if (!r.ok) { toast.error("Error"); setExporting(false); return; } const b = await r.blob(); const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `inventario_${new Date().toISOString().split('T')[0]}.xlsx`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u); toast.success("Exportado"); } catch { toast.error("Error"); } setExporting(false); };
 
   // Available products for combo (exclude self)
   const comboAvailable = products.filter(p => p.id !== editingProduct?.id && p.active);

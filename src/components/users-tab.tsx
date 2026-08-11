@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { authFetch } from "@/lib/auth-fetch";
 
 export interface CurrentUser {
   id: string;
@@ -154,7 +155,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
 
   const loadUsers = useCallback(async () => {
     try {
-      const res = await fetch("/api/users");
+      const res = await authFetch("/api/users");
       const data = await res.json();
       if (Array.isArray(data)) setUsers(data);
     } catch {
@@ -168,7 +169,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
 
   const loadRoleConfigs = useCallback(async () => {
     try {
-      const res = await fetch("/api/roles");
+      const res = await authFetch("/api/roles");
       const data = await res.json();
       if (Array.isArray(data)) {
         setRoleConfigs(data.map((r: any) => ({ ...r, permissions: JSON.parse(r.permissions || '{}') })));
@@ -182,7 +183,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
   const saveRolePerms = async (roleName: string) => {
     setSavingRolePerms(true);
     try {
-      const res = await fetch("/api/roles", {
+      const res = await authFetch("/api/roles", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roleName, permissions: editRolePerms }),
@@ -200,7 +201,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
     if (!roleConfig) { toast.error("No hay configuracion para este rol"); return; }
     if (!confirm(`Restablecer permisos de "${user.username}" a los valores predeterminados del rol ${roleConfig.label}?`)) return;
     try {
-      const res = await fetch("/api/users", {
+      const res = await authFetch("/api/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: user.id, permissions: roleConfig.permissions }),
@@ -270,7 +271,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
   // --- Upload avatar via dedicated endpoint (separate from user data) ---
   const uploadAvatar = async (userId: string, avatarData: string): Promise<boolean> => {
     try {
-      const res = await fetch("/api/users/avatar", {
+      const res = await authFetch("/api/users/avatar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, avatar: avatarData }),
@@ -352,7 +353,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
 
     setCreating(true);
     try {
-      const res = await fetch("/api/users", {
+      const res = await authFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -420,7 +421,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
         body.password = editNewPassword;
       }
 
-      const res = await fetch("/api/users", {
+      const res = await authFetch("/api/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -469,7 +470,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
     }
     if (!confirm(`Desactivar a "${user.username}"? Podra activarlo luego.`)) return;
     try {
-      const res = await fetch(`/api/users?id=${user.id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/users?id=${user.id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success(data.message);
@@ -487,7 +488,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
     }
     if (!confirm(`ELIMINAR PERMANENTEMENTE a "${user.username}"?\n\nEsta accion no se puede deshacer. Se borraran todos los datos del usuario.`)) return;
     try {
-      const res = await fetch(`/api/users?id=${user.id}&hard=true`, { method: "DELETE" });
+      const res = await authFetch(`/api/users?id=${user.id}&hard=true`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       toast.success(data.message);
@@ -506,7 +507,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
 
     setChangingPassword(true);
     try {
-      const res = await fetch("/api/auth", {
+      const res = await authFetch("/api/auth", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -536,7 +537,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
   const handleSaveProfilePhoto = async () => {
     setSavingProfileAvatar(true);
     try {
-      const res = await fetch("/api/users", {
+      const res = await authFetch("/api/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -821,7 +822,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                               size="sm"
                               onClick={async () => {
                                 try {
-                                  const res = await fetch("/api/users", {
+                                  const res = await authFetch("/api/users", {
                                     method: "PUT",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ id: user.id, isActive: true }),
@@ -924,7 +925,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                               size="sm"
                               onClick={async () => {
                                 try {
-                                  const res = await fetch("/api/users", {
+                                  const res = await authFetch("/api/users", {
                                     method: "PUT",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ id: user.id, isActive: true }),
