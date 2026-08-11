@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
         status: 'espera',
         items: {
           create: body.items.map((item: any) => ({
-            productId: item.productId,
-            productName: item.productName || '',
+            productId: item.productId || item.id,
+            productName: item.productName || item.name || '',
             quantity: sf(item.quantity),
-            unitPrice: sf(item.unitPrice),
+            unitPrice: sf(item.unitPrice || item.price),
             total: sf(item.total),
             taxType: item.taxType || 'general',
           })),

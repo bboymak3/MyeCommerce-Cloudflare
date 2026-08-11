@@ -54,8 +54,16 @@ interface ClientData {
   creditLimit?: number;
 }
 
+interface HeldSaleItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  taxType: string;
+}
 interface HeldSaleData {
-  items: CartItem[];
+  items: HeldSaleItem[];
   clientName: string;
   clientId: string | null;
   subtotal: number;
@@ -630,8 +638,17 @@ export default function PosTab({
 
   const holdCurrentSale = async () => {
     if (cart.length === 0) { toast.error("El carrito esta vacio"); return; }
+    // Mapear cart items igual que completeSale: id→productId, name→productName, price→unitPrice
+    const mappedItems = cart.map((item) => ({
+      productId: item.id,
+      productName: item.name,
+      quantity: item.quantity,
+      unitPrice: item.price,
+      total: item.total,
+      taxType: item.taxType || 'general',
+    }));
     const heldData: HeldSaleData = {
-      items: cart,
+      items: mappedItems,
       clientName: selectedClient ? selectedClient.fullName : "Cliente Final",
       clientId: selectedClient?.id || null,
       subtotal,
