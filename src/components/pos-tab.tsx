@@ -105,7 +105,7 @@ interface PosTabProps {
   businessType?: string;
   taxMode?: string;
   onSaleComplete?: () => void;
-  onHoldSale?: (data: HeldSaleData) => void;
+  onHoldSale?: (data: HeldSaleData) => void | Promise<void>;
   initialCart?: CartItem[] | null;
   initialClient?: ClientData | null;
   initialNotes?: string;
@@ -628,7 +628,7 @@ export default function PosTab({
     }
   };
 
-  const holdCurrentSale = () => {
+  const holdCurrentSale = async () => {
     if (cart.length === 0) { toast.error("El carrito esta vacio"); return; }
     const heldData: HeldSaleData = {
       items: cart,
@@ -645,9 +645,13 @@ export default function PosTab({
       sellerName,
       sellerRole: propSellerRole || "",
     };
-    onHoldSale?.(heldData);
-    clearCart();
-    toast.success("Factura puesta en espera");
+    try {
+      if (onHoldSale) await onHoldSale(heldData);
+      clearCart();
+      toast.success("Factura puesta en espera");
+    } catch (e: any) {
+      toast.error(e.message || "Error al poner en espera");
+    }
   };
 
   const completeSale = async () => {

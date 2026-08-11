@@ -357,8 +357,10 @@ export default function Home() {
     if (tab.value === "users") return false;
     if (tab.value === "config") return false;
     if (tab.value === "license") return false;
-    // POS always available to any logged-in user
-    if (tab.value === "pos") return true;
+    if (tab.value === "backup") return false;
+    // POS and core modules always available to any logged-in user
+    if (["pos", "products", "dashboard", "reports"].includes(tab.value)) return tab.allowed;
+    // Special permission tabs (suppliers, purchases, credit)
     if (tab.value === "suppliers") {
       return tab.allowed && !!currentUser.permissions?.suppliers;
     }
@@ -368,10 +370,15 @@ export default function Home() {
     if (tab.value === "credit") {
       return tab.allowed && !!currentUser.permissions?.credit;
     }
-    // For other tabs, check individual permissions
-    const permKey = tab.value === "cash-closing" ? "cash_closing" : tab.value;
-    const perm = currentUser.permissions?.[permKey];
-    return tab.allowed && !!perm;
+    // For restricted/plan-locked tabs
+    if (tab.restricted) return tab.allowed;
+    // For tabs with specific permission keys (cash-closing, devolutions, clients, etc.)
+    if (tab.value === "cash-closing") {
+      return tab.allowed && !!currentUser.permissions?.cash_closing;
+    }
+    // All other tabs with allowed:true and no specific restriction — available to everyone
+    // (kardex, held-sales, quotes, delivery-notes, expenses, etc.)
+    return tab.allowed;
   });
 
   return (
@@ -554,7 +561,7 @@ export default function Home() {
               onSaleComplete={loadData}
               onHoldSale={async (heldData: any) => {
                 try {
-                  const res = await fetch('/api/held-sales', {
+                  const res = await authFetch('/api/held-sales', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -562,9 +569,15 @@ export default function Home() {
                       userId: currentUser.id,
                       userName: currentUser.fullName || currentUser.username,
                     }),
-                  });
-                  if (!res.ok) toast.error('Error al poner en espera');
-                } catch { toast.error('Error de conexion'); }
+                  }, handleSessionExpired);
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || 'Error al poner en espera');
+                  }
+                  // Success toast is shown by POS itself — no double toast
+                } catch (e: any) {
+                  toast.error(e.message || 'Error al poner en espera');
+                }
               }}
               initialCart={pendingCartData?.items?.length ? pendingCartData.items.map((item: any) => {
                 const prod = products.find((p) => p.id === item.productId);

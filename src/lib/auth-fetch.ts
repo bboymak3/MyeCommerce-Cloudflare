@@ -59,7 +59,8 @@ export async function authFetch(
   }
 
   // Content-Type por defecto para POST/PUT/PATCH
-  if (!headers.has('Content-Type') && options.method && options.method !== 'GET') {
+  // NO inyectar Content-Type si el body es FormData (el navegador lo hace automaticamente con boundary correcto)
+  if (!headers.has('Content-Type') && options.method && options.method !== 'GET' && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
   }
 

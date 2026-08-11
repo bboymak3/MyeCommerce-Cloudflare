@@ -1,5 +1,13 @@
 # MyeCommerce v2.9.x - Registro de Versiones
 
+## v2.9.38 (2026-08-12)
+- **fix**: Pausar Venta — race condition eliminada (espera respuesta async antes de mostrar toast)
+- **fix**: Importar Excel — authFetch ya no sobreescribe Content-Type cuando body es FormData
+- **fix**: Imagenes de productos — creada API /api/products/upload (JPG/PNG/GIF/WebP/SVG hasta 5MB)
+- **fix**: Menú — modulos nuevos (Kardex, Ventas en Espera, Presupuestos, Notas de Entrega, Gastos) visibles para todos los roles
+- **fix**: Espaciado del menú — tabs mas grandes con mejor separacion (py-2, gap-1.5, min-h-36px)
+- **fix**: Menu lateral — espacio entre items aumentado (space-y-1)
+
 ## v2.9.37.1 (2026-08-12)
 - **fix**: Actualización de lockfile (bun.lock) + permisos de archivos
 

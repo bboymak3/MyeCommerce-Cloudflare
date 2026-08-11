@@ -79,7 +79,7 @@ export default function AppNav({ activeTab, onTabChange, tabs, stockAlertCount =
           </button>
         </div>
 
-        <nav className="p-2 space-y-0.5 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+        <nav className="p-2 space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 120px)' }}>
           {tabs.map((item) => {
             const isActive = activeTab === item.value
             return (
