@@ -25,6 +25,10 @@ import SuppliersTab from "@/components/suppliers-tab";
 import PurchasesTab from "@/components/purchases-tab";
 import CreditTab from "@/components/credit-tab";
 import DashboardTab from "@/components/dashboard-tab";
+import KardexTab from "@/components/kardex-tab";
+import HeldSalesTab from "@/components/held-sales-tab";
+import QuotesTab from "@/components/quotes-tab";
+import DeliveryNotesTab from "@/components/delivery-notes-tab";
 import type { CurrentUser } from "@/components/users-tab";
 import AppNav from "@/components/app-nav";
 import { create } from "zustand";
@@ -326,6 +330,10 @@ export default function Home() {
     { value: "suppliers", label: "Proveedores", icon: "🏪", allowed: true, restricted: false, plan: "" },
     { value: "purchases", label: "Compras", icon: "🛒", allowed: true, restricted: false, plan: "" },
     { value: "credit", label: "Cuentas por Cobrar", icon: "💳", allowed: true, restricted: false, plan: "" },
+    { value: "kardex", label: "Inventario/Kardex", icon: "📦", allowed: true, restricted: false, plan: "" },
+    { value: "held-sales", label: "Ventas en Espera", icon: "⏸️", allowed: true, restricted: false, plan: "" },
+    { value: "quotes", label: "Presupuestos", icon: "📋", allowed: true, restricted: false, plan: "" },
+    { value: "delivery-notes", label: "Notas de Entrega", icon: "🚚", allowed: true, restricted: false, plan: "" },
   ];
 
   // Filter tabs based on user role and permissions
@@ -600,6 +608,29 @@ export default function Home() {
           <ErrorBoundary name="CxC">
             <CreditTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency}
               sellerName={currentUser.fullName || currentUser.username} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="kardex" activeTab={activeTab}>
+          <ErrorBoundary name="Kardex">
+            <KardexTab products={products.map(p => ({ id: p.id, name: p.name, cost: p.cost, stock: p.stock }))}
+              bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="held-sales" activeTab={activeTab}>
+          <ErrorBoundary name="Ventas en Espera">
+            <HeldSalesTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="quotes" activeTab={activeTab}>
+          <ErrorBoundary name="Presupuestos">
+            <QuotesTab products={products.map(p => ({ id: p.id, name: p.name, price: p.price, taxType: p.taxType || 'general' }))}
+              bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="delivery-notes" activeTab={activeTab}>
+          <ErrorBoundary name="Notas de Entrega">
+            <DeliveryNotesTab products={products.map(p => ({ id: p.id, name: p.name, stock: p.stock, cost: p.cost }))}
+              bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser} />
           </ErrorBoundary>
         </TabsContent>
       </main>

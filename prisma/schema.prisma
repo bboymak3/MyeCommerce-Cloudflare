@@ -42,8 +42,9 @@ model Product {
   saleItems         SaleItem[]
   devolutionItems   DevolutionItem[]
   purchaseItems     PurchaseItem[]
-  comboItems        ComboItem[]
-  comboItemsRef     ComboItem[] @relation("ProductComboItems")
+  comboItems          ComboItem[]
+  comboItemsRef       ComboItem[] @relation("ProductComboItems")
+  inventoryMovements  InventoryMovement[]
 }
 
 model Category {
@@ -74,6 +75,8 @@ model Client {
   isActive       Boolean  @default(true)
   sales          Sale[]
   creditPayments CreditPayment[]
+  heldSales      HeldSale[]
+  quotes         Quote[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -375,4 +378,146 @@ model CreditPayment {
   @@index([date])
   @@index([saleId])
   @@index([clientId])
+}
+
+// ===== KARDEX DE INVENTARIO =====
+model InventoryMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  date        DateTime @default(now())
+  movementType String   // venta, compra, devolucion, ajuste_entrada, ajuste_salida, merma, nota_entrega
+  concept     String   @default("")   // Descripcion del movimiento
+  quantity    Float                   // Cantidad (positiva para entrada, negativa para salida en calculo)
+  absQuantity  Float                   // Cantidad absoluta siempre positiva
+  unitCost    Float    @default(0)    // Costo unitario al momento del movimiento
+  totalCost   Float    @default(0)    // Costo total del movimiento
+  // Saldos acumulados despues del movimiento
+  balanceQty       Float @default(0) // Saldo en cantidad
+  balanceTotalCost Float @default(0) // Saldo en costo total
+  balanceAvgCost   Float @default(0) // Costo promedio ponderado acumulado
+  // Auditoria
+  userId      String   @default("")
+  userName   String   @default("")
+  userRole   String   @default("")
+  referenceId String  @default("")   // ID de la venta, compra, devolucion, etc.
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+  @@index([date])
+  @@index([movementType])
+}
+
+// ===== FACTURAS EN ESPERA =====
+model HeldSale {
+  id             String       @id @default(cuid())
+  number         Int          @default(0)
+  userId         String       @default("")
+  userName       String       @default("")
+  clientName     String       @default("")
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  subtotal       Float        @default(0)
+  taxAmount      Float        @default(0)
+  discount       Float        @default(0)
+  total          Float        @default(0)
+  totalBs        Float        @default(0)
+  exchangeRate   Float        @default(0)
+  paymentMethod  String       @default("efectivo")
+  notes          String       @default("")
+  status         String       @default("espera") // espera, recuperada, cancelada
+  items          HeldSaleItem[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model HeldSaleItem {
+  id          String   @id @default(cuid())
+  heldSaleId  String
+  productId   String
+  productName String   @default("")
+  quantity    Float
+  unitPrice   Float
+  total       Float
+  taxType     String   @default("general")
+  heldSale    HeldSale @relation(fields: [heldSaleId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+// ===== PRESUPUESTOS / COTIZACIONES =====
+model Quote {
+  id             String       @id @default(cuid())
+  number         Int          @default(0)
+  userId         String       @default("")
+  userName       String       @default("")
+  clientName     String       @default("")
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  subtotal       Float        @default(0)
+  taxAmount      Float        @default(0)
+  discount       Float        @default(0)
+  total          Float        @default(0)
+  totalBs        Float        @default(0)
+  exchangeRate   Float        @default(0)
+  notes          String       @default("")
+  validUntil     String       @default("")  // Fecha de validez
+  status         String       @default("pendiente") // pendiente, aprobada, convertida, vencida
+  items          QuoteItem[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model QuoteItem {
+  id          String   @id @default(cuid())
+  quoteId     String
+  productId   String
+  productName String   @default("")
+  quantity    Float
+  unitPrice   Float
+  total       Float
+  taxType     String   @default("general")
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+// ===== NOTAS DE ENTREGA =====
+model DeliveryNote {
+  id             String            @id @default(cuid())
+  number         Int               @default(0)
+  userId         String            @default("")
+  userName       String            @default("")
+  recipientName  String            @default("")
+  recipientDoc   String            @default("")
+  recipientAddr  String            @default("")
+  reason         String            @default("")
+  notes          String            @default("")
+  totalUsd       Float             @default(0)
+  totalBs        Float             @default(0)
+  exchangeRate   Float             @default(0)
+  status         String            @default("emitida") // emitida, recibida, anulada
+  items          DeliveryNoteItem[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model DeliveryNoteItem {
+  id             String   @id @default(cuid())
+  deliveryNoteId String
+  productId      String
+  productName    String   @default("")
+  quantity       Float
+  unitCost       Float    @default(0)
+  totalCost      Float    @default(0)
+  deliveryNote   DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
 }
