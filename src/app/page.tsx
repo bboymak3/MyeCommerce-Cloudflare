@@ -30,6 +30,7 @@ import KardexTab from "@/components/kardex-tab";
 import HeldSalesTab from "@/components/held-sales-tab";
 import QuotesTab from "@/components/quotes-tab";
 import DeliveryNotesTab from "@/components/delivery-notes-tab";
+import CatalogTab from "@/components/catalog-tab";
 import type { CurrentUser } from "@/components/users-tab";
 import AppNav from "@/components/app-nav";
 import { create } from "zustand";
@@ -348,6 +349,7 @@ export default function Home() {
     { value: "quotes", label: "Presupuestos", icon: "📋", allowed: true, restricted: false, plan: "" },
     { value: "delivery-notes", label: "Notas de Entrega", icon: "🚚", allowed: true, restricted: false, plan: "" },
     { value: "expenses", label: "Gastos", icon: "💸", allowed: true, restricted: false, plan: "" },
+    { value: "catalog", label: "Catalogo", icon: "📖", allowed: true, restricted: false, plan: "" },
   ];
 
   // Filter tabs based on user role and permissions
@@ -703,6 +705,14 @@ export default function Home() {
               sellerName={currentUser.fullName || currentUser.username}
               sellerRole={currentUser.role}
               userId={currentUser.id} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="catalog" activeTab={activeTab}>
+          <ErrorBoundary name="Catalogo">
+            <CatalogTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency}
+              storeName={settings.storeName} storeAddress={settings.storeAddress}
+              storePhone={settings.storePhone} storeRif={settings.storeRif}
+              storeLogo={settings.storeLogo || ''} theme={settings.theme || 'blue'} />
           </ErrorBoundary>
         </TabsContent>
       </main>

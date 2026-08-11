@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { logError, logInfo } from '@/lib/logger';
 
 const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n) ? fb : n; };
 
@@ -33,6 +34,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Items son requeridos' }, { status: 400 });
     }
 
+    // Validar que cada item tenga productId válido
+    const validItems = body.items.filter((item: any) => {
+      const pid = item.productId || item.id;
+      return pid && typeof pid === 'string' && pid.trim() !== '';
+    }).map((item: any) => ({
+      productId: item.productId || item.id,
+      productName: item.productName || item.name || 'Sin nombre',
+      quantity: sf(item.quantity),
+      unitPrice: sf(item.unitPrice || item.price),
+      total: sf(item.total),
+      taxType: item.taxType || 'general',
+    }));
+
+    if (validItems.length === 0) {
+      logError('held-sales', 'Todos los items carecen de productId valido', { rawItems: body.items }, body.userId);
+      return NextResponse.json({ error: 'Los productos del carrito no son validos. Vuelva a agregarlos.' }, { status: 400 });
+    }
+
     // Get next sequential number
     const lastHeld = await db.heldSale.findFirst({
       orderBy: { number: 'desc' },
@@ -57,14 +76,7 @@ export async function POST(req: NextRequest) {
         notes: body.notes || '',
         status: 'espera',
         items: {
-          create: body.items.map((item: any) => ({
-            productId: item.productId || item.id,
-            productName: item.productName || item.name || '',
-            quantity: sf(item.quantity),
-            unitPrice: sf(item.unitPrice || item.price),
-            total: sf(item.total),
-            taxType: item.taxType || 'general',
-          })),
+          create: validItems,
         },
       },
       include: { items: true },
@@ -72,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(heldSale, { status: 201 });
   } catch (error: any) {
-    console.error('Error creating held sale:', error);
+    logError('held-sales', 'Error al crear factura en espera', error, body?.userId);
     return NextResponse.json({ error: 'Error al crear factura en espera: ' + (error.message || '') }, { status: 500 });
   }
 }

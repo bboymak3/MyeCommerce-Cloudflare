@@ -27,6 +27,7 @@ interface Product {
   minStock: number;
   barcode: string;
   icon: string;
+  image: string;
   noStock: boolean;
   vendePorPeso?: boolean;
   unidadPeso?: string;
@@ -1137,37 +1138,46 @@ export default function PosTab({
           </div>
         )}
 
-        {/* Grid View - ultra compacto */}
+        {/* Grid View - con imagenes reales */}
         {viewMode === "grid" && (
-        <div className="grid grid-cols-1 gap-1 overflow-y-auto max-h-[72vh] p-0.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 overflow-y-auto max-h-[72vh] p-0.5">
           {filteredProducts.map((product) => {
             const isOut = product.stock <= 0;
             const isLow = product.stock > 0 && product.stock <= (product.minStock || 5);
             return (
               <button key={product.id} onClick={() => addToCart(product)}
                 disabled={!allowZeroStock && isOut}
-                className={`flex items-center gap-2 p-2 rounded-lg border transition-all text-left ${
+                className={`relative flex flex-col items-center gap-1 p-2 rounded-lg border transition-all text-center ${
                   isOut && !allowZeroStock ? "bg-red-50 border-red-300 opacity-50 cursor-not-allowed"
                   : isOut && allowZeroStock ? "bg-orange-50 border-orange-300"
                   : isLow ? "bg-yellow-50 border-yellow-300"
-                  : "bg-card border-muted hover:bg-accent hover:border-primary/40"
+                  : "bg-card border-muted hover:bg-accent hover:border-primary/40 hover:shadow-sm"
                 }`}>
-                {product.icon && <span className="text-base flex-shrink-0">{product.icon}</span>}
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-medium leading-tight block truncate">{product.name}</span>
+                {/* Imagen o icono */}
+                <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+                  {product.image ? (
+                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }} />
+                  ) : null}
+                  {product.icon ? (
+                    <span className={product.image ? "hidden text-2xl" : "text-2xl"}>{product.icon}</span>
+                  ) : !product.image ? (
+                    <span className="text-2xl text-muted-foreground">📦</span>
+                  ) : null}
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <span className="text-xs font-bold text-primary">{currency} {product.price.toFixed(2)}{product.vendePorPeso && product.unidadPeso ? `/${product.unidadPeso}` : ''}</span>
-                  <span className="text-[9px] text-muted-foreground block">Bs {(product.price * bcvRate).toFixed(0)}</span>
-                </div>
-                <Badge variant={isOut ? "destructive" : isLow ? "warning" : "secondary"} className="flex-shrink-0 text-[9px] px-1.5 py-0">
+                {/* Nombre */}
+                <span className="text-[10px] font-medium leading-tight block truncate w-full">{product.name}</span>
+                {/* Precio */}
+                <span className="text-xs font-bold text-primary">{currency} {product.price.toFixed(2)}{product.vendePorPeso && product.unidadPeso ? `/${product.unidadPeso}` : ''}</span>
+                <span className="text-[9px] text-muted-foreground">Bs {(product.price * bcvRate).toFixed(0)}</span>
+                {/* Stock badge */}
+                <Badge variant={isOut ? "destructive" : isLow ? "warning" : "secondary"} className="text-[9px] px-1.5 py-0">
                   {product.stock}
                 </Badge>
               </button>
             );
           })}
           {filteredProducts.length === 0 && (
-            <div className="text-center text-muted-foreground py-8 text-sm">No se encontraron productos</div>
+            <div className="col-span-full text-center text-muted-foreground py-8 text-sm">No se encontraron productos</div>
           )}
         </div>
         )}

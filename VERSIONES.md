@@ -1,5 +1,13 @@
 # MyeCommerce v2.9.x - Registro de Versiones
 
+## v2.9.39 (2026-08-12)
+- **fix**: Pausar Venta (F9) DEFINITIVO — mapeo correcto id→productId, name→productName, price→unitPrice
+- **fix**: API held-sales — validacion de productId, filtra items invalidos, error legible para el usuario
+- **feat**: Sistema de log de errores — /api/logs (lectura, limpieza), logger.ts centralizado
+- **feat**: POS cuadricula con imagenes reales — grid 2-4 columnas con foto de producto + fallback icono
+- **feat**: Catalogo de productos — portada elegante con datos tienda, precios $/Bs, QR WhatsApp
+- **feat**: Modulo Catalogo — generar/ver/descargar catalogo HTML con filtro por categoria
+
 ## v2.9.38 (2026-08-12)
 - **fix**: Pausar Venta — race condition eliminada (espera respuesta async antes de mostrar toast)
 - **fix**: Importar Excel — authFetch ya no sobreescribe Content-Type cuando body es FormData
