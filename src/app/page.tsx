@@ -120,7 +120,14 @@ export default function Home() {
   // Auth: load user from localStorage
   useEffect(() => {
     const stored = getStoredUser();
-    if (stored) setCurrentUser(stored);
+    const token = localStorage.getItem("myecommerce_token");
+    if (stored && token) {
+      setCurrentUser(stored);
+    } else {
+      // No hay token valido — limpiar datos viejos y mostrar login
+      if (stored) clearSession();
+      setLoading(false);
+    }
     setAuthReady(true);
   }, []);
 
@@ -151,8 +158,9 @@ export default function Home() {
   const handleSessionExpired = useCallback(() => {
     clearSession();
     setCurrentUser(null);
+    setLoading(false);
     toast.error("Sesion expirada. Inicie sesion nuevamente.");
-    setTimeout(() => window.location.reload(), 1500);
+    // No reload — React muestra login screen automaticamente
   }, []);
 
   const loadData = useCallback(async () => {
@@ -228,7 +236,9 @@ export default function Home() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    if (currentUser) loadData();
+  }, [loadData, currentUser]);
 
   const saveInlineBcv = async () => {
     const rate = parseFloat(inlineBcv);
