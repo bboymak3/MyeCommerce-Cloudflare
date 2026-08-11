@@ -283,6 +283,7 @@ model User {
   lastLogin   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  expenses    Expense[]
 }
 
 model RoleConfig {
@@ -520,4 +521,39 @@ model DeliveryNoteItem {
   totalCost      Float    @default(0)
   deliveryNote   DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
+}
+
+// ========== MODULO DE GASTOS ==========
+model ExpenseCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String    @default("")
+  icon        String    @default("receipt")
+  color       String    @default("#ef4444")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  expenses    Expense[]
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  categoryId    String
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  description   String
+  amount        Float
+  amountBs      Float           @default(0)
+  exchangeRate  Float           @default(0)
+  date          DateTime
+  paymentMethod String          @default("efectivo")
+  reference     String          @default("")
+  notes         String          @default("")
+  userId        String?
+  user          User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([date])
+  @@index([categoryId])
+  @@index([userId])
 }

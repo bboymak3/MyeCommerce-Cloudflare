@@ -24,6 +24,7 @@ import BackupTab from "@/components/backup-tab";
 import SuppliersTab from "@/components/suppliers-tab";
 import PurchasesTab from "@/components/purchases-tab";
 import CreditTab from "@/components/credit-tab";
+import ExpensesTab from "@/components/expenses-tab";
 import DashboardTab from "@/components/dashboard-tab";
 import KardexTab from "@/components/kardex-tab";
 import HeldSalesTab from "@/components/held-sales-tab";
@@ -334,6 +335,7 @@ export default function Home() {
     { value: "held-sales", label: "Ventas en Espera", icon: "⏸️", allowed: true, restricted: false, plan: "" },
     { value: "quotes", label: "Presupuestos", icon: "📋", allowed: true, restricted: false, plan: "" },
     { value: "delivery-notes", label: "Notas de Entrega", icon: "🚚", allowed: true, restricted: false, plan: "" },
+    { value: "expenses", label: "Gastos", icon: "💸", allowed: true, restricted: false, plan: "" },
   ];
 
   // Filter tabs based on user role and permissions
@@ -631,6 +633,14 @@ export default function Home() {
           <ErrorBoundary name="Notas de Entrega">
             <DeliveryNotesTab products={products.map(p => ({ id: p.id, name: p.name, stock: p.stock, cost: p.cost }))}
               bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} currentUser={currentUser} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="expenses" activeTab={activeTab}>
+          <ErrorBoundary name="Gastos">
+            <ExpensesTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency}
+              sellerName={currentUser.fullName || currentUser.username}
+              sellerRole={currentUser.role}
+              userId={currentUser.id} />
           </ErrorBoundary>
         </TabsContent>
       </main>
