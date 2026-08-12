@@ -1,13 +1,15 @@
 # MyeCommerce v2.9.x - Registro de Versiones
 
 ## v2.9.40 (2026-08-12)
-- **fix**: Imagenes de productos ahora visibles en POS cuadricula, miniatura al crear, y catalogo (falta campo `image` en Product interface)
+- **fix**: Compras — campo cantidad editable en linea (antes solo se mostraba como texto, no se podia cambiar)
+- **feat**: Edicion de stock con Kardex — al modificar stock desde formulario de producto, aparece dialogo de ajuste de inventario solicitando motivo obligatorio, registra movimiento en Kardex (ajuste_entrada/ajuste_salida) con nombre de usuario, fecha, razon y variacion
+- **feat**: API /api/inventory-adjustments — nuevo endpoint POST para registrar ajustes manuales de inventario en kardex con log
+- **fix**: Margen de ganancia sin limite — cambiada formula de margen a markup (costo * (1 + %/100)), permite 100%, 200% o cualquier porcentaje. Antes la formula dividia por cero al llegar a 100%
+- **fix**: Imagenes de productos ahora visibles en POS cuadricula, miniatura al crear, y catalogo
 - **fix**: Upload API crea directorio automaticamente si no existe (mkdir recursive)
 - **feat**: Advertencia al salir de POS con carrito lleno — modal de confirmacion antes de cambiar modulo
-- **feat**: Catalogo — 4 plantillas (Moderno, Elegante, Minimalista, Oscuro) + 8 colores personalizables + color picker
-- **feat**: Catalogo — exportar como PDF (imprimir) o HTML descargable
-- **feat**: Exportar clientes — Excel con 3 hojas (Clientes, Resumen, WhatsApp) + Contactos .vcf para telefono
-- **refactor**: Store centralizado (app-store.ts) separado de page.tsx para evitar dependencia circular
+- **feat**: Catalogo — 4 plantillas + 8 colores personalizables + color picker + exportar PDF/HTML
+- **feat**: Exportar clientes — Excel con 3 hojas + Contactos .vcf para telefono
 
 ## v2.9.39 (2026-08-12)
 - **fix**: Pausar Venta (F9) DEFINITIVO — mapeo correcto id→productId, name→productName, price→unitPrice

@@ -157,8 +157,8 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
         updated.calcUnitCost = upb > 0 ? parseFloat((bCost / upb).toFixed(4)) : 0;
         // Calcular precio de venta si hay margen
         const margin = updated.calcMargin || 0;
-        updated.calcPrice = updated.calcUnitCost > 0 && margin > 0
-          ? parseFloat((updated.calcUnitCost / (1 - margin / 100)).toFixed(2))
+        updated.calcPrice = updated.calcUnitCost > 0 && margin >= 0
+          ? parseFloat((updated.calcUnitCost * (1 + margin / 100)).toFixed(2))
           : 0;
         updated.unitCost = updated.calcUnitCost;
       } else {
@@ -401,7 +401,13 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
                         {!item.isBox && <Input type="number" step="0.0001" min="0" value={item.unitCost} onChange={(e) => updateItem(idx, 'unitCost', e.target.value)} className="h-8 text-center" />}
                         {item.isBox && <span className="text-xs text-muted-foreground text-center block">$ {(item.calcUnitCost || 0).toFixed(4)}</span>}
                       </td>
-                      <td className="p-1 text-center text-xs font-medium">{item.quantity}</td>
+                      <td className="p-1">
+                        {item.isBox ? (
+                          <span className="text-xs text-muted-foreground text-center block">{item.quantity} uds</span>
+                        ) : (
+                          <Input type="number" step="1" min="0" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', e.target.value)} className="h-8 text-center text-xs font-medium" />
+                        )}
+                      </td>
                       <td className="p-2 text-right font-bold">${item.total.toFixed(2)}</td>
                       <td className="p-1">
                         <Button variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-7 w-7 p-0 text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>

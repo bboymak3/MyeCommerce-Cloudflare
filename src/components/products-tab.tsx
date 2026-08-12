@@ -48,7 +48,7 @@ function Chevron({ open }: { open: boolean }) {
 }
 function MarginBar({ margin }: { margin: number }) {
   const c = margin >= 40 ? 'bg-green-500' : margin >= 20 ? 'bg-yellow-500' : margin > 0 ? 'bg-red-500' : 'bg-gray-300';
-  return <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${c}`} style={{ width: `${Math.min(Math.max(margin, 0), 100)}%` }} title={`${margin}%`} /></div>;
+  return <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${c}`} style={{ width: `${Math.min(Math.max(margin, 0), 100)}%` }} title={`${margin}%`} /><span className="text-[8px] ml-1 font-medium">{margin.toFixed(1)}%</span></div>;
 }
 function Block({ title, icon, badge, defaultOpen = true, children }: { title: string; icon: string; badge?: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -101,6 +101,12 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   const [stockAlerts, setStockAlerts] = useState<StockAlertsData | null>(null);
   const [showAlerts, setShowAlerts] = useState(true);
 
+  // Stock adjustment dialog (kardex)
+  const [showStockAdjustDialog, setShowStockAdjustDialog] = useState(false);
+  const [stockAdjustReason, setStockAdjustReason] = useState("");
+  const [stockAdjustData, setStockAdjustData] = useState<{ productId: string; productName: string; oldStock: number; newStock: number; productCost: number } | null>(null);
+  const [stockAdjustSaving, setStockAdjustSaving] = useState(false);
+
   // Barcode scanner
   const [showScanner, setShowScanner] = useState(false);
   const [scannerLoading, setScannerLoading] = useState(false);
@@ -120,9 +126,9 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
   useEffect(() => { (async () => { try { const r = await authFetch('/api/products/stock-alerts'); const d = await r.json(); if (r.ok) { setStockAlerts(d); if (d.totalAlerts === 0) setShowAlerts(false); } } catch {} })(); }, []);
 
   // ─── CALC HELPERS ───
-  const calcPrice = (cost: string, margin: string) => { const c = parseFloat(cost) || 0, m = parseFloat(margin) || 0; return c > 0 && m > 0 ? (c / (1 - m / 100)).toFixed(2) : ""; };
-  const calcMargin = (price: string, cost: string) => { const p = parseFloat(price) || 0, c = parseFloat(cost) || 0; return p > 0 && c > 0 ? (((p - c) / p) * 100).toFixed(1) : ""; };
-  const calcBoxPrice = (cost: string, margin: string, units: string) => { const c = parseFloat(cost) || 0, m = parseFloat(margin) || 0, u = parseInt(units) || 1; return c > 0 && m > 0 && u > 0 ? ((c * u) / (1 - m / 100)).toFixed(2) : ""; };
+  const calcPrice = (cost: string, margin: string) => { const c = parseFloat(cost) || 0, m = parseFloat(margin) || 0; return c > 0 && m >= 0 ? (c * (1 + m / 100)).toFixed(2) : ""; };
+  const calcMargin = (price: string, cost: string) => { const p = parseFloat(price) || 0, c = parseFloat(cost) || 0; return p > 0 && c > 0 ? (((p - c) / c) * 100).toFixed(1) : ""; };
+  const calcBoxPrice = (cost: string, margin: string, units: string) => { const c = parseFloat(cost) || 0, m = parseFloat(margin) || 0, u = parseInt(units) || 1; return c > 0 && m >= 0 && u > 0 ? ((c / u) * (1 + m / 100)).toFixed(2) : ""; };
   const autoPrice = formData.cost && formData.marginPercent ? calcPrice(formData.cost, formData.marginPercent) : "";
   const autoMargin = formData.price && formData.cost ? calcMargin(formData.price, formData.cost) : "";
   const autoBoxPrice = formData.cost && formData.boxMarginPercent && formData.unitsPerBox ? calcBoxPrice(formData.cost, formData.boxMarginPercent, formData.unitsPerBox) : "";
@@ -168,12 +174,62 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
 
   const saveProduct = async () => {
     if (!formData.name || !formData.price) { toast.error("Nombre y precio requeridos"); return; }
+    // Detectar cambio de stock en edición → requiere ajuste kardex
+    if (editingProduct && formData.stock !== undefined) {
+      const oldStock = editingProduct.stock;
+      const newStock = parseFloat(formData.stock) || 0;
+      if (oldStock !== newStock) {
+        setStockAdjustData({
+          productId: editingProduct.id,
+          productName: editingProduct.name,
+          oldStock,
+          newStock,
+          productCost: editingProduct.cost || 0,
+        });
+        setShowStockAdjustDialog(true);
+        return;
+      }
+    }
     try {
       const res = await authFetch("/api/products", { method: editingProduct ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editingProduct ? { id: editingProduct.id, ...formData } : formData) });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
       toast.success(editingProduct ? "Producto actualizado" : "Producto creado");
       setShowProductDialog(false); onRefresh();
     } catch (e: any) { toast.error(e.message); }
+  };
+
+  const confirmStockAdjust = async () => {
+    if (!stockAdjustData || !stockAdjustReason.trim()) { toast.error("Debe indicar el motivo del ajuste de inventario"); return; }
+    setStockAdjustSaving(true);
+    try {
+      // 1) Actualizar el producto con todos los datos del formulario
+      const res = await authFetch("/api/products", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: stockAdjustData.productId, ...formData }) });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      // 2) Registrar movimiento en kardex
+      const diff = stockAdjustData.newStock - stockAdjustData.oldStock;
+      const adjRes = await authFetch("/api/inventory-adjustments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: stockAdjustData.productId,
+          productName: stockAdjustData.productName,
+          oldStock: stockAdjustData.oldStock,
+          newStock: stockAdjustData.newStock,
+          quantity: Math.abs(diff),
+          movementType: diff > 0 ? "ajuste_entrada" : "ajuste_salida",
+          reason: stockAdjustReason.trim(),
+          unitCost: stockAdjustData.productCost,
+        }),
+      });
+      if (!adjRes.ok) { const d = await adjRes.json(); throw new Error(d.error || "Error al registrar ajuste en kardex"); }
+      toast.success(`Producto actualizado. Ajuste de inventario registrado en Kardex (${diff > 0 ? '+' : ''}${diff} uds)`);
+      setShowStockAdjustDialog(false);
+      setShowProductDialog(false);
+      setStockAdjustReason("");
+      setStockAdjustData(null);
+      onRefresh();
+    } catch (e: any) { toast.error(e.message); }
+    finally { setStockAdjustSaving(false); }
   };
 
   const deleteProduct = async (id: string) => { if (!confirm("Desactivar producto?")) return; try { await authFetch(`/api/products?id=${id}`, { method: "DELETE" }); toast.success("Desactivado"); onRefresh(); } catch { toast.error("Error"); } };
@@ -437,7 +493,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                     </div>
                     <div>
                       <Label className="text-xs">Margen Ganancia %</Label>
-                      <Input type="number" step="0.1" min="0" value={formData.marginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, marginPercent: m }; if (formData.cost && m) nf.price = calcPrice(formData.cost, m); setFormData(nf); }} placeholder="35" className="text-sm font-mono" />
+                      <Input type="number" step="0.1" value={formData.marginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, marginPercent: m }; if (formData.cost && m) nf.price = calcPrice(formData.cost, m); setFormData(nf); }} placeholder="35" className="text-sm font-mono" />
                     </div>
                     <div>
                       <Label className="text-xs">Precio Venta ({currency})</Label>
@@ -486,7 +542,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                     </div>
                     <div>
                       <Label className="text-xs">Margen Ganancia %</Label>
-                      <Input type="number" step="0.1" min="0" value={formData.boxMarginPercent} onChange={e => setFormData({ ...formData, boxMarginPercent: e.target.value })} placeholder="20" className="text-sm font-mono" />
+                      <Input type="number" step="0.1" value={formData.boxMarginPercent} onChange={e => setFormData({ ...formData, boxMarginPercent: e.target.value })} placeholder="20" className="text-sm font-mono" />
                       <p className="text-[8px] text-muted-foreground">Ganancia deseada</p>
                     </div>
                   </div>
@@ -703,6 +759,64 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
             </>}
             {bulkApplied && <Button variant="outline" onClick={() => setShowBulkPrice(false)}>Cerrar</Button>}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* STOCK ADJUSTMENT DIALOG (KARDEX) */}
+      <Dialog open={showStockAdjustDialog} onOpenChange={o => { if (!o) { setShowStockAdjustDialog(false); setStockAdjustReason(""); setStockAdjustData(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Ajuste de Inventario
+            </DialogTitle>
+          </DialogHeader>
+          {stockAdjustData && (
+            <div className="space-y-3">
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg text-sm">
+                <p className="font-semibold text-amber-800 dark:text-amber-200 mb-2">Se detectó un cambio en el stock del producto:</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Producto:</span>
+                    <p className="font-medium">{stockAdjustData.productName}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Variación:</span>
+                    <p className={`font-bold ${stockAdjustData.newStock > stockAdjustData.oldStock ? 'text-green-600' : 'text-red-600'}`}>
+                      {stockAdjustData.newStock > stockAdjustData.oldStock ? '+' : ''}{stockAdjustData.newStock - stockAdjustData.oldStock} uds
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Stock anterior:</span>
+                    <p className="font-medium">{stockAdjustData.oldStock} uds</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Nuevo stock:</span>
+                    <p className="font-medium">{stockAdjustData.newStock} uds</p>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-red-600">Motivo del ajuste *</Label>
+                <textarea
+                  className="w-full mt-1 min-h-[80px] p-2 border rounded-md text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 dark:bg-gray-800"
+                  placeholder="Describa el motivo por el cual se modifica el inventario (ej: conteo físico, merma, ajuste por error, etc.)"
+                  value={stockAdjustReason}
+                  onChange={e => setStockAdjustReason(e.target.value)}
+                />
+                <p className="text-[9px] text-muted-foreground mt-1">Este motivo quedará registrado en el Kardex de inventario junto con el nombre del usuario.</p>
+              </div>
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded text-[10px] text-blue-700 dark:text-blue-300">
+                Se generará un registro en el <strong>Kardex de Inventario</strong> documenting este ajuste con el usuario, fecha, motivo y variación de stock.
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => { setShowStockAdjustDialog(false); setStockAdjustReason(""); setStockAdjustData(null); }} disabled={stockAdjustSaving}>Cancelar</Button>
+                <Button className="flex-1 bg-amber-600 hover:bg-amber-700" onClick={confirmStockAdjust} disabled={stockAdjustSaving || !stockAdjustReason.trim()}>
+                  {stockAdjustSaving ? "Registrando..." : "Confirmar Ajuste"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

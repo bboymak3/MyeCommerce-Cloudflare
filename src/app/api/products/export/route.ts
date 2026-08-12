@@ -24,12 +24,12 @@ export async function GET() {
 
     // Construir filas del Excel con TODOS los campos
     const rows = products.map((p, index) => {
-      const margen = p.price > 0 ? ((p.price - p.cost) / p.price * 100) : 0;
+      const margen = p.cost > 0 ? ((p.price - p.cost) / p.cost * 100) : 0;
       const gananciaUnitaria = p.price - p.cost;
       const valorInventario = p.price * p.stock;
       const gananciaTotal = gananciaUnitaria * p.stock;
       const margenCaja = p.boxPrice && p.cost && p.unitsPerBox && p.unitsPerBox > 0
-        ? ((p.boxPrice - (p.cost * p.unitsPerBox)) / p.boxPrice * 100)
+        ? ((p.boxPrice - (p.cost * p.unitsPerBox)) / (p.cost * p.unitsPerBox) * 100)
         : 0;
       const gananciaCaja = p.boxPrice && p.cost && p.unitsPerBox && p.unitsPerBox > 0
         ? p.boxPrice - (p.cost * p.unitsPerBox)

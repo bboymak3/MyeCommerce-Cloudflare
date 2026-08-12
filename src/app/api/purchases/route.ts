@@ -110,8 +110,8 @@ export async function POST(req: NextRequest) {
             const totalUnits = boxQty * unitsPerBox;
             const calcUnitCost = unitsPerBox > 0 ? boxCost / unitsPerBox : 0;
             const calcMargin = parseFloat(item.calcMargin || 0);
-            const calcPrice = calcUnitCost > 0 && calcMargin > 0
-              ? calcUnitCost / (1 - calcMargin / 100) : 0;
+            const calcPrice = calcUnitCost > 0 && calcMargin >= 0
+              ? calcUnitCost * (1 + calcMargin / 100) : 0;
 
             const updateData: any = {
               stock: { increment: totalUnits },
