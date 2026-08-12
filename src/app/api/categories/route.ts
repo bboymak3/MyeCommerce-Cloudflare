@@ -19,10 +19,20 @@ export async function POST(req: NextRequest) {
     if (!body.name || !body.name.trim()) {
       return NextResponse.json({ error: 'Nombre de la categoría es requerido' }, { status: 400 });
     }
+    // Case-insensitive: evitar duplicados ignorando mayusculas/minusculas
+    const normalized = body.name.trim().toLowerCase();
+    const existing = await db.category.findFirst({
+      where: { name: normalized },
+    });
+    if (existing) {
+      await db.category.update({ where: { id: existing.id }, data: { name: body.name.trim(), icon: body.icon || existing.icon, color: body.color || existing.color } });
+      const updated = await db.category.findUnique({ where: { id: existing.id }, include: { _count: { select: { products: true } } } });
+      return NextResponse.json(updated, 200);
+    }
     const category = await db.category.create({
       data: { name: body.name.trim(), icon: body.icon || '', color: body.color || '#6366f1' },
     });
-    return NextResponse.json(category);
+    return NextResponse.json(category, 201);
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return NextResponse.json({ error: 'Categoría ya existe' }, { status: 409 });

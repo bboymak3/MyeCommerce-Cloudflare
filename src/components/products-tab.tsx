@@ -14,6 +14,7 @@ import BarcodePrint from "@/components/barcode-print";
 import { authFetch } from "@/lib/auth-fetch";
 
 interface Category { id: string; name: string; icon?: string; color?: string; _count?: { products: number }; }
+interface Brand { id: string; name: string; _count?: { products: number }; }
 interface ComboItemProduct { id: string; name: string; barcode: string; price: number; stock: number; icon?: string; }
 interface ComboItemData { id: string; comboId: string; productId: string; quantity: number; product?: ComboItemProduct; }
 interface Product {
@@ -25,12 +26,12 @@ interface Product {
   expirationDate: string | null; lotNumber: string;
   isCombo: boolean; loyaltyPoints: number;
   unitsPerBox: number; boxPrice: number; boxMarginPercent: number;
-  categoryId: string | null; category: { name: string } | null; active: boolean;
+  categoryId: string | null; category: { name: string } | null; brandId: string | null; brand: { name: string } | null; active: boolean;
   comboItems?: ComboItemData[]; comboItemsRef?: ComboItemData[];
 }
 interface StockAlert { id: string; name: string; barcode: string; stock: number; minStock: number; price: number; cost: number; icon: string; categoryName: string; deficit: number; }
 interface StockAlertsData { totalAlerts: number; zeroStockCount: number; lowStockCount: number; zeroStock: StockAlert[]; lowStock: StockAlert[]; }
-interface ProductsTabProps { products: Product[]; categories: Category[]; bcvRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; taxRate?: number; }
+interface ProductsTabProps { products: Product[]; categories: Category[]; brands: Brand[]; bcvRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; taxRate?: number; }
 
 function CatBadge({ categoryName, categories }: { categoryName: string; categories: Category[] }) {
   const cat = categories.find(c => c.name === categoryName);
@@ -63,18 +64,20 @@ function Block({ title, icon, badge, defaultOpen = true, children }: { title: st
   );
 }
 
-export default function ProductsTab({ products, categories, bcvRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional", taxRate = 0 }: ProductsTabProps) {
+export default function ProductsTab({ products, categories, brands, bcvRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional", taxRate = 0 }: ProductsTabProps) {
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [showBarcodePrint, setShowBarcodePrint] = useState(false);
-  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
+  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", brandId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
   const [formData, setFormData] = useState(emptyForm);
   const [categoryName, setCategoryName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");
   const [newCatColor, setNewCatColor] = useState("#6366f1");
+  const [showBrandDialog, setShowBrandDialog] = useState(false);
+  const [brandName, setBrandName] = useState("");
 
   // Combo items
   const [comboItems, setComboItems] = useState<ComboItemData[]>([]);
@@ -167,7 +170,7 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
 
   const openEdit = (p: Product) => {
     setEditingProduct(p);
-    setFormData({ name: p.name, description: p.description, barcode: p.barcode, secondaryBarcode: p.secondaryBarcode || "", price: p.price.toString(), cost: p.cost.toString(), marginPercent: (p.marginPercent || 0).toString(), taxType: p.taxType || "general", stock: p.stock.toString(), minStock: (p.minStock || 5).toString(), categoryId: p.categoryId || "", icon: p.icon || "", image: p.image || "", wholesalePrice: (p.wholesalePrice || 0).toString(), minWholesaleQty: (p.minWholesaleQty || 0).toString(), noStock: p.noStock || false, vendePorPeso: p.vendePorPeso || false, unidadPeso: p.unidadPeso || "kg", location: p.location || "", expirationDate: p.expirationDate ? p.expirationDate.split("T")[0] : "", lotNumber: p.lotNumber || "", isCombo: p.isCombo || false, loyaltyPoints: (p.loyaltyPoints || 0).toString(), unitsPerBox: (p.unitsPerBox || 0).toString(), boxPrice: (p.boxPrice || 0).toString(), boxMarginPercent: (p.boxMarginPercent || 0).toString() });
+    setFormData({ name: p.name, description: p.description, barcode: p.barcode, secondaryBarcode: p.secondaryBarcode || "", price: p.price.toString(), cost: p.cost.toString(), marginPercent: (p.marginPercent || 0).toString(), taxType: p.taxType || "general", stock: p.stock.toString(), minStock: (p.minStock || 5).toString(), categoryId: p.categoryId || "", brandId: p.brandId || "", icon: p.icon || "", image: p.image || "", wholesalePrice: (p.wholesalePrice || 0).toString(), minWholesaleQty: (p.minWholesaleQty || 0).toString(), noStock: p.noStock || false, vendePorPeso: p.vendePorPeso || false, unidadPeso: p.unidadPeso || "kg", location: p.location || "", expirationDate: p.expirationDate ? p.expirationDate.split("T")[0] : "", lotNumber: p.lotNumber || "", isCombo: p.isCombo || false, loyaltyPoints: (p.loyaltyPoints || 0).toString(), unitsPerBox: (p.unitsPerBox || 0).toString(), boxPrice: (p.boxPrice || 0).toString(), boxMarginPercent: (p.boxMarginPercent || 0).toString() });
     setShowProductDialog(true);
     if (p.isCombo && p.id) { (async () => { try { const r = await authFetch(`/api/products/combo-items?comboId=${p.id}`); if (r.ok) setComboItems(await r.json()); } catch { setComboItems([]); } })(); } else setComboItems([]);
   };
@@ -239,6 +242,12 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
     try { const r = await authFetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: categoryName.trim(), icon: newCatIcon, color: newCatColor }) }); if (!r.ok) throw new Error((await r.json()).error); toast.success("Categoria creada"); setCategoryName(""); setShowCategoryDialog(false); onRefresh(); } catch (e: any) { toast.error(e.message); }
   };
   const deleteCategory = async (id: string) => { if (!confirm("Eliminar categoria?")) return; try { await authFetch(`/api/categories?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
+
+  const createBrand = async () => {
+    if (!brandName.trim()) return;
+    try { const r = await authFetch("/api/brands", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: brandName.trim() }) }); if (!r.ok) throw new Error((await r.json()).error); toast.success("Marca creada"); setBrandName(""); onRefresh(); } catch (e: any) { toast.error(e.message); }
+  };
+  const deleteBrand = async (id: string) => { if (!confirm("Eliminar marca?")) return; try { await authFetch(`/api/brands?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
 
   // Scanner
   const openScanner = async () => {
@@ -441,6 +450,12 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
                 <div className="col-span-2"><Label className="text-xs">Nombre *</Label><Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Nombre" className="text-sm" /></div>
                 <div><Label className="text-xs">Icono</Label><Input value={formData.icon} onChange={e => setFormData({ ...formData, icon: e.target.value })} placeholder="🍕" className="text-lg text-center" /></div>
                 <div><Label className="text-xs">Categoria</Label><Select value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: (e.target as any).value })}><option value="">Sin cat.</option>{categories.map(c => <option key={c.id} value={c.id}>{c.icon ? c.icon + ' ' : ''}{c.name}</option>)}</Select></div>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                <div><Label className="text-xs">Marca</Label><Select value={formData.brandId} onChange={e => setFormData({ ...formData, brandId: (e.target as any).value })}><option value="">Sin marca</option>{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div>
+                <div><Label className="text-xs">Cod. Barras</Label><Input value={formData.barcode} onChange={e => setFormData({ ...formData, barcode: e.target.value })} placeholder="EAN/UPC" className="text-sm font-mono" /></div>
+                <div><Label className="text-xs">Cod. Secundario</Label><Input value={formData.secondaryBarcode} onChange={e => setFormData({ ...formData, secondaryBarcode: e.target.value })} placeholder="Opcional" className="text-sm font-mono" /></div>
+                <div className="flex items-end gap-1"><Button type="button" variant="outline" size="sm" className="text-[10px] flex-1" onClick={() => setShowBrandDialog(true)}>Marcas</Button><Button type="button" variant="outline" size="sm" className="text-[10px] flex-1" onClick={() => setShowCategoryDialog(true)}>Cat.</Button></div>
               </div>
               <div><Label className="text-xs">Descripcion</Label><Input value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Opcional" className="text-sm" /></div>
             </Block>
@@ -734,6 +749,24 @@ export default function ProductsTab({ products, categories, bcvRate, currency, o
             <Separator />
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {categories.map(c => <div key={c.id} className="flex items-center justify-between p-2 rounded hover:bg-muted"><span className="text-sm">{c.icon ? c.icon + ' ' : ''}{c.name} <span className="text-muted-foreground text-xs">({c._count?.products || 0})</span></span><Button variant="ghost" size="sm" onClick={() => deleteCategory(c.id)} className="text-destructive text-xs h-7">X</Button></div>)}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* BRANDS DIALOG */}
+      <Dialog open={showBrandDialog} onOpenChange={setShowBrandDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Marcas</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <Input value={brandName} onChange={e => setBrandName(e.target.value)} placeholder="Nueva marca" onKeyDown={e => e.key === "Enter" && createBrand()} className="flex-1" />
+              <Button onClick={createBrand}>+</Button>
+            </div>
+            <Separator />
+            <div className="text-[10px] text-muted-foreground">Las marcas no distinguen mayusculas/minusculas (HP = hp)</div>
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {brands.map(b => <div key={b.id} className="flex items-center justify-between p-2 rounded hover:bg-muted"><span className="text-sm">{b.name} <span className="text-muted-foreground text-xs">({b._count?.products || 0})</span></span><Button variant="ghost" size="sm" onClick={() => deleteBrand(b.id)} className="text-destructive text-xs h-7">X</Button></div>)}
             </div>
           </div>
         </DialogContent>

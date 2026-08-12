@@ -1,5 +1,14 @@
 # MyeCommerce v2.9.x - Registro de Versiones
 
+## v2.9.41 (2026-08-12)
+- **feat**: Campo Marca (Brand) en productos — modelo Prisma Brand, API /api/brands CRUD, selector en formulario de producto
+- **feat**: POS — filtro por marca ademas de categoria, dos selectores independientes
+- **feat**: Catalogo — filtro por marca, 8 plantillas (modern, elegant, minimal, dark, magazine, neon, classic, gradient), marca visible en tarjeta de producto
+- **fix**: Categorias duplicadas — case-insensitive al crear (ARRANQUE = arranque), evita duplicados
+- **fix**: Marcas case-insensitive — HP = hp, misma logica que categorias
+- **fix**: Imagenes de productos — nueva API /api/product-images para servir imagenes de forma confiable, upload retorna URL via API en lugar de path estatico
+- **feat**: API /api/product-images — endpoint GET que sirve imagenes desde filesystem con MIME correcto y cache
+
 ## v2.9.40 (2026-08-12)
 - **fix**: Compras — campo cantidad editable en linea (antes solo se mostraba como texto, no se podia cambiar)
 - **feat**: Edicion de stock con Kardex — al modificar stock desde formulario de producto, aparece dialogo de ajuste de inventario solicitando motivo obligatorio, registra movimiento en Kardex (ajuste_entrada/ajuste_salida) con nombre de usuario, fecha, razon y variacion

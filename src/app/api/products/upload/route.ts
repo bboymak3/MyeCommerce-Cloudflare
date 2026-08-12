@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes);
     await writeFile(join(uploadsDir, fileName), buffer);
 
-    // Retornar URL relativa (accesible via /uploads/products/filename)
-    const imageUrl = `/uploads/products/${fileName}`;
+    // Retornar URL via API (mas confiable que servir desde public/)
+    const imageUrl = `/api/product-images?file=${fileName}`;
 
     return NextResponse.json({ imageUrl, fileName });
   } catch (error: any) {

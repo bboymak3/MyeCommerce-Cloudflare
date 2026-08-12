@@ -39,6 +39,7 @@ import { authFetch, storeSession, clearSession, getStoredUser as getStoredUserFr
 
 interface Product { id: string; name: string; description: string; barcode: string; price: number; cost: number; stock: number; minStock: number; wholesalePrice: number; minWholesaleQty: number; icon: string; image: string; noStock: boolean; categoryId: string | null; category: { name: string; icon?: string; color?: string } | null; active: boolean; }
 interface Category { id: string; name: string; icon?: string; color?: string; _count?: { products: number }; }
+interface Brand { id: string; name: string; _count?: { products: number }; }
 interface Settings {
   id: string; storeName: string; storeAddress: string; storePhone: string; storeRif: string;
   bcvRate: number; taxRate: number; currency: string; allowZeroStock: boolean; enableDiscount: boolean; maxDiscountPct: number;
@@ -82,6 +83,7 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [settings, setSettings] = useState<Settings>({
     id: "", storeName: "Mi Tienda", storeAddress: "", storePhone: "", storeRif: "",
     bcvRate: 36.5, taxRate: 0, currency: "USD", allowZeroStock: false, enableDiscount: false, maxDiscountPct: 20, theme: "blue",
@@ -193,18 +195,20 @@ export default function Home() {
 
   const loadData = useCallback(async () => {
     try {
-      const [productsRes, categoriesRes, settingsRes, licenseRes] = await Promise.all([
+      const [productsRes, categoriesRes, brandsRes, settingsRes, licenseRes] = await Promise.all([
         authFetch("/api/products", {}, handleSessionExpired),
         authFetch("/api/categories", {}, handleSessionExpired),
+        authFetch("/api/brands", {}, handleSessionExpired),
         authFetch("/api/settings", {}, handleSessionExpired),
         authFetch("/api/license", {}, handleSessionExpired),
       ]);
-      const [productsData, categoriesData, settingsData, licenseData] = await Promise.all([
-        productsRes.json(), categoriesRes.json(), settingsRes.json(), licenseRes.json(),
+      const [productsData, categoriesData, brandsData, settingsData, licenseData] = await Promise.all([
+        productsRes.json(), categoriesRes.json(), brandsRes.json(), settingsRes.json(), licenseRes.json(),
       ]);
       // Solo actualizar si la respuesta es valida (no objeto de error)
       if (Array.isArray(productsData)) setProducts(productsData);
       if (Array.isArray(categoriesData)) setCategories(categoriesData);
+      if (Array.isArray(brandsData)) setBrands(brandsData);
       if (settingsData && !settingsData.error && typeof settingsData.bcvRate === 'number') {
         setSettings(settingsData);
       }
@@ -620,7 +624,7 @@ export default function Home() {
         </TabsContent>
         <TabsContent value="products" activeTab={activeTab}>
           <ErrorBoundary name="Productos">
-            <ProductsTab products={products} categories={categories} bcvRate={settings.bcvRate ?? 36.5}
+            <ProductsTab products={products} categories={categories} brands={brands} bcvRate={settings.bcvRate ?? 36.5}
               currency={settings.currency} onRefresh={loadData} maxProducts={license?.maxProducts || 30} licenseType={license?.licenseType || "trial"} taxRate={settings.taxRate ?? 0} />
           </ErrorBoundary>
         </TabsContent>

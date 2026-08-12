@@ -12,6 +12,7 @@ export async function GET() {
       where: { active: true },
       include: {
         category: true,
+        brand: true,
         comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
         comboItemsRef: { include: { combo: { select: { id: true, name: true } } } },
       },
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
         stock: Math.max(0, stock),
         minStock: Math.max(0, minStock),
         categoryId: body.categoryId || null,
+        brandId: body.brandId || null,
         icon: body.icon || '',
         image: body.image || '',
         noStock: body.noStock === true,
@@ -72,6 +74,7 @@ export async function POST(req: NextRequest) {
       },
       include: {
         category: true,
+        brand: true,
         comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
       },
     });
@@ -104,6 +107,7 @@ export async function PUT(req: NextRequest) {
         stock: body.stock !== undefined ? Math.max(0, safeFloat(body.stock, 0)) : undefined,
         minStock: body.minStock !== undefined ? Math.max(0, safeFloat(body.minStock, 5)) : undefined,
         categoryId: body.categoryId !== undefined ? (body.categoryId || null) : undefined,
+        brandId: body.brandId !== undefined ? (body.brandId || null) : undefined,
         active: body.active !== undefined ? body.active : true,
         icon: body.icon !== undefined ? body.icon : undefined,
         noStock: body.noStock !== undefined ? body.noStock === true : undefined,
@@ -126,6 +130,7 @@ export async function PUT(req: NextRequest) {
       },
       include: {
         category: true,
+        brand: true,
         comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
       },
     });

@@ -6,8 +6,9 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category') || 'all';
+    const brand = searchParams.get('brand') || 'all';
     const format = searchParams.get('format') || 'html'; // html or pdf
-    const template = searchParams.get('template') || 'modern'; // modern, elegant, minimal, dark
+    const template = searchParams.get('template') || 'modern'; // modern, elegant, minimal, dark, magazine, neon, classic, gradient
     const accentColor = searchParams.get('color') || ''; // custom hex color override
 
     // Cargar configuracion de la tienda
@@ -35,10 +36,13 @@ export async function GET(req: NextRequest) {
     if (category !== 'all') {
       whereClause.categoryId = category;
     }
+    if (brand !== 'all') {
+      whereClause.brandId = brand;
+    }
 
     const products = await db.product.findMany({
       where: whereClause,
-      include: { category: { select: { name: true, icon: true, color: true } } },
+      include: { category: { select: { name: true, icon: true, color: true } }, brand: { select: { name: true } } },
       orderBy: [{ category: { name: 'asc' } }, { name: 'asc' }],
     });
 
@@ -67,6 +71,10 @@ export async function GET(req: NextRequest) {
       elegant: 'purple',
       minimal: 'teal',
       dark: 'dark',
+      magazine: 'pink',
+      neon: 'green',
+      classic: 'orange',
+      gradient: 'blue',
     };
     const effectiveTheme = templateThemes[template] || theme;
     let colors = themeColors[effectiveTheme] || themeColors.blue;
@@ -111,7 +119,7 @@ export async function GET(req: NextRequest) {
               <div style="background:${cardBg};border-radius:12px;border:1px solid ${isDark ? '#334155' : '#e2e8f0'};overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;">
                 ${p.image ? `
                   <div style="width:100%;height:140px;overflow:hidden;background:${isDark ? '#334155' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;">
-                    <img src="${p.image.startsWith('http') || p.image.startsWith('/uploads') ? p.image : '/uploads/products/' + p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:40px;\\'>${p.icon || '📦'}</span>'" />
+                    <img src="${p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:40px;\\'>${p.icon || '📦'}</span>'" />
                   </div>
                 ` : `
                   <div style="width:100%;height:100px;background:${isDark ? '#1e293b' : '#f8fafc'};display:flex;align-items:center;justify-content:center;">
@@ -119,7 +127,8 @@ export async function GET(req: NextRequest) {
                   </div>
                 `}
                 <div style="padding:10px 12px;">
-                  <p style="font-size:12px;font-weight:600;color:${textColor};margin:0 0 6px 0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</p>
+                  <p style="font-size:12px;font-weight:600;color:${textColor};margin:0 0 4px 0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</p>
+                  ${p.brand ? `<span style="display:inline-block;font-size:9px;padding:1px 6px;border-radius:10px;background:${colors.primary}12;color:${colors.primary};font-weight:600;margin-bottom:4px;">${p.brand.name}</span>` : ''}
                   ${p.description ? `<p style="font-size:10px;color:${subTextColor};margin:0 0 6px 0;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${p.description}</p>` : ''}
                   <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div>

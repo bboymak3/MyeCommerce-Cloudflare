@@ -33,6 +33,7 @@ interface Product {
   vendePorPeso?: boolean;
   unidadPeso?: string;
   category?: { name: string } | null;
+  brand?: { name: string } | null;
 }
 
 interface CartItem extends Product {
@@ -152,6 +153,7 @@ export default function PosTab({
   }, [cart.length, setCartItemCount]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
@@ -293,11 +295,17 @@ export default function PosTab({
           .map(p => [p.category!.name, { name: p.category!.name, icon: (p.category as any)?.icon || '', color: (p.category as any)?.color || '' }])
       ).values()];
 
+  const brandsList = [...new Map(
+        products.filter(p => p.brand)
+          .map(p => [p.brand!.name, { name: p.brand!.name }])
+      ).values()];
+
   const filteredProducts = products.filter((p) => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search);
     const matchCategory = !selectedCategory || p.category?.name === selectedCategory;
+    const matchBrand = !selectedBrand || p.brand?.name === selectedBrand;
     const matchStock = allowZeroStock || p.noStock || p.stock > 0;
-    return matchSearch && matchCategory && matchStock;
+    return matchSearch && matchCategory && matchBrand && matchStock;
   });
 
   const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
@@ -1125,14 +1133,22 @@ export default function PosTab({
               </Button>
             </div>
           </div>
-          <Select value={selectedCategory} onChange={(e: any) => setSelectedCategory(e.target.value)} className="h-10 text-sm">
-            <option value="">Todas</option>
-            {categories.map((cat: any) => (
-              <option key={cat.name} value={cat.name}>
-                {cat.icon ? cat.icon + ' ' : ''}{cat.name}
-              </option>
-            ))}
-          </Select>
+          <div className="flex gap-1.5">
+            <Select value={selectedCategory} onChange={(e: any) => setSelectedCategory(e.target.value)} className="h-10 text-sm flex-1">
+              <option value="">Todas Cat.</option>
+              {categories.map((cat: any) => (
+                <option key={cat.name} value={cat.name}>
+                  {cat.icon ? cat.icon + ' ' : ''}{cat.name}
+                </option>
+              ))}
+            </Select>
+            <Select value={selectedBrand} onChange={(e: any) => setSelectedBrand(e.target.value)} className="h-10 text-sm flex-1">
+              <option value="">Todas Marcas</option>
+              {brandsList.map((br: any) => (
+                <option key={br.name} value={br.name}>{br.name}</option>
+              ))}
+            </Select>
+          </div>
           <div className="flex gap-1">
             <button onClick={() => setViewMode("grid")} className={`flex-1 p-1.5 rounded border text-xs font-medium ${viewMode === "grid" ? "bg-primary text-primary-foreground" : "bg-card hover:bg-accent"}`}>&#9638; Cuadricula</button>
             <button onClick={() => setViewMode("list")} className={`flex-1 p-1.5 rounded border text-xs font-medium ${viewMode === "list" ? "bg-primary text-primary-foreground" : "bg-card hover:bg-accent"}`}>&#9776; Lista</button>
