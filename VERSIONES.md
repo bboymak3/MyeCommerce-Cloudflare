@@ -1,5 +1,14 @@
 # MyeCommerce v2.9.x - Registro de Versiones
 
+## v2.9.40 (2026-08-12)
+- **fix**: Imagenes de productos ahora visibles en POS cuadricula, miniatura al crear, y catalogo (falta campo `image` en Product interface)
+- **fix**: Upload API crea directorio automaticamente si no existe (mkdir recursive)
+- **feat**: Advertencia al salir de POS con carrito lleno — modal de confirmacion antes de cambiar modulo
+- **feat**: Catalogo — 4 plantillas (Moderno, Elegante, Minimalista, Oscuro) + 8 colores personalizables + color picker
+- **feat**: Catalogo — exportar como PDF (imprimir) o HTML descargable
+- **feat**: Exportar clientes — Excel con 3 hojas (Clientes, Resumen, WhatsApp) + Contactos .vcf para telefono
+- **refactor**: Store centralizado (app-store.ts) separado de page.tsx para evitar dependencia circular
+
 ## v2.9.39 (2026-08-12)
 - **fix**: Pausar Venta (F9) DEFINITIVO — mapeo correcto id→productId, name→productName, price→unitPrice
 - **fix**: API held-sales — validacion de productId, filtra items invalidos, error legible para el usuario

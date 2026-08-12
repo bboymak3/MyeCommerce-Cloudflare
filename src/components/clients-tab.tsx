@@ -325,6 +325,37 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
     setShowDialog(true);
   };
 
+  const exportClients = async (format: string) => {
+    try {
+      const res = await authFetch(`/api/clients/export?format=${format}`);
+      if (!res.ok) throw new Error("Error al exportar");
+      if (format === 'vcard') {
+        const text = await res.text();
+        const blob = new Blob([text], { type: "text/vcard" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "contactos-clientes.vcf";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("Contactos descargados - abre el archivo en tu telefono");
+      } else {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `clientes-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("Clientes exportados - incluye hoja de WhatsApp");
+      }
+    } catch { toast.error("Error al exportar"); }
+  };
+
   const openEdit = (client: Client) => {
     setEditingClient(client);
     setFormData({
@@ -450,6 +481,12 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
         </div>
         <Button size="sm" onClick={openCreate}>
           + Nuevo Cliente
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => exportClients('xlsx')} disabled={loading} title="Exportar Excel">
+          📊 Excel
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => exportClients('vcard')} disabled={loading} title="Exportar Contactos (.vcf)">
+          📱 Contactos
         </Button>
       </div>
 

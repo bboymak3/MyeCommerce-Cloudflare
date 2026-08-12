@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
+import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 
 export async function POST(req: NextRequest) {
@@ -35,6 +36,11 @@ export async function POST(req: NextRequest) {
     const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase() || '.jpg';
     const fileName = `${randomUUID()}${ext}`;
     const uploadsDir = join(process.cwd(), 'public', 'uploads', 'products');
+
+    // Asegurar que el directorio existe
+    if (!existsSync(uploadsDir)) {
+      await mkdir(uploadsDir, { recursive: true });
+    }
 
     // Escribir archivo
     const bytes = await file.arrayBuffer();

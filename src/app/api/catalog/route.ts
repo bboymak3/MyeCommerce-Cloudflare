@@ -7,6 +7,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category') || 'all';
     const format = searchParams.get('format') || 'html'; // html or pdf
+    const template = searchParams.get('template') || 'modern'; // modern, elegant, minimal, dark
+    const accentColor = searchParams.get('color') || ''; // custom hex color override
 
     // Cargar configuracion de la tienda
     const settings = await db.settings.findFirst();
@@ -54,8 +56,25 @@ export async function GET(req: NextRequest) {
       red: { primary: '#dc2626', secondary: '#b91c1c', accent: '#ef4444', bg: '#fef2f2' },
       orange: { primary: '#ea580c', secondary: '#c2410c', accent: '#f97316', bg: '#fff7ed' },
       dark: { primary: '#6366f1', secondary: '#4f46e5', accent: '#818cf8', bg: '#0f172a' },
+      pink: { primary: '#db2777', secondary: '#be185d', accent: '#ec4899', bg: '#fdf2f8' },
+      teal: { primary: '#0d9488', secondary: '#0f766e', accent: '#14b8a6', bg: '#f0fdfa' },
+      amber: { primary: '#d97706', secondary: '#b45309', accent: '#f59e0b', bg: '#fffbeb' },
     };
-    const colors = themeColors[theme] || themeColors.blue;
+
+    // Template-based color selection
+    const templateThemes: Record<string, string> = {
+      modern: theme,
+      elegant: 'purple',
+      minimal: 'teal',
+      dark: 'dark',
+    };
+    const effectiveTheme = templateThemes[template] || theme;
+    let colors = themeColors[effectiveTheme] || themeColors.blue;
+
+    // Custom color override
+    if (accentColor && /^#[0-9a-fA-F]{6}$/.test(accentColor)) {
+      colors = { primary: accentColor, secondary: accentColor, accent: accentColor + '80', bg: accentColor + '08' };
+    }
 
     // Agrupar productos por categoria
     const grouped = new Map<string, typeof products>();

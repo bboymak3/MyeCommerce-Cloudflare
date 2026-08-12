@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import { authFetch } from "@/lib/auth-fetch";
+import { useAppStore } from "@/lib/app-store";
 
 interface Product {
   id: string;
@@ -143,6 +144,12 @@ export default function PosTab({
   initialPaymentMethod,
 }: PosTabProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const setCartItemCount = useAppStore((s) => s.setCartItemCount);
+
+  // Sync cart item count with global store (for tab-switch warning)
+  useEffect(() => {
+    setCartItemCount(cart.length);
+  }, [cart.length, setCartItemCount]);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("efectivo");

@@ -33,11 +33,11 @@ import DeliveryNotesTab from "@/components/delivery-notes-tab";
 import CatalogTab from "@/components/catalog-tab";
 import type { CurrentUser } from "@/components/users-tab";
 import AppNav from "@/components/app-nav";
-import { create } from "zustand";
+import { useAppStore } from "@/lib/app-store";
 import { toast } from "sonner";
 import { authFetch, storeSession, clearSession, getStoredUser as getStoredUserFromLib } from "@/lib/auth-fetch";
 
-interface Product { id: string; name: string; description: string; barcode: string; price: number; cost: number; stock: number; minStock: number; wholesalePrice: number; minWholesaleQty: number; icon: string; noStock: boolean; categoryId: string | null; category: { name: string; icon?: string; color?: string } | null; active: boolean; }
+interface Product { id: string; name: string; description: string; barcode: string; price: number; cost: number; stock: number; minStock: number; wholesalePrice: number; minWholesaleQty: number; icon: string; image: string; noStock: boolean; categoryId: string | null; category: { name: string; icon?: string; color?: string } | null; active: boolean; }
 interface Category { id: string; name: string; icon?: string; color?: string; _count?: { products: number }; }
 interface Settings {
   id: string; storeName: string; storeAddress: string; storePhone: string; storeRif: string;
@@ -72,15 +72,12 @@ interface LicenseInfo {
   };
 }
 
-interface AppState { activeTab: string; setActiveTab: (tab: string) => void; }
-const useAppStore = create<AppState>((set) => ({ activeTab: "pos", setActiveTab: (tab) => set({ activeTab: tab }) }));
-
 function getStoredUser(): CurrentUser | null {
   return getStoredUserFromLib<CurrentUser>();
 }
 
 export default function Home() {
-  const { activeTab, setActiveTab } = useAppStore();
+  const { activeTab, setActiveTab, cartItemCount } = useAppStore();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -127,6 +124,19 @@ export default function Home() {
   // BCV inline editor
   const [editingBcv, setEditingBcv] = useState(false);
   const [inlineBcv, setInlineBcv] = useState("");
+
+  // Warning al salir de POS con carrito lleno
+  const [showCartWarning, setShowCartWarning] = useState(false);
+  const [pendingTabChange, setPendingTabChange] = useState<string | null>(null);
+
+  const safeSetTab = (tab: string) => {
+    if (activeTab === 'pos' && cartItemCount > 0 && tab !== 'pos') {
+      setPendingTabChange(tab);
+      setShowCartWarning(true);
+    } else {
+      setActiveTab(tab);
+    }
+  };
 
   // Apply theme on mount and settings change
   useEffect(() => {
@@ -446,7 +456,7 @@ export default function Home() {
               const tab = availableTabs.find(t => t.value === v);
               if (!tab) return;
               if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
-              setActiveTab(v);
+              safeSetTab(v);
             }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon }))} stockAlertCount={stockAlertCount} />
             <div>
               <h1 className="text-xl font-bold text-primary">
@@ -515,7 +525,7 @@ export default function Home() {
                 <TabsTrigger key={tab.value} value={tab.value} activeTab={activeTab}
                   setActiveTab={(v: string) => {
                     if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
-                    setActiveTab(v);
+                    safeSetTab(v);
                   }}>
                   {tab.label}
                   {tab.restricted && <Badge variant="destructive" className="ml-1 text-[8px] px-1 py-0">{tab.plan}</Badge>}
@@ -742,6 +752,20 @@ export default function Home() {
             <p className="text-sm text-muted-foreground">Ingrese su clave de licencia.</p>
             <div><Label>Clave de Licencia</Label><Input value={activateKey} onChange={(e: any) => setActivateKey(e.target.value.toUpperCase())} placeholder="XXXXX-XXXXX-XXXXX-XXXXX-XXXXX" className="font-mono text-center text-lg tracking-widest" onKeyDown={(e: any) => e.key === "Enter" && activateFromModal()} /></div>
             <div className="flex gap-2"><Button variant="outline" className="flex-1" onClick={() => setShowActivateModal(false)}>Cancelar</Button><Button className="flex-1" onClick={activateFromModal} disabled={activating || !activateKey.trim()}>{activating ? "Activando..." : "Activar"}</Button></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* ADVERTENCIA: Salir de POS con carrito lleno */}
+      <Dialog open={showCartWarning} onOpenChange={setShowCartWarning}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle className="text-center text-lg">⚠️ Factura en curso</DialogTitle></DialogHeader>
+          <div className="text-center space-y-3">
+            <p className="text-sm">Tienes <strong className="text-primary">{cartItemCount} producto(s)</strong> en el carrito de Punto de Venta.</p>
+            <p className="text-xs text-muted-foreground">Si sales del modulo, los productos del carrito se mantendran pero no se perderan.</p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowCartWarning(false)}>Volver al POS</Button>
+              <Button className="flex-1" onClick={() => { setShowCartWarning(false); if (pendingTabChange) { setActiveTab(pendingTabChange); setPendingTabChange(null); } }}>Salir</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
