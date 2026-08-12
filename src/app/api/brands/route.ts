@@ -20,10 +20,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nombre de la marca es requerido' }, { status: 400 });
     }
     // Case-insensitive check: buscar si ya existe una marca con el mismo nombre (ignorando mayusculas/minusculas)
-    const normalized = body.name.trim().toLowerCase();
-    const existing = await db.brand.findFirst({
-      where: { name: normalized },
-    });
+    // SQLite no soporta ILIKE, usamos findMany + filter en JS
+    const allBrands = await db.brand.findMany({ select: { id: true, name: true } });
+    const existing = allBrands.find((b: any) => b.name.toLowerCase() === body.name.trim().toLowerCase());
     if (existing) {
       // Si existe pero con diferente casing, actualizar al casing nuevo
       await db.brand.update({ where: { id: existing.id }, data: { name: body.name.trim() } });

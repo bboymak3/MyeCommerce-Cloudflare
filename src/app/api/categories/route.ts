@@ -20,10 +20,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nombre de la categoría es requerido' }, { status: 400 });
     }
     // Case-insensitive: evitar duplicados ignorando mayusculas/minusculas
-    const normalized = body.name.trim().toLowerCase();
-    const existing = await db.category.findFirst({
-      where: { name: normalized },
-    });
+    // SQLite no soporta ILIKE, usamos findMany + filter en JS
+    const allCategories = await db.category.findMany({ select: { id: true, name: true, icon: true, color: true } });
+    const existing = allCategories.find((c: any) => c.name.toLowerCase() === body.name.trim().toLowerCase());
     if (existing) {
       await db.category.update({ where: { id: existing.id }, data: { name: body.name.trim(), icon: body.icon || existing.icon, color: body.color || existing.color } });
       const updated = await db.category.findUnique({ where: { id: existing.id }, include: { _count: { select: { products: true } } } });

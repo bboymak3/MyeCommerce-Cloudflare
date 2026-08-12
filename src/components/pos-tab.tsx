@@ -58,7 +58,7 @@ export default function PosTab(props: PosTabProps) {
     cashReceived, setCashReceived, cashReceivedUsd, setCashReceivedUsd,
     mixedPayments, updateMixedEntry, addMixedEntry, removeMixedEntry,
     isCredit, setIsCredit, creditClientId, setCreditClientId,
-    creditClientName, creditClientDebt, setCreditClientDebt,
+    creditClientName, setCreditClientName, creditClientDebt, setCreditClientDebt,
     creditDays, setCreditDays,
   } = cartHook;
 

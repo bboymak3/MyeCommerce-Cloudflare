@@ -328,7 +328,10 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
   const exportClients = async (format: string) => {
     try {
       const res = await authFetch(`/api/clients/export?format=${format}`);
-      if (!res.ok) throw new Error("Error al exportar");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Error HTTP ${res.status}`);
+      }
       if (format === 'vcard') {
         const text = await res.text();
         const blob = new Blob([text], { type: "text/vcard" });
@@ -353,7 +356,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
         URL.revokeObjectURL(url);
         toast.success("Clientes exportados - incluye hoja de WhatsApp");
       }
-    } catch { toast.error("Error al exportar"); }
+    } catch (e: any) { toast.error(e.message || "Error al exportar"); }
   };
 
   const openEdit = (client: Client) => {

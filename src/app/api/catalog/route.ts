@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
               <div style="background:${cardBg};border-radius:12px;border:1px solid ${isDark ? '#334155' : '#e2e8f0'};overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;">
                 ${p.image ? `
                   <div style="width:100%;height:140px;overflow:hidden;background:${isDark ? '#334155' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;">
-                    <img src="${p.image}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:40px;\\'>${p.icon || '📦'}</span>'" />
+                    <img src="${p.image}" alt="${p.name}" style="max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:40px;\\'>${p.icon || '📦'}</span>'" />
                   </div>
                 ` : `
                   <div style="width:100%;height:100px;background:${isDark ? '#1e293b' : '#f8fafc'};display:flex;align-items:center;justify-content:center;">
