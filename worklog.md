@@ -1,48 +1,38 @@
 ---
 Task ID: 1
-Agent: Main Agent
-Task: Venta por peso - Verificar implementación + agregar badge visual + mejorar iconos de negocio
+Agent: Super Z (Main)
+Task: Fix 6 bugs criticos reportados por el usuario - v2.9.44
 
 Work Log:
-- Analizado el código completo del sistema POS
-- Confirmado que "vender por peso" ya estaba implementado (schema, formulario, POS, tickets)
-- Agregado badge visual (kg/g/lb) en tabla de productos para identificar productos por peso
-- Grid de iconos de negocio mejorada: gap-0.5 (antes gap-1), 10 columnas en sm (antes 8), max-h-24 (antes max-h-20)
-- Expandido BUSINESS_TYPES de 32 a 48 tipos de negocio
-- Sincronizado BUSINESS_EMOJIS en ticket-printer.ts con los 48 tipos
-- Build exitoso, commit y push a GitHub
+- Analizadas 7 capturas de pantalla del usuario con VLM
+- Clonado repositorio y leidos todos los archivos criticos
+- Diagnosticados 6 bugs con causa raiz:
+
+BUG 1: API /api/products/upload ELIMINADA en v2.9.43
+- Causa: commit 586f0d6 elimino el archivo por error
+- Fix: Restaurada desde git history (commit b219551)
+
+BUG 2: Exportar clientes - error Prisma
+- Causa: whereClause.active = true pero schema usa isActive
+- Fix: Cambiado a whereClause.isActive = true
+
+BUG 3: ShortcutsBar no renderizada en POS
+- Causa: Componente importado en pos-tab.tsx pero nunca renderizado
+- Fix: Agregada al cart-panel.tsx (dentro del CardContent)
+
+BUG 4: Marcas/Categorias no funcionan
+- Causa RAIZ: Tabla Brand NUNCA fue migrada a la BD
+- La unica migracion (20260811133522) NO incluye Brand
+- Fix: Creada migracion SQL completa + cambiado INICIAR-MYECCOMMERCE.bat
+  para ejecutar prisma db push SIEMPRE (no solo si dev.db no existe)
+
+BUG 5: Mejorados mensajes de error en APIs brands/categories
+
+BUG 6: Catalogo imagenes - ya estaba fixeado en v2.9.43 (object-fit:contain)
 
 Stage Summary:
-- v2.9.31 commiteada y subida a GitHub
-- ZIPs generados: MyeCommerce-v2.9.31.zip (134MB) + MyeCommerce-POS-v2.9.31-clean-install.zip (41MB)
-- 3 archivos modificados: products-tab.tsx, config-tab.tsx, ticket-printer.ts
----
-Task ID: 1
-Agent: Main Agent
-Task: Implementar autenticacion y autorizacion en rutas API
-
-Work Log:
-- Analice estructura del proyecto: 30 rutas API sin proteccion
-- Verifique existencia de sistema de auth frontend (login screen con localStorage)
-- Instale dependencia jsonwebtoken para generacion de tokens JWT
-- Cree src/lib/session.ts con funciones createSessionToken y verifySessionToken
-- Cree src/lib/auth-fetch.ts como wrapper centralizado con inyeccion automatica de token
-- Cree src/middleware.ts con middleware Next.js que protege todas las rutas /api/*
-  - Rutas publicas: /api/auth
-  - Rutas admin: /api/users, /api/roles, /api/backup, /api/license
-  - Verificacion JWT con Web Crypto API (Edge Runtime compatible)
-  - Headers: Authorization Bearer, cookie httpOnly, query param
-- Actualice src/app/api/auth/route.ts para generar JWT en login
-- Actualice src/components/login-screen.tsx para guardar token JWT
-- Actualice src/app/page.tsx para usar authFetch en todas las llamadas API
-- Reemplace fetch() por authFetch() en 15 componentes frontend
-- Build exitoso: Middleware compilado a 33.7 kB
-- Commit v2.9.34, tag, push, y GitHub release creado
-
-Stage Summary:
-- Vulnerabilidad critica CORREGIDA: Todas las rutas API ahora requieren autenticacion JWT
-- Token JWT con expiracion de 24h
-- Cookie httpOnly session_token como capa adicional de seguridad
-- Deteccion automatica de sesion expirada con logout forzado
-- Rutas admin protegidas por verificacion de rol
-- Release: https://github.com/csglider/MyeCommerce-v2.9.20/releases/tag/v2.9.34
+- Build pasa limpio (next build)
+- Commit: 6df5469 v2.9.44
+- Push: exitoso a origin/main
+- Tag: v2.9.44 creado y pusheado
+- 7 archivos modificados, 318 lineas agregadas, 88 eliminadas
