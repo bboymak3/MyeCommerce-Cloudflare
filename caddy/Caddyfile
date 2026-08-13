@@ -13,3 +13,11 @@ myecommerce.ve {
     tls internal
     reverse_proxy localhost:3000
 }
+
+# Acceso movil via IP local (HTTPS auto-certificado)
+# Los telefonos acceden via https://IP_DEL_SERVER:8443
+# Al primer acceso: navegador muestra advertencia > "Avanzado" > "Continuar"
+:8443 {
+    tls internal
+    reverse_proxy localhost:3000
+}

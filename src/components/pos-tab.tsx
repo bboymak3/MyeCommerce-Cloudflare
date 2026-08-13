@@ -29,6 +29,7 @@ import { ReceiptDialog } from "./pos/dialogs/receipt-dialog";
 import { CreditConfirmDialog } from "./pos/dialogs/credit-confirm-dialog";
 import { StockWarningDialog } from "./pos/dialogs/stock-warning-dialog";
 import { QrAccessDialog } from "./pos/dialogs/qr-access-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export default function PosTab(props: PosTabProps) {
   const {
@@ -88,6 +89,7 @@ export default function PosTab(props: PosTabProps) {
   const [showStockWarning, setShowStockWarning] = useState<any>(null);
   const [showCreditConfirm, setShowCreditConfirm] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
   const [localUrl, setLocalUrl] = useState("");
 
   // Refs
@@ -155,7 +157,7 @@ export default function PosTab(props: PosTabProps) {
 
   // ─── Keyboard shortcuts ───────────────────────────────────────
   const anyDialogOpen = showClientDialog || showNewClientDialog || showCreditConfirm
-    || showStockWarning || showQrModal || scanner.showScanner || !!showReceipt;
+    || showStockWarning || showQrModal || showClearCartConfirm || scanner.showScanner || !!showReceipt;
 
   useKeyboardShortcuts({
     cartLength: cart.length,
@@ -168,7 +170,7 @@ export default function PosTab(props: PosTabProps) {
     onF7: () => setPaymentMethod("pago-movil"),
     onF8: () => completeSale(),
     onF9: () => holdCurrentSale(),
-    onEsc: () => clearCart(),
+    onEsc: () => { if (cart.length > 0) setShowClearCartConfirm(true); },
   });
 
   // ─── Credit client change handler ─────────────────────────────
@@ -349,7 +351,7 @@ export default function PosTab(props: PosTabProps) {
       {/* Cart (3/5) */}
       <CartPanel
         cart={cart} products={products} currency={currency} allowZeroStock={allowZeroStock}
-        onClearCart={clearCart} onUpdateQty={updateQuantity} onRemove={removeFromCart}
+        onClearCart={() => setShowClearCartConfirm(true)} onUpdateQty={updateQuantity} onRemove={removeFromCart}
         onToggleWholesale={toggleWholesale}
         selectedClient={selectedClient} onOpenClientDialog={() => setShowClientDialog(true)}
         onOpenQrModal={() => setShowQrModal(true)}
@@ -446,6 +448,29 @@ export default function PosTab(props: PosTabProps) {
         onOpenChange={setShowQrModal}
         localUrl={localUrl}
       />
+
+      {/* Confirmacion al vaciar carrito */}
+      <Dialog open={showClearCartConfirm} onOpenChange={setShowClearCartConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center text-orange-600">⚠️ Carrito con articulos</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <p className="text-sm text-center text-muted-foreground">
+              Hay <span className="font-bold text-foreground">{cart.length}</span> articulo(s) en el carrito por un total de <span className="font-bold text-foreground">${total.toFixed(2)}</span> / <span className="font-bold text-foreground">Bs {totalBs.toFixed(2)}</span>
+            </p>
+            <p className="text-sm text-center font-medium">¿Desea vaciar el carrito o cancelar?</p>
+            <div className="flex gap-2">
+              <Button variant="destructive" className="flex-1" onClick={() => { clearCart(); setShowClearCartConfirm(false); toast.success("Carrito vaciado"); }}>
+                Vaciar Carrito
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setShowClearCartConfirm(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
