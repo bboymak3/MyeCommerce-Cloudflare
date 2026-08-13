@@ -239,13 +239,30 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
 
   const createCategory = async () => {
     if (!categoryName.trim()) return;
-    try { const r = await authFetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: categoryName.trim(), icon: newCatIcon, color: newCatColor }) }); if (!r.ok) throw new Error((await r.json()).error); toast.success("Categoria creada"); setCategoryName(""); setShowCategoryDialog(false); onRefresh(); } catch (e: any) { toast.error(e.message); }
+    try {
+      const r = await authFetch("/api/categories", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: categoryName.trim(), icon: newCatIcon, color: newCatColor }) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error al crear categoria");
+      toast.success("Categoria creada");
+      setCategoryName("");
+      // Update local categories list immediately
+      if (data && data.id) setCategories(prev => [...prev, data]);
+      onRefresh();
+    } catch (e: any) { toast.error(e.message); }
   };
   const deleteCategory = async (id: string) => { if (!confirm("Eliminar categoria?")) return; try { await authFetch(`/api/categories?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
 
   const createBrand = async () => {
     if (!brandName.trim()) return;
-    try { const r = await authFetch("/api/brands", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: brandName.trim() }) }); if (!r.ok) throw new Error((await r.json()).error); toast.success("Marca creada"); setBrandName(""); onRefresh(); } catch (e: any) { toast.error(e.message); }
+    try {
+      const r = await authFetch("/api/brands", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: brandName.trim() }) });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Error al crear marca");
+      toast.success("Marca creada");
+      setBrandName("");
+      if (data && data.id) setBrands(prev => [...prev, data]);
+      onRefresh();
+    } catch (e: any) { toast.error(e.message); }
   };
   const deleteBrand = async (id: string) => { if (!confirm("Eliminar marca?")) return; try { await authFetch(`/api/brands?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
 

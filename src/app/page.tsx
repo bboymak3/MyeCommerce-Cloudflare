@@ -424,10 +424,11 @@ export default function Home() {
           <button onClick={() => setShowBlockedModal(true)} className="bg-white text-red-700 px-3 py-0.5 rounded text-xs font-bold hover:bg-red-100 ml-2">VER DETALLES</button>
         </div>
       )}
-      {!isTrial && !isExpired && license?.isValid && !isMachineBlocked && !isDifferentMachine && (
-        <div className="bg-green-600 text-white text-center py-0.5 px-4 text-[10px]">
-          <span className="font-medium">{license.licenseType.toUpperCase()} | Vence: {new Date(license.expiresAt).toLocaleDateString("es-VE")} | {license.daysRemaining} dias</span>
-          {license.ownerName && <span> | {license.ownerName}</span>}
+      {/* LICENCIA POR VENCER - Solo mostrar alerta en los ultimos 30 dias */}
+      {!isTrial && !isExpired && license?.isValid && !isMachineBlocked && !isDifferentMachine && (license.daysRemaining ?? 999) <= 30 && (
+        <div className="bg-amber-500 text-white text-center py-1.5 px-4 text-xs font-medium flex items-center justify-center gap-2">
+          <span>&#9888;&#65039; SU LICENCIA VENCE EN {license.daysRemaining} DIAS - {license.licenseType.toUpperCase()}</span>
+          <button onClick={() => safeSetTab("license")} className="bg-white text-amber-700 px-3 py-0.5 rounded text-xs font-bold hover:bg-amber-100 ml-2">VER LICENCIA</button>
         </div>
       )}
 
@@ -452,93 +453,75 @@ export default function Home() {
         </div>
       )}
 
-      {/* HEADER */}
+      {/* HEADER - 2 rows: store info + user */}
       <header className="border-b bg-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <AppNav activeTab={activeTab} onTabChange={(v: string) => {
-              const tab = availableTabs.find(t => t.value === v);
-              if (!tab) return;
-              if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
-              safeSetTab(v);
-            }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon }))} stockAlertCount={stockAlertCount} />
-            <div>
-              <h1 className="text-xl font-bold text-primary">
-                {settings.storeName}
-                {showWatermark && <span className="text-xs font-normal text-yellow-600 ml-2">(TRIAL)</span>}
-              </h1>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>v2.9.23 | 1$ =</span>
-                {editingBcv ? (
-                  <input type="number" min="0" step="0.01" value={inlineBcv}
-                    onChange={(e) => setInlineBcv(e.target.value)}
-                    onBlur={saveInlineBcv}
-                    onKeyDown={(e: any) => { if (e.key === "Enter") saveInlineBcv(); if (e.key === "Escape") setEditingBcv(false); }}
-                    autoFocus
-                    className="w-20 bg-transparent border-b border-primary text-primary font-bold text-xs px-1 py-0 focus:outline-none" />
-                ) : (
-                  <button onClick={() => { setInlineBcv((settings.bcvRate ?? 36.5).toFixed(2)); setEditingBcv(true); }}
-                    className="font-bold text-primary hover:underline cursor-pointer">
-                    {(settings.bcvRate ?? 36.5).toFixed(2)}
-                  </button>
-                )}
-                <span>Bs</span>
-                {!editingBcv && <span className="text-[9px] text-muted-foreground/60">(click para cambiar)</span>}
-              </div>
-            </div>
+        {/* Row 1: Menu + Store info + BCV rate */}
+        <div className="container mx-auto px-4 py-2 flex items-center gap-3">
+          <AppNav activeTab={activeTab} onTabChange={(v: string) => {
+            const tab = availableTabs.find(t => t.value === v);
+            if (!tab) return;
+            if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
+            safeSetTab(v);
+          }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon }))} stockAlertCount={stockAlertCount} />
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-bold text-primary truncate">
+              {settings.storeName}
+              {showWatermark && <span className="text-xs font-normal text-yellow-600 ml-1">(TRIAL)</span>}
+            </h1>
+            {settings.storeAddress && (
+              <p className="text-[10px] text-muted-foreground truncate">{settings.storeAddress}</p>
+            )}
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right text-xs text-muted-foreground">
-              <p>{new Date().toLocaleDateString("es-VE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
-              <p>{new Date().toLocaleTimeString("es-VE")}</p>
-            </div>
-            <Separator orientation="vertical" className="h-8" />
-            <div className="flex items-center gap-2">
-              {currentUser.avatar ? (
-                <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-primary/30" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary text-xs font-bold">
-                  {(currentUser.fullName || currentUser.username).split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-                </div>
-              )}
-              <Badge variant={currentUser.role === "admin" ? "default" : "secondary"}>
-                {currentUser.role === "admin" ? "Admin" : currentUser.role === "vendedor" ? "Vendedor" : "Cajero"}
-              </Badge>
-              <span className="text-sm font-medium max-w-[120px] truncate hidden sm:inline-block">
-                {currentUser.fullName || currentUser.username}
-              </span>
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded hover:bg-destructive/10"
-                title="Cerrar sesion"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                <span className="hidden sm:inline">Salir</span>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+            <span>1$ =</span>
+            {editingBcv ? (
+              <input type="number" min="0" step="0.01" value={inlineBcv}
+                onChange={(e) => setInlineBcv(e.target.value)}
+                onBlur={saveInlineBcv}
+                onKeyDown={(e: any) => { if (e.key === "Enter") saveInlineBcv(); if (e.key === "Escape") setEditingBcv(false); }}
+                autoFocus
+                className="w-16 bg-transparent border-b border-primary text-primary font-bold text-xs px-1 py-0 focus:outline-none" />
+            ) : (
+              <button onClick={() => { setInlineBcv((settings.bcvRate ?? 36.5).toFixed(2)); setEditingBcv(true); }}
+                className="font-bold text-primary hover:underline cursor-pointer">
+                {(settings.bcvRate ?? 36.5).toFixed(2)}
               </button>
-            </div>
+            )}
+            <span>Bs</span>
+          </div>
+        </div>
+        {/* Row 2: Date/Time + User */}
+        <div className="border-t container mx-auto px-4 py-1.5 flex items-center justify-between text-xs text-muted-foreground">
+          <div>
+            <span>{new Date().toLocaleDateString("es-VE", { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</span>
+            <span className="mx-2">|</span>
+            <span>{new Date().toLocaleTimeString("es-VE")}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentUser.avatar ? (
+              <img src={currentUser.avatar} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-primary/30" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary text-[10px] font-bold">
+                {(currentUser.fullName || currentUser.username).split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              </div>
+            )}
+            <Badge variant={currentUser.role === "admin" ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
+              {currentUser.role === "admin" ? "Admin" : currentUser.role === "vendedor" ? "Vendedor" : "Cajero"}
+            </Badge>
+            <span className="font-medium max-w-[100px] truncate hidden sm:inline-block">
+              {currentUser.fullName || currentUser.username}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors px-1.5 py-0.5 rounded hover:bg-destructive/10"
+              title="Cerrar sesion"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              <span className="hidden sm:inline">Salir</span>
+            </button>
           </div>
         </div>
       </header>
-
-      {/* NAV - Barra de tabs: visible solo en escritorio como referencia rapida */}
-      <div className="border-b bg-card hidden md:block">
-        <div className="container mx-auto px-2 py-2">
-          <div className="overflow-x-visible">
-            <TabsList className="w-full flex-wrap">
-              {availableTabs.map((tab) => (
-                <TabsTrigger key={tab.value} value={tab.value} activeTab={activeTab}
-                  setActiveTab={(v: string) => {
-                    if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
-                    safeSetTab(v);
-                  }}>
-                  {tab.label}
-                  {tab.restricted && <Badge variant="destructive" className="ml-1 text-[8px] px-1 py-0">{tab.plan}</Badge>}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </div>
-      </div>
 
       {/* MAIN */}
       <main className="flex-1 container mx-auto px-4 py-4">

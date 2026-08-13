@@ -51,6 +51,7 @@ export async function GET() {
 
   return NextResponse.json({
     url,
+    secureUrl: "https://myecommerce.ve",
     ip: bestIp,
     port,
     hostname: os.hostname(),

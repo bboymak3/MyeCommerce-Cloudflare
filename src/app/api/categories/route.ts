@@ -26,12 +26,13 @@ export async function POST(req: NextRequest) {
     if (existing) {
       await db.category.update({ where: { id: existing.id }, data: { name: body.name.trim(), icon: body.icon || existing.icon, color: body.color || existing.color } });
       const updated = await db.category.findUnique({ where: { id: existing.id }, include: { _count: { select: { products: true } } } });
-      return NextResponse.json(updated, 200);
+      return NextResponse.json(updated, { status: 200 });
     }
     const category = await db.category.create({
       data: { name: body.name.trim(), icon: body.icon || '', color: body.color || '#6366f1' },
+      include: { _count: { select: { products: true } } },
     });
-    return NextResponse.json(category, 201);
+    return NextResponse.json(category, { status: 201 });
   } catch (error: any) {
     if (error?.code === 'P2002') {
       return NextResponse.json({ error: 'Categoría ya existe' }, { status: 409 });
