@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import type { CartItem, ClientData, MixedEntry, Product } from "../types";
 import { CartItemRow } from "./cart-item";
 import { PaymentSection } from "./payment-section";
+import { ShortcutsBar } from "../shortcuts-bar";
 
 interface CartPanelProps {
   // Cart data
@@ -106,6 +107,9 @@ export function CartPanel({
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-3 overflow-hidden px-4 pb-4">
+        {/* Keyboard shortcuts bar */}
+        <ShortcutsBar />
+
         {/* Selected client */}
         <div className="p-3 rounded-lg border bg-muted/30">
           <div className="flex items-center justify-between">

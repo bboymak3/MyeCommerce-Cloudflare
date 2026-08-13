@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 // Rutas API que NO requieren autenticacion
 const PUBLIC_ROUTES = [
   '/api/auth',
+  '/api/product-images',
+  '/api/catalog',
 ];
 
 // Rutas API que requieren rol de administrador

@@ -6,62 +6,19 @@ function safeFloat(v: any, fallback: number = 0): number {
   return isNaN(n) ? fallback : n;
 }
 
-export async function GET(req?: NextRequest) {
+export async function GET() {
   try {
-    const url = req?.url || '';
-    const { searchParams } = new URL(url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '1000');
-    const search = searchParams.get('search') || '';
-    const categoryId = searchParams.get('categoryId') || '';
-    const brandId = searchParams.get('brandId') || '';
-    const paginated = searchParams.get('paginated') === 'true';
-
-    const where: any = { active: true };
-    if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { barcode: { contains: search } },
-        { secondaryBarcode: { contains: search } },
-      ];
-    }
-    if (categoryId) where.categoryId = categoryId;
-    if (brandId) where.brandId = brandId;
-
-    if (!paginated) {
-      // Comportamiento original: retorna array directo (compatibilidad)
-      const products = await db.product.findMany({
-        where,
-        include: {
-          category: true,
-          brand: true,
-          comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
-          comboItemsRef: { include: { combo: { select: { id: true, name: true } } } },
-        },
-        orderBy: { name: 'asc' },
-      });
-      return NextResponse.json(products);
-    }
-
-    // Paginado: retorna { products, total, page, limit, totalPages }
-    const skip = (page - 1) * limit;
-    const [products, total] = await Promise.all([
-      db.product.findMany({
-        where,
-        include: {
-          category: true,
-          brand: true,
-          comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
-          comboItemsRef: { include: { combo: { select: { id: true, name: true } } } },
-        },
-        orderBy: { name: 'asc' },
-        skip,
-        take: limit,
-      }),
-      db.product.count({ where }),
-    ]);
-
-    return NextResponse.json({ products, total, page, limit, totalPages: Math.ceil(total / limit) });
+    const products = await db.product.findMany({
+      where: { active: true },
+      include: {
+        category: true,
+        brand: true,
+        comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
+        comboItemsRef: { include: { combo: { select: { id: true, name: true } } } },
+      },
+      orderBy: { name: 'asc' },
+    });
+    return NextResponse.json(products);
   } catch (error) {
     return NextResponse.json({ error: 'Error al obtener productos' }, { status: 500 });
   }

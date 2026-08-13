@@ -78,6 +78,10 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   const [newCatColor, setNewCatColor] = useState("#6366f1");
   const [showBrandDialog, setShowBrandDialog] = useState(false);
   const [brandName, setBrandName] = useState("");
+  // Local brands state that syncs with prop but allows immediate updates
+  const [brandsLocal, setBrandsLocal] = useState<Brand[]>(brands);
+  const effectiveBrands = brandsLocal.length > 0 || !brands.length ? brandsLocal : brands;
+  useEffect(() => { setBrandsLocal(brands); }, [brands]);
 
   // Combo items
   const [comboItems, setComboItems] = useState<ComboItemData[]>([]);
@@ -244,11 +248,9 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error al crear categoria");
       toast.success("Categoria creada");
-      setCategoryName("");
-      // Update local categories list immediately
-      if (data && data.id) setCategories(prev => [...prev, data]);
+      setCategoryName(""); setNewCatIcon(""); setNewCatColor("#6366f1"); setShowCategoryDialog(false);
       onRefresh();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e.message || "Error al crear categoria"); }
   };
   const deleteCategory = async (id: string) => { if (!confirm("Eliminar categoria?")) return; try { await authFetch(`/api/categories?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
 
@@ -258,19 +260,31 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
       const r = await authFetch("/api/brands", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: brandName.trim() }) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Error al crear marca");
+      // Actualizar lista local de marcas inmediatamente
+      if (data && data.id) {
+        setBrandsLocal(prev => {
+          const exists = prev.find((b: Brand) => b.id === data.id);
+          if (exists) return prev.map((b: Brand) => b.id === data.id ? data : b);
+          return [...prev, data];
+        });
+      }
       toast.success("Marca creada");
       setBrandName("");
-      if (data && data.id) setBrands(prev => [...prev, data]);
       onRefresh();
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e.message || "Error al crear marca"); }
   };
   const deleteBrand = async (id: string) => { if (!confirm("Eliminar marca?")) return; try { await authFetch(`/api/brands?id=${id}`, { method: "DELETE" }); toast.success("Eliminada"); onRefresh(); } catch {} };
 
   // Scanner
   const openScanner = async () => {
     setShowScanner(true); setScannerLoading(true); setScannerError("");
+    // Esperar a que el Dialog renderice el div del scanner
+    await new Promise(r => setTimeout(r, 400));
     try {
       const { Html5Qrcode } = await import("html5-qrcode");
+      // Verificar que el div existe
+      const divEl = document.getElementById(scannerDivId.current);
+      if (!divEl) throw new Error("No se encontro el elemento del escaner. Reintente.");
       const qr = new Html5Qrcode(scannerDivId.current);
       scannerRef.current = qr;
       await qr.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 150 } }, (txt: string) => { stopScanner(); setFormData(p => ({ ...p, barcode: txt })); toast.success("Escaneado: " + txt); }, () => {});
@@ -278,7 +292,12 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
     } catch (e: any) {
       setScannerLoading(false);
       const m = (e?.message || "").toLowerCase();
-      setScannerError(m.includes("permission") ? "Permiso denegado. Active la camara en el navegador." : m.includes("notfound") ? "No se encontro camara." : "Error al iniciar escaner.");
+      let errMsg = "Error al iniciar escaner.";
+      if (m.includes("permission") || m.includes("notallowederror")) errMsg = "Permiso de camara denegado. Active la camara en el navegador (icono de candado) y recargue la pagina.";
+      else if (m.includes("notfound") || m.includes("notfounderror")) errMsg = "No se encontro camara. Verifique que este conectada y no este en uso por otra app.";
+      else if (m.includes("notsecure") || m.includes("secure context")) errMsg = "La camara requiere conexion segura (HTTPS). Use https://myecommerce.ve en lugar de http://localhost.";
+      else if (m.includes("notreadable") || m.includes("aborterror")) errMsg = "La camara esta siendo usada por otra aplicacion. Cierre otras apps que usen la camara.";
+      setScannerError(errMsg);
     }
   };
   const stopScanner = async () => { try { if (scannerRef.current) { if (scannerRef.current.getState() === 2) await scannerRef.current.stop(); scannerRef.current.clear(); scannerRef.current = null; } } catch {} setShowScanner(false); setScannerError(""); };
@@ -469,7 +488,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                 <div><Label className="text-xs">Categoria</Label><Select value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: (e.target as any).value })}><option value="">Sin cat.</option>{categories.map(c => <option key={c.id} value={c.id}>{c.icon ? c.icon + ' ' : ''}{c.name}</option>)}</Select></div>
               </div>
               <div className="grid grid-cols-4 gap-2">
-                <div><Label className="text-xs">Marca</Label><Select value={formData.brandId} onChange={e => setFormData({ ...formData, brandId: (e.target as any).value })}><option value="">Sin marca</option>{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div>
+                <div><Label className="text-xs">Marca</Label><Select value={formData.brandId} onChange={e => setFormData({ ...formData, brandId: (e.target as any).value })}><option value="">Sin marca</option>{effectiveBrands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div>
                 <div><Label className="text-xs">Cod. Barras</Label><Input value={formData.barcode} onChange={e => setFormData({ ...formData, barcode: e.target.value })} placeholder="EAN/UPC" className="text-sm font-mono" /></div>
                 <div><Label className="text-xs">Cod. Secundario</Label><Input value={formData.secondaryBarcode} onChange={e => setFormData({ ...formData, secondaryBarcode: e.target.value })} placeholder="Opcional" className="text-sm font-mono" /></div>
                 <div className="flex items-end gap-1"><Button type="button" variant="outline" size="sm" className="text-[10px] flex-1" onClick={() => setShowBrandDialog(true)}>Marcas</Button><Button type="button" variant="outline" size="sm" className="text-[10px] flex-1" onClick={() => setShowCategoryDialog(true)}>Cat.</Button></div>
@@ -783,7 +802,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
             <Separator />
             <div className="text-[10px] text-muted-foreground">Las marcas no distinguen mayusculas/minusculas (HP = hp)</div>
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {brands.map(b => <div key={b.id} className="flex items-center justify-between p-2 rounded hover:bg-muted"><span className="text-sm">{b.name} <span className="text-muted-foreground text-xs">({b._count?.products || 0})</span></span><Button variant="ghost" size="sm" onClick={() => deleteBrand(b.id)} className="text-destructive text-xs h-7">X</Button></div>)}
+              {effectiveBrands.map(b => <div key={b.id} className="flex items-center justify-between p-2 rounded hover:bg-muted"><span className="text-sm">{b.name} <span className="text-muted-foreground text-xs">({b._count?.products || 0})</span></span><Button variant="ghost" size="sm" onClick={() => deleteBrand(b.id)} className="text-destructive text-xs h-7">X</Button></div>)}
             </div>
           </div>
         </DialogContent>

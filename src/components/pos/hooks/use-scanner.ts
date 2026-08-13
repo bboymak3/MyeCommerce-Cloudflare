@@ -35,6 +35,21 @@ export function useScanner({ products, onProductFound, onCodeDetected }: UseScan
     [scannerMode, products, onProductFound, onCodeDetected],
   );
 
+  // stopScanner debe declararse ANTES de startScanner para evitar
+  // "Cannot access before initialization"
+  const stopScanner = useCallback(async () => {
+    try {
+      if (scannerRef.current) {
+        const state = scannerRef.current.getState();
+        if (state === 2) await scannerRef.current.stop();
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    } catch (e) { console.error("Error stopping scanner:", e); }
+    setShowScanner(false);
+    setScannerError("");
+  }, []);
+
   const startScanner = useCallback(
     async (mode: "product" | "client") => {
       setScannerMode(mode);
@@ -42,9 +57,16 @@ export function useScanner({ products, onProductFound, onCodeDetected }: UseScan
       setScannerLoading(true);
       setScannerError("");
 
+      // Esperar a que el Dialog renderice el div del scanner
+      await new Promise(r => setTimeout(r, 400));
+
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
         const scannerId = scannerDivRef.current;
+        // Verificar que el div existe
+        const divEl = document.getElementById(scannerId);
+        if (!divEl) throw new Error("No se encontro el elemento del escaner. Reintente.");
+
         const html5QrCode = new Html5Qrcode(scannerId);
         scannerRef.current = html5QrCode;
 
@@ -63,13 +85,13 @@ export function useScanner({ products, onProductFound, onCodeDetected }: UseScan
         const msg = (err?.message || err?.toString() || "").toLowerCase();
         let errorMsg = "";
         if (msg.includes("permission") || msg.includes("notallowederror")) {
-          errorMsg = "Permiso de camara denegado. Permita el acceso a la camara en la configuracion del navegador y recargue la pagina.";
+          errorMsg = "Permiso de camara denegado. Active la camara en el navegador (icono de candado) y recargue la pagina.";
         } else if (msg.includes("notfound") || msg.includes("notfounderror")) {
           errorMsg = "No se encontro ninguna camara. Verifique que este conectada.";
         } else if (msg.includes("notreadable") || msg.includes("aborterror")) {
           errorMsg = "La camara esta siendo usada por otra aplicacion.";
         } else if (msg.includes("notsecure") || msg.includes("secure context")) {
-          errorMsg = "La camara requiere conexion segura (HTTPS).";
+          errorMsg = "La camara requiere conexion segura (HTTPS). Use https://myecommerce.ve.";
         } else {
           errorMsg = `Error al iniciar el escaner: ${err?.message || "Error desconocido"}.`;
         }
@@ -77,21 +99,8 @@ export function useScanner({ products, onProductFound, onCodeDetected }: UseScan
         console.error("Scanner error:", err);
       }
     },
-    [handleScannedCode],
+    [handleScannedCode, stopScanner],
   );
-
-  const stopScanner = useCallback(async () => {
-    try {
-      if (scannerRef.current) {
-        const state = scannerRef.current.getState();
-        if (state === 2) await scannerRef.current.stop();
-        scannerRef.current.clear();
-        scannerRef.current = null;
-      }
-    } catch (e) { console.error("Error stopping scanner:", e); }
-    setShowScanner(false);
-    setScannerError("");
-  }, []);
 
   return {
     showScanner, scannerMode, scannerLoading, scannerError,

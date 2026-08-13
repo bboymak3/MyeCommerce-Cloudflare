@@ -7,9 +7,6 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
     const type = searchParams.get('type') || '';
-    const paginated = searchParams.get('paginated') === 'true';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '100');
 
     const where: any = { isActive: true };
     if (search) {
@@ -23,27 +20,12 @@ export async function GET(req: NextRequest) {
     }
     if (type) where.type = type;
 
-    if (!paginated) {
-      const clients = await db.client.findMany({
-        where,
-        orderBy: [{ isFinalClient: 'desc' }, { fullName: 'asc' }],
-        take: 100,
-      });
-      return NextResponse.json(clients);
-    }
-
-    const skip = (page - 1) * limit;
-    const [clients, total] = await Promise.all([
-      db.client.findMany({
-        where,
-        orderBy: [{ isFinalClient: 'desc' }, { fullName: 'asc' }],
-        skip,
-        take: limit,
-      }),
-      db.client.count({ where }),
-    ]);
-
-    return NextResponse.json({ clients, total, page, limit, totalPages: Math.ceil(total / limit) });
+    const clients = await db.client.findMany({
+      where,
+      orderBy: [{ isFinalClient: 'desc' }, { fullName: 'asc' }],
+      take: 100,
+    });
+    return NextResponse.json(clients);
   } catch (error) {
     return NextResponse.json({ error: 'Error al obtener clientes' }, { status: 500 });
   }

@@ -91,6 +91,7 @@ export default function PosTab(props: PosTabProps) {
   const [showQrModal, setShowQrModal] = useState(false);
   const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
   const [localUrl, setLocalUrl] = useState("");
+  const [secureUrl, setSecureUrl] = useState("");
 
   // Refs
   const isSubmittingRef = useRef(false);
@@ -111,7 +112,7 @@ export default function PosTab(props: PosTabProps) {
 
   // Fetch local IP for QR
   useEffect(() => {
-    authFetch("/api/local-ip", {}).then((r) => r.json()).then((d) => setLocalUrl(d.url || "")).catch(() => setLocalUrl(""));
+    authFetch("/api/local-ip", {}).then((r) => r.json()).then((d) => { setLocalUrl(d.url || ""); setSecureUrl(d.secureUrl || ""); }).catch(() => { setLocalUrl(""); setSecureUrl(""); });
   }, []);
 
   // Auto-focus cash input on payment method change
@@ -447,6 +448,7 @@ export default function PosTab(props: PosTabProps) {
         open={showQrModal}
         onOpenChange={setShowQrModal}
         localUrl={localUrl}
+        secureUrl={secureUrl}
       />
 
       {/* Confirmacion al vaciar carrito */}

@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
+import { headers } from 'next/headers';
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,6 +11,8 @@ export async function GET(req: NextRequest) {
     const format = searchParams.get('format') || 'html'; // html or pdf
     const template = searchParams.get('template') || 'modern'; // modern, elegant, minimal, dark, magazine, neon, classic, gradient
     const accentColor = searchParams.get('color') || ''; // custom hex color override
+    const hideUnavailable = searchParams.get('hideUnavailable') === 'true';
+    const categoriesParam = searchParams.get('categories') || ''; // comma-separated for multi-category
 
     // Cargar configuracion de la tienda
     const settings = await db.settings.findFirst();
@@ -22,6 +25,28 @@ export async function GET(req: NextRequest) {
     const storeLogo = settings?.storeLogo || '';
     const theme = settings?.theme || 'blue';
 
+    // Detectar origin para URLs absolutas de imagenes (funciona en nueva ventana y PDF)
+    let baseUrl = '';
+    try {
+      const headersList = headers();
+      const referer = headersList.get('referer') || headersList.get('host') || '';
+      if (referer.includes('://')) {
+        const url = new URL(referer);
+        baseUrl = url.origin;
+      } else if (referer) {
+        baseUrl = req.nextUrl.protocol + '//' + referer;
+      } else {
+        baseUrl = req.nextUrl.protocol + '//' + req.nextUrl.host;
+      }
+    } catch { baseUrl = ''; }
+
+    // Funcion para convertir URLs relativas de imagenes a absolutas
+    const toAbsoluteUrl = (imgUrl: string) => {
+      if (!imgUrl) return imgUrl;
+      if (imgUrl.startsWith('http://') || imgUrl.startsWith('https://') || imgUrl.startsWith('data:')) return imgUrl;
+      return baseUrl + imgUrl;
+    };
+
     // Generar QR para WhatsApp
     const waMessage = encodeURIComponent(`Hola ${storeName}! Me gustaria informacion sobre sus productos.`);
     const waNumber = storePhone.replace(/[^0-9]/g, '');
@@ -33,11 +58,18 @@ export async function GET(req: NextRequest) {
 
     // Cargar productos activos
     const whereClause: any = { active: true };
-    if (category !== 'all') {
+    if (categoriesParam) {
+      const catIds = categoriesParam.split(',').filter(Boolean);
+      if (catIds.length > 0) whereClause.categoryId = { in: catIds };
+    } else if (category !== 'all') {
       whereClause.categoryId = category;
     }
     if (brand !== 'all') {
       whereClause.brandId = brand;
+    }
+    if (hideUnavailable) {
+      whereClause.stock = { gt: 0 };
+      whereClause.noStock = false;
     }
 
     const products = await db.product.findMany({
@@ -119,7 +151,7 @@ export async function GET(req: NextRequest) {
               <div style="background:${cardBg};border-radius:12px;border:1px solid ${isDark ? '#334155' : '#e2e8f0'};overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;">
                 ${p.image ? `
                   <div style="width:100%;height:140px;overflow:hidden;background:${isDark ? '#334155' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;">
-                    <img src="${p.image}" alt="${p.name}" style="max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:40px;\\'>${p.icon || '📦'}</span>'" />
+                    <img src="${toAbsoluteUrl(p.image)}" alt="${p.name}" style="max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:40px;\\'>${p.icon || '📦'}</span>'" />
                   </div>
                 ` : `
                   <div style="width:100%;height:100px;background:${isDark ? '#1e293b' : '#f8fafc'};display:flex;align-items:center;justify-content:center;">
@@ -184,7 +216,7 @@ export async function GET(req: NextRequest) {
   <div class="catalog-container">
     <!-- PORTADA -->
     <div class="cover">
-      ${storeLogo ? `<div class="cover-logo"><img src="${storeLogo.startsWith('http') || storeLogo.startsWith('/uploads') || storeLogo.startsWith('data:') ? storeLogo : '/uploads/products/' + storeLogo}" alt="${storeName}" onerror="this.parentElement.innerHTML='<span style=\\'font-size:36px;\\'>🏪</span>'" /></div>` : `<div class="cover-logo"><span style="font-size:36px;">🏪</span></div>`}
+      ${storeLogo ? `<div class="cover-logo"><img src="${toAbsoluteUrl(storeLogo)}" alt="${storeName}" onerror="this.parentElement.innerHTML='<span style=\\'font-size:36px;\\'>🏪</span>'" /></div>` : `<div class="cover-logo"><span style="font-size:36px;">🏪</span></div>`}
       <h1 class="store-name">${storeName}</h1>
       <div class="store-info">
         ${storeAddress ? `<span>📍 ${storeAddress}</span>` : ''}

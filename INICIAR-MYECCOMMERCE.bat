@@ -35,16 +35,11 @@ if not exist "node_modules\next" (
     exit /b 1
 )
 
-if not exist "prisma\dev.db" (
-    echo [WARN] Base de datos no encontrada. Creando...
-    call npx prisma db push
-    if %ERRORLEVEL% NEQ 0 (
-        echo [ERROR] No se pudo crear la base de datos.
-        echo Ejecute INSTALAR.bat para instalacion completa.
-        echo.
-        pause
-        exit /b 1
-    )
+echo [INFO] Sincronizando base de datos con el esquema...
+call npx prisma db push --skip-generate >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo [WARN] Error al sincronizar BD. Reintentando...
+    call npx prisma db push --skip-generate
 )
 
 echo Regenerando cliente Prisma...

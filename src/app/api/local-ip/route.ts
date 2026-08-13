@@ -7,17 +7,18 @@ import os from "os";
  * Returns the LAN IP of this machine so the POS can build a QR code
  * that lets a phone open the POS on the same Wi-Fi network.
  *
+ * Also returns the HTTPS domain URL (https://myecommerce.ve) which is
+ * required for camera/barcode scanner access on mobile browsers.
+ *
  * The response shape is:
  *   {
- *     url: "http://192.168.x.x:3000",
- *     ip:   "192.168.x.x",
- *     port: 3000,
- *     hostname: "...",
- *     networkInterfaces: { ... }
+ *     url:       "http://192.168.x.x:3000",
+ *     secureUrl: "https://myecommerce.ve",
+ *     ip:        "192.168.x.x",
+ *     port:      3000,
+ *     hostname:  "...",
+ *     domain:    "myecommerce.ve"
  *   }
- *
- * The route is intentionally permissive: any non-loopback IPv4 address
- * is accepted, with a preference for 192.168.x.x then 10.x then 172.16-31.x.
  */
 export async function GET() {
   const port = Number(process.env.PORT) || 3000;
@@ -48,13 +49,15 @@ export async function GET() {
   bestIp = candidates[0] || "127.0.0.1";
 
   const url = `http://${bestIp}:${port}`;
+  const domain = "myecommerce.ve";
+  const secureUrl = `https://${domain}`;
 
   return NextResponse.json({
     url,
-    secureUrl: "https://myecommerce.ve",
+    secureUrl,
     ip: bestIp,
     port,
     hostname: os.hostname(),
-    networkInterfaces: ifaces,
+    domain,
   });
 }

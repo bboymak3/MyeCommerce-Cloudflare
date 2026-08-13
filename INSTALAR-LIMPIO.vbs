@@ -1,5 +1,5 @@
 ' ==========================================================
-' MyeCommerce POS v2.9.16.5 - Instalador con Progreso Visible
+' MyeCommerce POS v2.9.45 - Instalador con Progreso Visible
 '
 ' Ejecutar como Administrador.
 ' Ventana de progreso se mantiene abierta durante toda la instalacion.
@@ -16,33 +16,44 @@ htaSrc = strDir & "\PROGRESS.hta"
 htaPath = WshShell.ExpandEnvironmentStrings("%TEMP%") & "\mepos_progress.hta"
 
 Sub LogWrite(msg)
+    On Error Resume Next
     Set f = objFSO.OpenTextFile(logFile, 8, True)
     f.WriteLine Now() & " | " & msg
     f.Close
+    On Error GoTo 0
 End Sub
 
 Sub WriteStatus(stepN, totalN, msg, detail, pct, doneFlag, errMsg)
+    On Error Resume Next
     Set f = objFSO.CreateTextFile(statusFile, True)
     f.Write stepN & "|" & totalN & "|" & msg & "|" & detail & "|" & pct & "|" & doneFlag & "|" & errMsg
     f.Close
+    On Error GoTo 0
 End Sub
 
 Function RunHidden(cmd)
     WshShell.CurrentDirectory = strDir
     tmpOut = strDir & "\__cmd_out.tmp"
+    On Error Resume Next
+    objFSO.DeleteFile tmpOut
+    On Error GoTo 0
     cmdFull = "cmd /c " & cmd & " > " & Chr(34) & tmpOut & Chr(34) & " 2>&1"
     ret = WshShell.Run(cmdFull, 0, True)
     RunHidden = ret
+    On Error Resume Next
     If objFSO.FileExists(tmpOut) Then
         Set f = objFSO.OpenTextFile(tmpOut, 1)
-        output = f.ReadAll
+        If Not f.AtEndOfStream Then
+            output = f.ReadAll
+        Else
+            output = ""
+        End If
         f.Close
-        On Error Resume Next
         objFSO.DeleteFile tmpOut
-        On Error GoTo 0
         If Len(output) > 500 Then output = "..." & Right(output, 500)
         If Len(output) > 0 Then LogWrite "  >> " & Replace(output, vbCrLf, " | ")
     End If
+    On Error GoTo 0
 End Function
 
 On Error Resume Next
@@ -54,7 +65,7 @@ End If
 On Error GoTo 0
 
 Dim bienvenida
-bienvenida = "MyeCommerce POS v2.9.16.5" & vbCrLf & vbCrLf & _
+bienvenida = "MyeCommerce POS v2.9.45" & vbCrLf & vbCrLf & _
   "Sistema Punto de Venta - Venezuela" & vbCrLf & _
   "Doble Moneda USD/Bs con tasa BCV" & vbCrLf & _
   "Impresion Termica ESC/POS (agente v3.1 winspool)" & vbCrLf & _
@@ -74,7 +85,7 @@ If resultado <> vbYes Then WScript.Quit
 On Error Resume Next
 objFSO.DeleteFile logFile
 On Error GoTo 0
-LogWrite "=== INSTALACION LIMPIA v2.9.16.5 ==="
+LogWrite "=== INSTALACION LIMPIA v2.9.45 ==="
 LogWrite "Carpeta: " & strDir
 
 WriteStatus 1, 8, "Verificando permisos...", "", 0, "", ""
@@ -112,7 +123,6 @@ objFSO.DeleteFile strDir & "\prisma\dev.db"
 objFSO.DeleteFile strDir & "\prisma\dev.db-journal"
 objFSO.DeleteFile strDir & "\prisma\dev.db-wal"
 objFSO.DeleteFile strDir & "\prisma\dev.db-shm"
-
 Call RunHidden("if exist printer-agent\spool rmdir /s /q printer-agent\spool")
 On Error GoTo 0
 LogWrite "  OK: Limpieza completada"
@@ -163,7 +173,7 @@ If ret <> 0 Then
     WScript.Quit
 End If
 LogWrite "  OK: Dependencias instaladas"
-WriteStatus 5, 8, "Dependencias instaladas", "166 paquetes OK", 62, "", ""
+WriteStatus 5, 8, "Dependencias instaladas", "Paquetes OK", 62, "", ""
 
 WriteStatus 6, 8, "Configurando base de datos Prisma...", "Generando cliente + creando DB...", 62, "", ""
 LogWrite "PASO 6: Prisma..."
@@ -198,7 +208,6 @@ If Not objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
     If Not objFSO.FolderExists(strDir & "\caddy") Then
         objFSO.CreateFolder strDir & "\caddy"
     End If
-
     caddyUrl = "https://caddyserver.com/api/download?os=windows&arch=amd64"
     caddyDest = strDir & "\caddy\caddy.exe"
     psCmd = "powershell -NoProfile -Command " & Chr(34) & "Invoke-WebRequest -Uri " & Chr(39) & caddyUrl & Chr(39) & " -OutFile " & Chr(39) & caddyDest & Chr(39) & " -UseBasicParsing" & Chr(34)
@@ -247,7 +256,7 @@ strDesktop = WshShell.SpecialFolders("Desktop")
 Set oLink = WshShell.CreateShortcut(strDesktop & "\MyeCommerce POS.lnk")
 oLink.TargetPath = strDir & "\INICIAR-TODO-OCULTO.vbs"
 oLink.WorkingDirectory = strDir
-oLink.Description = "MyeCommerce POS v2.9.16.5"
+oLink.Description = "MyeCommerce POS v2.9.45"
 oLink.IconLocation = "shell32.dll,14"
 oLink.Save
 On Error GoTo 0
@@ -273,4 +282,4 @@ finale = "INSTALACION COMPLETADA" & vbCrLf & vbCrLf & _
   "  DETENER-TODO.bat           - Detener servicios" & vbCrLf & _
   "  install-log.txt            - Log de esta instalacion"
 
-MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.16.5 - Listo"
+MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.45 - Listo"

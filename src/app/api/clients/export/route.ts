@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     const includeInactive = searchParams.get('includeInactive') === 'true';
 
     const whereClause: any = {};
-    if (!includeInactive) whereClause.active = true;
+    if (!includeInactive) whereClause.isActive = true;
 
     const clients = await db.client.findMany({
       where: whereClause,

@@ -8,8 +8,9 @@ export async function GET() {
       orderBy: { name: 'asc' },
     });
     return NextResponse.json(categories);
-  } catch (error) {
-    return NextResponse.json({ error: 'Error al obtener categorías' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Categories GET error:', error.message || error);
+    return NextResponse.json({ error: 'Error al obtener categorias: ' + (error.message || '') }, { status: 500 });
   }
 }
 
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     if (!body.name || !body.name.trim()) {
-      return NextResponse.json({ error: 'Nombre de la categoría es requerido' }, { status: 400 });
+      return NextResponse.json({ error: 'Nombre de la categoria es requerido' }, { status: 400 });
     }
     // Case-insensitive: evitar duplicados ignorando mayusculas/minusculas
     // SQLite no soporta ILIKE, usamos findMany + filter en JS
@@ -30,14 +31,19 @@ export async function POST(req: NextRequest) {
     }
     const category = await db.category.create({
       data: { name: body.name.trim(), icon: body.icon || '', color: body.color || '#6366f1' },
-      include: { _count: { select: { products: true } } },
     });
-    return NextResponse.json(category, { status: 201 });
+    const catWithCount = await db.category.findUnique({ where: { id: category.id }, include: { _count: { select: { products: true } } } });
+    return NextResponse.json(catWithCount, { status: 201 });
   } catch (error: any) {
+    console.error('Categories POST error:', error.message || error);
     if (error?.code === 'P2002') {
-      return NextResponse.json({ error: 'Categoría ya existe' }, { status: 409 });
+      return NextResponse.json({ error: 'Categoria ya existe' }, { status: 409 });
     }
-    return NextResponse.json({ error: 'Error al crear categoría' }, { status: 500 });
+    const msg = error?.message || '';
+    if (msg.includes('no such table') || msg.includes('Unknown table') || msg.includes('does not exist')) {
+      return NextResponse.json({ error: 'Tabla de categorias no existe. Ejecute: npm run setup' }, { status: 500 });
+    }
+    return NextResponse.json({ error: 'Error al crear categoria: ' + msg }, { status: 500 });
   }
 }
 
@@ -48,7 +54,8 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
     await db.category.delete({ where: { id } });
     return NextResponse.json({ success: true });
-  } catch (error) {
-    return NextResponse.json({ error: 'Error al eliminar categoría' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Categories DELETE error:', error.message || error);
+    return NextResponse.json({ error: 'Error al eliminar categoria' }, { status: 500 });
   }
 }

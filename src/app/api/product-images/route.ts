@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400',
-        'Content-Security-Policy': "default-src 'self'",
       },
     });
   } catch (error) {

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -24,6 +23,13 @@ interface Category {
   id: string;
   name: string;
   icon?: string;
+  color?: string;
+  _count?: { products: number };
+}
+
+interface Brand {
+  id: string;
+  name: string;
   _count?: { products: number };
 }
 
@@ -31,9 +37,12 @@ export default function CatalogTab({
   bcvRate, currency, storeName, storeAddress, storePhone, storeRif, storeLogo, theme,
 }: CatalogTabProps) {
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedBrand, setSelectedBrand] = useState("all");
   const [selectedTemplate, setSelectedTemplate] = useState("modern");
   const [selectedColor, setSelectedColor] = useState("");
+  const [hideUnavailable, setHideUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
 
@@ -54,32 +63,51 @@ export default function CatalogTab({
     { id: "#d97706", label: "Dorado", color: "#d97706" },
   ];
 
-  const loadCategories = useCallback(async () => {
+  const loadData = useCallback(async () => {
     try {
-      const res = await authFetch("/api/categories");
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) setCategories(data);
-      }
+      const [catRes, brandRes] = await Promise.all([
+        authFetch("/api/categories"),
+        authFetch("/api/brands"),
+      ]);
+      if (catRes.ok) { const d = await catRes.json(); if (Array.isArray(d)) setCategories(d); }
+      if (brandRes.ok) { const d = await brandRes.json(); if (Array.isArray(d)) setBrands(d); }
     } catch { /* silently ignore */ }
   }, []);
 
-  useEffect(() => { loadCategories(); }, [loadCategories]);
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const toggleCategory = (id: string) => {
+    setSelectedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 5) next.add(id); // Max 5 categories
+      else toast.warning("Maximo 5 categorias seleccionadas");
+      return next;
+    });
+  };
+
+  const clearCategories = () => setSelectedCategories(new Set());
+
+  const buildParams = () => {
+    const params = new URLSearchParams();
+    if (selectedCategories.size > 0) {
+      params.set("categories", Array.from(selectedCategories).join(","));
+    }
+    if (selectedBrand !== "all") params.set("brand", selectedBrand);
+    if (selectedTemplate) params.set("template", selectedTemplate);
+    if (selectedColor) params.set("color", selectedColor);
+    if (hideUnavailable) params.set("hideUnavailable", "true");
+    return params;
+  };
 
   const generateCatalog = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (selectedCategory !== "all") params.set("category", selectedCategory);
-      if (selectedTemplate) params.set("template", selectedTemplate);
-      if (selectedColor) params.set("color", selectedColor);
-
+      const params = buildParams();
       const res = await authFetch(`/api/catalog?${params.toString()}`);
       if (!res.ok) throw new Error("Error al generar");
 
       const html = await res.text();
-
-      // Abrir en nueva ventana
       const blob = new Blob([html], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
@@ -95,12 +123,8 @@ export default function CatalogTab({
   const downloadCatalog = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (selectedCategory !== "all") params.set("category", selectedCategory);
-      if (selectedTemplate) params.set("template", selectedTemplate);
-      if (selectedColor) params.set("color", selectedColor);
+      const params = buildParams();
       params.set("format", "html");
-
       const res = await authFetch(`/api/catalog?${params.toString()}`);
       if (!res.ok) throw new Error("Error al descargar");
 
@@ -122,11 +146,7 @@ export default function CatalogTab({
   const downloadCatalogHTML = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (selectedCategory !== "all") params.set("category", selectedCategory);
-      if (selectedTemplate) params.set("template", selectedTemplate);
-      if (selectedColor) params.set("color", selectedColor);
-
+      const params = buildParams();
       const res = await authFetch(`/api/catalog?${params.toString()}`);
       if (!res.ok) throw new Error("Error al descargar");
 
@@ -184,14 +204,23 @@ export default function CatalogTab({
             </div>
           </div>
 
-          {/* Category filter */}
+          {/* Multi-category filter */}
           <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground">Filtrar por categoria (opcional)</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">
+                Filtrar por categorias (puedes seleccionar hasta 5)
+              </label>
+              {selectedCategories.size > 0 && (
+                <button onClick={clearCategories} className="text-[10px] text-destructive hover:underline">
+                  Limpiar ({selectedCategories.size} seleccionada{selectedCategories.size > 1 ? 's' : ''})
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-1.5">
               <button
-                onClick={() => setSelectedCategory("all")}
+                onClick={clearCategories}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                  selectedCategory === "all"
+                  selectedCategories.size === 0
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-card border-muted hover:bg-accent"
                 }`}
@@ -201,9 +230,9 @@ export default function CatalogTab({
               {categories.map(cat => (
                 <button
                   key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
+                  onClick={() => toggleCategory(cat.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                    selectedCategory === cat.id
+                    selectedCategories.has(cat.id)
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-card border-muted hover:bg-accent"
                   }`}
@@ -215,6 +244,53 @@ export default function CatalogTab({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Brand filter */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Filtrar por marca (opcional)</label>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                onClick={() => setSelectedBrand("all")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  selectedBrand === "all"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-muted hover:bg-accent"
+                }`}
+              >
+                Todas las marcas
+              </button>
+              {brands.map(b => (
+                <button
+                  key={b.id}
+                  onClick={() => setSelectedBrand(b.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                    selectedBrand === b.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card border-muted hover:bg-accent"
+                  }`}
+                >
+                  {b.name}
+                  {b._count?.products ? (
+                    <Badge variant="secondary" className="ml-1 text-[8px] px-1 py-0">{b._count.products}</Badge>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Hide unavailable toggle */}
+          <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div>
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Ocultar productos sin disponibilidad</p>
+              <p className="text-[10px] text-amber-600 dark:text-amber-400">No se mostraran productos agotados o con stock en 0</p>
+            </div>
+            <button
+              onClick={() => setHideUnavailable(!hideUnavailable)}
+              className={`relative w-11 h-6 rounded-full transition-colors ${hideUnavailable ? 'bg-amber-500' : 'bg-gray-300'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow-sm ${hideUnavailable ? 'translate-x-5' : ''}`} />
+            </button>
           </div>
 
           <Separator />
@@ -304,7 +380,9 @@ export default function CatalogTab({
           <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
             <li>Agrega imagenes reales a tus productos desde el modulo Productos</li>
             <li>Completa la direccion y telefono en Configuracion para la portada</li>
-            <li>Organiza tus productos en categorias para mejor presentacion</li>
+            <li>Selecciona multiples categorias para catalogos por seccion</li>
+            <li>Filtra por marca para crear catalogos especificos de una marca</li>
+            <li>Activa &quot;Ocultar sin disponibilidad&quot; para no mostrar productos agotados</li>
             <li>El catalogo se abre en el navegador y tambien se puede imprimir (Ctrl+P)</li>
             <li>El archivo HTML descargado se puede compartir por WhatsApp o email</li>
           </ul>
