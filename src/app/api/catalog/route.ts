@@ -13,6 +13,14 @@ export async function GET(req: NextRequest) {
     const accentColor = searchParams.get('color') || ''; // custom hex color override
     const hideUnavailable = searchParams.get('hideUnavailable') === 'true';
     const categoriesParam = searchParams.get('categories') || ''; // comma-separated for multi-category
+    const hidePriceUsd = searchParams.get('hidePriceUsd') === 'true';
+    const hidePriceBs = searchParams.get('hidePriceBs') === 'true';
+    const selectedFont = searchParams.get('font') || 'Inter';
+    const viewMode = searchParams.get('view') || 'grid'; // grid, list, compact, large
+    const cardSize = searchParams.get('cardSize') || 'medium'; // small, medium, large
+    const hideDescription = searchParams.get('hideDescription') === 'true';
+    const hideStock = searchParams.get('hideStock') === 'true';
+    const hideBrand = searchParams.get('hideBrand') === 'true';
 
     // Cargar configuracion de la tienda
     const settings = await db.settings.findFirst();
@@ -146,28 +154,28 @@ export async function GET(req: NextRequest) {
             <h2 style="font-size:18px;font-weight:700;color:${catColor};margin:0;">${catName}</h2>
             <span style="font-size:11px;color:${subTextColor};margin-left:auto;">${catProducts.length} productos</span>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;">
+          <div style="display:${viewMode === 'list' ? 'flex' : 'grid'};${viewMode !== 'list' ? `grid-template-columns:repeat(auto-fill,minmax(${cardSize === 'small' ? '150px' : cardSize === 'large' ? '260px' : '200px'},1fr));` : ''}gap:${viewMode === 'list' ? '12px' : '12px'};${viewMode === 'list' ? 'flex-direction:column;' : ''}">
             ${catProducts.map(p => `
-              <div style="background:${cardBg};border-radius:12px;border:1px solid ${isDark ? '#334155' : '#e2e8f0'};overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;">
+              <div style="background:${cardBg};border-radius:12px;border:1px solid ${isDark ? '#334155' : '#e2e8f0'};overflow:hidden;transition:transform 0.2s,box-shadow 0.2s;${viewMode === 'list' ? 'display:flex;gap:16px;padding:16px;align-items:center;' : ''}">
                 ${p.image ? `
-                  <div style="width:100%;height:140px;overflow:hidden;background:${isDark ? '#334155' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;">
+                  <div style="${viewMode === 'list' ? 'width:100px;height:100px;min-width:100px;' : 'width:100%;height:' + (cardSize === 'small' ? '100px' : cardSize === 'large' ? '200px' : '140px') + ';'}overflow:hidden;background:${isDark ? '#334155' : '#f1f5f9'};display:flex;align-items:center;justify-content:center;${viewMode === 'list' ? 'border-radius:10px;' : ''}">
                     <img src="${toAbsoluteUrl(p.image)}" alt="${p.name}" style="max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;" onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\\'font-size:40px;\\'>${p.icon || '📦'}</span>'" />
                   </div>
                 ` : `
-                  <div style="width:100%;height:100px;background:${isDark ? '#1e293b' : '#f8fafc'};display:flex;align-items:center;justify-content:center;">
+                  <div style="${viewMode === 'list' ? 'width:80px;height:80px;min-width:80px;border-radius:10px;' : 'width:100%;height:' + (cardSize === 'small' ? '70px' : cardSize === 'large' ? '120px' : '100px') + ';'}background:${isDark ? '#1e293b' : '#f8fafc'};display:flex;align-items:center;justify-content:center;">
                     <span style="font-size:40px;">${p.icon || '📦'}</span>
                   </div>
                 `}
                 <div style="padding:10px 12px;">
                   <p style="font-size:12px;font-weight:600;color:${textColor};margin:0 0 4px 0;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</p>
-                  ${p.brand ? `<span style="display:inline-block;font-size:9px;padding:1px 6px;border-radius:10px;background:${colors.primary}12;color:${colors.primary};font-weight:600;margin-bottom:4px;">${p.brand.name}</span>` : ''}
-                  ${p.description ? `<p style="font-size:10px;color:${subTextColor};margin:0 0 6px 0;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${p.description}</p>` : ''}
+                  ${!hideBrand && p.brand ? `<span style="display:inline-block;font-size:9px;padding:1px 6px;border-radius:10px;background:${colors.primary}12;color:${colors.primary};font-weight:600;margin-bottom:4px;">${p.brand.name}</span>` : ''}
+                  ${!hideDescription && p.description ? `<p style="font-size:10px;color:${subTextColor};margin:0 0 6px 0;line-height:1.2;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${p.description}</p>` : ''}
                   <div style="display:flex;justify-content:space-between;align-items:center;">
                     <div>
-                      <p style="font-size:16px;font-weight:800;color:${colors.primary};margin:0;">${currency} ${p.price.toFixed(2)}${p.vendePorPeso && p.unidadPeso ? '/' + p.unidadPeso : ''}</p>
-                      <p style="font-size:10px;color:${subTextColor};margin:2px 0 0 0;">Bs ${(p.price * bcvRate).toFixed(2)}</p>
+                      ${!hidePriceUsd ? `<p style="font-size:16px;font-weight:800;color:${colors.primary};margin:0;">${currency} ${p.price.toFixed(2)}${p.vendePorPeso && p.unidadPeso ? '/' + p.unidadPeso : ''}</p>` : ''}
+                      ${!hidePriceBs ? `<p style="font-size:10px;color:${subTextColor};margin:2px 0 0 0;">Bs ${(p.price * bcvRate).toFixed(2)}</p>` : ''}
                     </div>
-                    ${!p.noStock && p.stock > 0 ? `<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:${p.stock <= (p.minStock || 5) ? '#fef3c7' : '#dcfce7'};color:${p.stock <= (p.minStock || 5) ? '#92400e' : '#166534'};font-weight:600;">${p.stock} disp.</span>` : `<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;font-weight:600;">Agotado</span>`}
+                    ${!hideStock ? (!p.noStock && p.stock > 0 ? `<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:${p.stock <= (p.minStock || 5) ? '#fef3c7' : '#dcfce7'};color:${p.stock <= (p.minStock || 5) ? '#92400e' : '#166534'};font-weight:600;">${p.stock} disp.</span>` : `<span style="font-size:9px;padding:2px 8px;border-radius:20px;background:#fee2e2;color:#991b1b;font-weight:600;">Agotado</span>`) : ''}
                   </div>
                 </div>
               </div>
@@ -184,9 +192,9 @@ export async function GET(req: NextRequest) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Catalogo - ${storeName}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@300;400;500;600;700;800;900&display=swap');
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Inter',system-ui,sans-serif; background:${pageBg}; color:${textColor}; }
+    body { font-family:'${selectedFont}',system-ui,sans-serif; background:${pageBg}; color:${textColor}; }
     .catalog-container { max-width:900px; margin:0 auto; }
     .cover { background:linear-gradient(135deg,${colors.primary},${colors.secondary}); color:white; padding:50px 40px; border-radius:0 0 30px 30px; text-align:center; position:relative; overflow:hidden; }
     .cover::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle at 30% 50%,${colors.accent}40,transparent 50%),radial-gradient(circle at 70% 80%,${colors.primary}30,transparent 40%); }
@@ -256,7 +264,7 @@ export async function GET(req: NextRequest) {
     <!-- PIE DE PAGINA -->
     <div class="footer">
       <p>${storeName} &middot; ${storeRif} &middot; Generado el ${dateStr}</p>
-      <p style="margin-top:4px;">Catalogo generado por MyeCommerce POS v2.9.39</p>
+      <p style="margin-top:4px;">Catalogo generado por MyeCommerce POS v2.9.47</p>
     </div>
   </div>
 </body>

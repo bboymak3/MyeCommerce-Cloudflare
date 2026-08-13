@@ -30,6 +30,7 @@ import { CreditConfirmDialog } from "./pos/dialogs/credit-confirm-dialog";
 import { StockWarningDialog } from "./pos/dialogs/stock-warning-dialog";
 import { QrAccessDialog } from "./pos/dialogs/qr-access-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function PosTab(props: PosTabProps) {
   const {

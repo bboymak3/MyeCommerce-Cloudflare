@@ -45,12 +45,24 @@ export default function CatalogTab({
   const [hideUnavailable, setHideUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [showPriceUsd, setShowPriceUsd] = useState(true);
+  const [showPriceBs, setShowPriceBs] = useState(true);
+  const [selectedFont, setSelectedFont] = useState("Inter");
+  const [selectedView, setSelectedView] = useState("grid");
+  const [cardSize, setCardSize] = useState("medium");
+  const [showDescription, setShowDescription] = useState(true);
+  const [showStock, setShowStock] = useState(true);
+  const [showBrand, setShowBrand] = useState(true);
 
   const templates = [
     { id: "modern", label: "Moderno", desc: "Gradientes y sombras", color: "#2563eb" },
     { id: "elegant", label: "Elegante", desc: "Tono purpura sofisticado", color: "#7c3aed" },
     { id: "minimal", label: "Minimalista", desc: "Limpio y simple", color: "#0d9488" },
     { id: "dark", label: "Oscuro", desc: "Modo oscuro premium", color: "#1e293b" },
+    { id: "neon", label: "Neon", desc: "Colores vibrantes", color: "#22c55e" },
+    { id: "classic", label: "Clasico", desc: "Estilo tradicional", color: "#ea580c" },
+    { id: "magazine", label: "Revista", desc: "Estilo editorial", color: "#db2777" },
+    { id: "gradient", label: "Degrade", desc: "Gradiente multiple", color: "#6366f1" },
   ];
   const colorPresets = [
     { id: "", label: "Auto", color: "#6366f1" },
@@ -61,6 +73,31 @@ export default function CatalogTab({
     { id: "#ea580c", label: "Naranja", color: "#ea580c" },
     { id: "#db2777", label: "Rosa", color: "#db2777" },
     { id: "#d97706", label: "Dorado", color: "#d97706" },
+    { id: "#0891b2", label: "Cyan", color: "#0891b2" },
+    { id: "#4f46e5", label: "Indigo", color: "#4f46e5" },
+    { id: "#be185d", label: "Fucsia", color: "#be185d" },
+    { id: "#15803d", label: "Esmeralda", color: "#15803d" },
+  ];
+  const fontOptions = [
+    { id: "Inter", label: "Inter", desc: "Moderna y legible" },
+    { id: "Roboto", label: "Roboto", desc: "Google standard" },
+    { id: "Poppins", label: "Poppins", desc: "Redondeada y amigable" },
+    { id: "Montserrat", label: "Montserrat", desc: "Elegante y profesional" },
+    { id: "Open Sans", label: "Open Sans", desc: "Limpia y neutral" },
+    { id: "Lato", label: "Lato", desc: "Suave y clara" },
+    { id: "Playfair Display", label: "Playfair", desc: "Serif sofisticada" },
+    { id: "Oswald", label: "Oswald", desc: "Compacta y bold" },
+  ];
+  const viewOptions = [
+    { id: "grid", label: "Cuadricula", icon: "▦" },
+    { id: "list", label: "Lista", icon: "☰" },
+    { id: "compact", label: "Compacto", icon: "▫" },
+    { id: "large", label: "Tarjetas grandes", icon: "▥" },
+  ];
+  const cardSizeOptions = [
+    { id: "small", label: "Peque\u00f1as" },
+    { id: "medium", label: "Medianas" },
+    { id: "large", label: "Grandes" },
   ];
 
   const loadData = useCallback(async () => {
@@ -97,6 +134,14 @@ export default function CatalogTab({
     if (selectedTemplate) params.set("template", selectedTemplate);
     if (selectedColor) params.set("color", selectedColor);
     if (hideUnavailable) params.set("hideUnavailable", "true");
+    if (!showPriceUsd) params.set("hidePriceUsd", "true");
+    if (!showPriceBs) params.set("hidePriceBs", "true");
+    if (selectedFont) params.set("font", selectedFont);
+    if (selectedView) params.set("view", selectedView);
+    if (cardSize) params.set("cardSize", cardSize);
+    if (!showDescription) params.set("hideDescription", "true");
+    if (!showStock) params.set("hideStock", "true");
+    if (!showBrand) params.set("hideBrand", "true");
     return params;
   };
 
@@ -279,6 +324,37 @@ export default function CatalogTab({
             </div>
           </div>
 
+          {/* Price toggles */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Mostrar precios</label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div>
+                  <p className="text-xs font-semibold text-green-800 dark:text-green-300">Precio en {currency}</p>
+                  <p className="text-[10px] text-green-600 dark:text-green-400">Dolares</p>
+                </div>
+                <button
+                  onClick={() => setShowPriceUsd(!showPriceUsd)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${showPriceUsd ? 'bg-green-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow-sm ${showPriceUsd ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div>
+                  <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Precio en Bs</p>
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400">Bolivares</p>
+                </div>
+                <button
+                  onClick={() => setShowPriceBs(!showPriceBs)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${showPriceBs ? 'bg-blue-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow-sm ${showPriceBs ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Hide unavailable toggle */}
           <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
             <div>
@@ -291,6 +367,81 @@ export default function CatalogTab({
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow-sm ${hideUnavailable ? 'translate-x-5' : ''}`} />
             </button>
+          </div>
+
+          {/* Content toggles */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Contenido de las tarjetas</label>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                <p className="text-[10px] font-medium">Descripcion</p>
+                <button
+                  onClick={() => setShowDescription(!showDescription)}
+                  className={`relative w-9 h-5 rounded-full transition-colors ${showDescription ? 'bg-primary' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${showDescription ? 'translate-x-4' : ''}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                <p className="text-[10px] font-medium">Stock</p>
+                <button
+                  onClick={() => setShowStock(!showStock)}
+                  className={`relative w-9 h-5 rounded-full transition-colors ${showStock ? 'bg-primary' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${showStock ? 'translate-x-4' : ''}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                <p className="text-[10px] font-medium">Marca</p>
+                <button
+                  onClick={() => setShowBrand(!showBrand)}
+                  className={`relative w-9 h-5 rounded-full transition-colors ${showBrand ? 'bg-primary' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${showBrand ? 'translate-x-4' : ''}`} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* View mode */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Tipo de vista</label>
+            <div className="grid grid-cols-4 gap-2">
+              {viewOptions.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => setSelectedView(v.id)}
+                  className={`p-2.5 rounded-lg border-2 text-center transition-all ${
+                    selectedView === v.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-primary/30'
+                  }`}
+                >
+                  <span className="text-lg">{v.icon}</span>
+                  <p className="text-[10px] font-medium mt-1">{v.label}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Card size */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Tamano de tarjetas</label>
+            <div className="grid grid-cols-3 gap-2">
+              {cardSizeOptions.map(s => (
+                <button
+                  key={s.id}
+                  onClick={() => setCardSize(s.id)}
+                  className={`p-2.5 rounded-lg border-2 text-center transition-all ${
+                    cardSize === s.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-primary/30'
+                  }`}
+                >
+                  <p className="text-xs font-semibold">{s.label}</p>
+                </button>
+              ))}
+            </div>
           </div>
 
           <Separator />
@@ -346,6 +497,28 @@ export default function CatalogTab({
               {selectedColor && (
                 <button onClick={() => setSelectedColor("")} className="text-[10px] text-muted-foreground hover:text-destructive">Reset</button>
               )}
+            </div>
+          </div>
+
+          {/* Font selector */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Tipo de letra</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {fontOptions.map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setSelectedFont(f.id)}
+                  className={`p-2.5 rounded-lg border-2 text-left transition-all ${
+                    selectedFont === f.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-muted hover:border-primary/30'
+                  }`}
+                  style={{ fontFamily: f.id.includes(' ') ? `'${f.id}', sans-serif` : `${f.id}, sans-serif` }}
+                >
+                  <p className="text-xs font-semibold">{f.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{f.desc}</p>
+                </button>
+              ))}
             </div>
           </div>
 
