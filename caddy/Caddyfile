@@ -16,8 +16,23 @@ myecommerce.ve {
 
 # Acceso movil via IP local (HTTPS auto-certificado)
 # Los telefonos acceden via https://IP_DEL_SERVER:8443
+# Ejemplo: https://192.168.1.105:8443
 # Al primer acceso: navegador muestra advertencia > "Avanzado" > "Continuar"
+# IMPORTANTE: NO usar https://IP:3000 (HTTP no permite camara)
 :8443 {
     tls internal
     reverse_proxy localhost:3000
+
+    # Headers necesarios para acceso movil y camara
+    header {
+        # Permitir que el navegador use la camara desde cualquier IP local
+        Cross-Origin-Embedder-Policy "require-corp"
+        Cross-Origin-Opener-Policy "same-origin"
+        # Cache para assets estaticos en movil
+        Cache-Control "public, max-age=3600"
+        X-Content-Type-Options "nosniff"
+        # Permitir WebSocket (si se necesita en el futuro)
+        Upgrade "websocket"
+        Connection "upgrade"
+    }
 }
