@@ -3,24 +3,15 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  webpack: (config, { isServer }) => {
-    // Ignorar dependencias opcionales de jspdf que no se usan
-    // html2canvas, dompurify y canvg son opcionales pero webpack
-    // intenta resolverlas y falla si no estan instaladas
+  webpack: (config) => {
+    // jspdf referencia canvas y fflate como deps opcionales internas.
+    // canvas requiere compilacion nativa (no disponible en Windows facil).
+    // fflate no se usa en nuestro flujo. Se ignora para evitar errores.
     config.resolve.alias = {
       ...config.resolve.alias,
-      'html2canvas': false,
-      'dompurify': false,
-      'canvg': false,
+      'canvas': false,
       'fflate': false,
     };
-    // Evitar que webpack intente bundle node:canvas en client
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        canvas: false,
-      };
-    }
     return config;
   },
 };
