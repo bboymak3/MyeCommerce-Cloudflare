@@ -34,6 +34,7 @@ End Sub
 Function RunHidden(cmd)
     WshShell.CurrentDirectory = strDir
     tmpOut = strDir & "\__cmd_out.tmp"
+    npmLog = strDir & "\npm-debug-output.txt"
     On Error Resume Next
     objFSO.DeleteFile tmpOut
     On Error GoTo 0
@@ -49,8 +50,14 @@ Function RunHidden(cmd)
             output = ""
         End If
         f.Close
+        ' Si el comando fallo, guardar output completo para debug
+        If ret <> 0 And Len(output) > 0 Then
+            Set dbg = objFSO.CreateTextFile(npmLog, True)
+            dbg.Write output
+            dbg.Close
+        End If
         objFSO.DeleteFile tmpOut
-        If Len(output) > 500 Then output = "..." & Right(output, 500)
+        If Len(output) > 2000 Then output = "..." & Right(output, 2000)
         If Len(output) > 0 Then LogWrite "  >> " & Replace(output, vbCrLf, " | ")
     End If
     On Error GoTo 0
@@ -163,22 +170,49 @@ LogWrite "  OK: Node.js " & Trim(nodeVer)
 WriteStatus 4, 8, "Node.js encontrado", Trim(nodeVer), 50, "", ""
 
 WriteStatus 5, 8, "Instalando dependencias npm...", "Este paso tarda 1-3 minutos...", 50, "", ""
-LogWrite "PASO 5: npm install --legacy-peer-deps..."
-ret = RunHidden("npm install --legacy-peer-deps")
+LogWrite "PASO 5: npm install --legacy-peer-deps --ignore-scripts..."
+ret = RunHidden("npm install --legacy-peer-deps --ignore-scripts")
+
+If ret <> 0 Then
+    LogWrite "  WARN: Primer intento fallo (codigo " & ret & "), reintentando..."
+    WriteStatus 5, 8, "Reintentando npm install...", "Segundo intento...", 50, "", ""
+    WScript.Sleep 2000
+    ret = RunHidden("npm install --legacy-peer-deps --ignore-scripts")
+End If
 
 If ret <> 0 Then
     LogWrite "  ERROR: npm install fallo (codigo " & ret & ")"
     WriteStatus 0, 8, "ERROR en npm install", "Revise install-log.txt para detalles", 0, "FAIL", "npm install fallo con codigo " & ret & ". Revise install-log.txt en la carpeta del sistema."
-    MsgBox "npm install fallo (codigo " & ret & ")." & vbCrLf & "Revise install-log.txt" & vbCrLf & "Carpeta: " & strDir, vbCritical, "Error"
+    MsgBox "npm install fallo (codigo " & ret & ")." & vbCrLf & "Posible solucion:" & vbCrLf & "1. Ejecute manualmente en la carpeta: npm install --legacy-peer-deps --ignore-scripts" & vbCrLf & "2. Si falla, actualice Node.js a la version 20 LTS desde nodejs.org" & vbCrLf & "3. Vuelva a ejecutar INSTALAR-LIMPIO.vbs" & vbCrLf & "Carpeta: " & strDir, vbCritical, "Error"
     WScript.Quit
 End If
 LogWrite "  OK: Dependencias instaladas"
 WriteStatus 5, 8, "Dependencias instaladas", "Paquetes OK", 62, "", ""
 
 WriteStatus 6, 8, "Configurando base de datos Prisma...", "Generando cliente + creando DB...", 62, "", ""
-LogWrite "PASO 6: Prisma..."
-Call RunHidden("npx prisma generate")
-Call RunHidden("npx prisma db push --skip-generate")
+LogWrite "PASO 6: Prisma generate..."
+ret = RunHidden("npx prisma generate")
+If ret <> 0 Then
+    LogWrite "  WARN: prisma generate fallo, reintentando..."
+    ret = RunHidden("npx prisma generate")
+    If ret <> 0 Then
+        LogWrite "  ERROR: prisma generate fallo (codigo " & ret & ")"
+        MsgBox "prisma generate fallo (codigo " & ret & ")." & vbCrLf & "Ejecute manualmente: npx prisma generate" & vbCrLf & "Carpeta: " & strDir, vbCritical, "Error"
+        WScript.Quit
+    End If
+End If
+LogWrite "  OK: Prisma generate OK"
+LogWrite "PASO 6b: prisma db push..."
+ret = RunHidden("npx prisma db push --skip-generate")
+If ret <> 0 Then
+    LogWrite "  WARN: db push fallo, reintentando..."
+    ret = RunHidden("npx prisma db push --skip-generate")
+    If ret <> 0 Then
+        LogWrite "  ERROR: db push fallo (codigo " & ret & ")"
+        MsgBox "prisma db push fallo (codigo " & ret & ")." & vbCrLf & "Ejecute manualmente: npx prisma db push --skip-generate" & vbCrLf & "Carpeta: " & strDir, vbCritical, "Error"
+        WScript.Quit
+    End If
+End If
 LogWrite "  OK: Base de datos lista"
 WriteStatus 6, 8, "Base de datos lista", "Prisma generado + DB creada", 75, "", ""
 
