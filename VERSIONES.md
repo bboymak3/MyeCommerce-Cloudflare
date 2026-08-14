@@ -1,5 +1,46 @@
 # MyeCommerce v2.9.x - Registro de Versiones
 
+## v2.9.48 (2026-08-14)
+- **feat**: Header 2 filas — nombre tienda + datos fiscales en fila superior, navegacion en fila inferior
+- **feat**: Catalogo logo personalizado — upload logo desde configuracion de catalogo
+- **feat**: Fondos decorativos para catalogo — paletas de colores y gradientes seleccionables
+
+## v2.9.47.4 (2026-08-14)
+- **fix**: Instalador — fix instalador para version actualizada
+- **fix**: npm install — separar postinstall, agregar reintentos para evitar fallos
+- **chore**: Version package.json actualizada a v2.9.47.4 (correlativo)
+
+## v2.9.47.3 (2026-08-14)
+- **feat**: 5 nuevas funcionalidades:
+  - Paginacion en Productos y Clientes (25/pagina)
+  - Exportar reportes a Excel/PDF (xlsx + jspdf + autotable)
+  - Scanner USB/Bluetooth wedge (deteccion rapida de teclas + Enter en POS)
+  - Alertas de vencimiento de productos (expirado, <15 dias, <30 dias)
+  - Estadisticas por cliente (Top Compradores, Clientes Mas Frecuentes)
+
+## v2.9.47.2 (2026-08-14)
+- **feat**: ZIP exportado con todas las mejoras
+
+## v2.9.47.1 (2026-08-14)
+- **fix**: POS "Button is not defined" — import faltante en pos-tab
+- **feat**: Catalog config avanzada — fuentes, vistas, colores, plantillas
+- **feat**: Installer version actualizada
+
+## v2.9.47 (2026-08-13)
+- **feat**: Base limpia desde v2.9.46-clean-install
+- **fix**: Categorias — fix creacion y duplicados
+- **feat**: Confirmacion vaciar carrito — dialog antes de limpiar
+- **feat**: Caddy movil — acceso HTTPS :8443 para camara del telefono
+
+## v2.9.46 (2026-08-13)
+- **fix**: Category creation, duplicate menus, QR HTTPS, license banner, header layout
+
+## v2.9.43 (2026-08-12)
+- **fix**: POS critico + marcas + clientes export + catalogo imagenes
+
+## v2.9.42 (2026-08-12)
+- **feat**: POS refactorizado en 18 subcomponentes modulares
+
 ## v2.9.41 (2026-08-12)
 - **feat**: Campo Marca (Brand) en productos — modelo Prisma Brand, API /api/brands CRUD, selector en formulario de producto
 - **feat**: POS — filtro por marca ademas de categoria, dos selectores independientes
