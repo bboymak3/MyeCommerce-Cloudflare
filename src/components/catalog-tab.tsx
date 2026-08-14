@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,6 +57,36 @@ export default function CatalogTab({
   const [customBgColor1, setCustomBgColor1] = useState("");
   const [customBgColor2, setCustomBgColor2] = useState("");
   const [coverLogoUrl, setCoverLogoUrl] = useState("");
+  const coverLogoInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCoverLogoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 512 * 1024) {
+      toast.error("Imagen demasiado grande. Maximo 512KB");
+      return;
+    }
+    const validTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Formato no soportado. Use PNG, JPG, GIF o WEBP");
+      return;
+    }
+    try {
+      const formData = new FormData();
+      formData.append('logo', file);
+      const res = await authFetch('/api/store-logo', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.url) {
+        setCoverLogoUrl(data.url);
+        toast.success("Logo del catalogo cargado");
+      } else {
+        toast.error(data.error || "Error al subir logo");
+      }
+    } catch (err) {
+      toast.error("Error de conexion al subir logo");
+    }
+    if (coverLogoInputRef.current) coverLogoInputRef.current.value = '';
+  }, []);
 
   const templates = [
     { id: "modern", label: "Moderno", desc: "Gradientes y sombras", color: "#2563eb" },
@@ -474,9 +504,11 @@ export default function CatalogTab({
               <div className="flex-1 space-y-2">
                 <div className="flex gap-2">
                   <input type="text" value={coverLogoUrl} onChange={(e) => setCoverLogoUrl(e.target.value)} placeholder="URL del logo" className="flex-1 px-3 py-1.5 text-xs border rounded-lg bg-background" />
+                  <button onClick={() => coverLogoInputRef.current?.click()} className="px-3 py-1.5 text-xs rounded-lg border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium" title="Subir logo desde tu equipo">Subir</button>
                   <button onClick={() => setCoverLogoUrl(storeLogo || "")} className="px-3 py-1.5 text-xs rounded-lg border bg-muted hover:bg-accent transition-colors" title="Usar logo de la tienda">Tienda</button>
+                  <input ref={coverLogoInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleCoverLogoUpload} className="hidden" />
                 </div>
-                <p className="text-[10px] text-muted-foreground">Pega URL o usa el logo configurado en tu tienda</p>
+                <p className="text-[10px] text-muted-foreground">Pega URL, sube desde tu equipo o usa el logo de la tienda</p>
               </div>
             </div>
           </div>

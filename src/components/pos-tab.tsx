@@ -82,11 +82,7 @@ export default function PosTab(props: PosTabProps) {
   });
 
   // ─── USB/Bluetooth barcode wedge scanner ──────────────────
-  useBarcodeWedge({
-    products,
-    onProductScanned: addToCart,
-    anyDialogOpen,
-  });
+  // (moved after anyDialogOpen declaration - see below)
 
   // ─── Local POS state ─────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -168,6 +164,13 @@ export default function PosTab(props: PosTabProps) {
   // ─── Keyboard shortcuts ───────────────────────────────────────
   const anyDialogOpen = showClientDialog || showNewClientDialog || showCreditConfirm
     || showStockWarning || showQrModal || showClearCartConfirm || scanner.showScanner || !!showReceipt;
+
+  // ─── USB/Bluetooth barcode wedge scanner ──────────────────
+  useBarcodeWedge({
+    products,
+    onProductScanned: addToCart,
+    anyDialogOpen,
+  });
 
   useKeyboardShortcuts({
     cartLength: cart.length,
