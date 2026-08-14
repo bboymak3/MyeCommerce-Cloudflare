@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
     const hideDescription = searchParams.get('hideDescription') === 'true';
     const hideStock = searchParams.get('hideStock') === 'true';
     const hideBrand = searchParams.get('hideBrand') === 'true';
+    const bgStyle = searchParams.get('bgStyle') || 'solid';
+    const bgColor1 = searchParams.get('bgColor1') || '';
+    const bgColor2 = searchParams.get('bgColor2') || '';
+    const coverLogo = searchParams.get('coverLogo') || '';
 
     // Cargar configuracion de la tienda
     const settings = await db.settings.findFirst();
@@ -138,6 +142,35 @@ export async function GET(req: NextRequest) {
     const cardBg = isDark ? '#1e293b' : '#ffffff';
     const pageBg = isDark ? '#0f172a' : colors.bg;
 
+    // Background style generation
+    const c1 = bgColor1 || colors.primary;
+    const c2 = bgColor2 || colors.secondary;
+    let bgStyleCSS = '';
+    let bgExtraCSS = '';
+    switch (bgStyle) {
+      case 'gradient':
+        bgStyleCSS = `background:linear-gradient(135deg,${c1},${c2});`;
+        bgExtraCSS = `.content{background:transparent;}.cover{background:transparent;border-radius:0;}`;
+        break;
+      case 'radial':
+        bgStyleCSS = `background:radial-gradient(circle at 30% 20%,${c1}40,${c2}20 50%,${pageBg} 80%);`;
+        break;
+      case 'pattern':
+        bgStyleCSS = `background-color:${pageBg};background-image:repeating-linear-gradient(45deg,${c1}08 0px,${c1}08 10px,${c2}05 10px,${c2}05 20px);`;
+        break;
+      case 'geometric':
+        bgStyleCSS = `background-color:${pageBg};background-image:linear-gradient(${c1}10 1px,transparent 1px),linear-gradient(90deg,${c1}10 1px,transparent 1px),linear-gradient(${c2}08 1px,transparent 1px),linear-gradient(90deg,${c2}08 1px,transparent 1px);background-size:100px 100px,100px 100px,20px 20px,20px 20px;background-position:0 0,0 0,10px 10px,10px 10px;`;
+        break;
+      case 'waves':
+        bgStyleCSS = `background-color:${pageBg};background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='${encodeURIComponent(c1)}15' d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,165.3C1248,171,1344,149,1392,138.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");background-repeat:no-repeat;background-position:bottom;background-size:cover;`;
+        break;
+      default: // solid
+        bgStyleCSS = `background-color:${pageBg};`;
+    }
+
+    // Logo for cover - use coverLogo if provided, otherwise storeLogo
+    const effectiveLogo = coverLogo || storeLogo;
+
     const now = new Date();
     const dateStr = now.toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -194,7 +227,8 @@ export async function GET(req: NextRequest) {
   <style>
     @import url('https://fonts.googleapis.com/css2?family=${encodeURIComponent(selectedFont)}:wght@300;400;500;600;700;800;900&display=swap');
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'${selectedFont}',system-ui,sans-serif; background:${pageBg}; color:${textColor}; }
+    body { font-family:'${selectedFont}',system-ui,sans-serif; ${bgStyleCSS} color:${textColor}; }
+    ${bgExtraCSS}
     .catalog-container { max-width:900px; margin:0 auto; }
     .cover { background:linear-gradient(135deg,${colors.primary},${colors.secondary}); color:white; padding:50px 40px; border-radius:0 0 30px 30px; text-align:center; position:relative; overflow:hidden; }
     .cover::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle at 30% 50%,${colors.accent}40,transparent 50%),radial-gradient(circle at 70% 80%,${colors.primary}30,transparent 40%); }
@@ -214,9 +248,10 @@ export async function GET(req: NextRequest) {
     .footer { text-align:center; padding:20px; font-size:10px; color:${subTextColor}; }
     .badge-cat { display:inline-block; font-size:10px; padding:2px 8px; border-radius:20px; background:${colors.primary}15; color:${colors.primary}; font-weight:600; }
     @media print {
-      body { background:white; }
+      body { background:white !important; ${bgStyle !== 'solid' ? `background-image:none !important;background-color:white !important;` : ''} }
       .cover { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       .content { padding:20px; }
+      .cover, .qr-section, .card { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     }
   </style>
 </head>
@@ -224,7 +259,7 @@ export async function GET(req: NextRequest) {
   <div class="catalog-container">
     <!-- PORTADA -->
     <div class="cover">
-      ${storeLogo ? `<div class="cover-logo"><img src="${toAbsoluteUrl(storeLogo)}" alt="${storeName}" onerror="this.parentElement.innerHTML='<span style=\\'font-size:36px;\\'>🏪</span>'" /></div>` : `<div class="cover-logo"><span style="font-size:36px;">🏪</span></div>`}
+      ${effectiveLogo ? `<div class="cover-logo"><img src="${toAbsoluteUrl(effectiveLogo)}" alt="${storeName}" onerror="this.parentElement.innerHTML='<span style=\\'font-size:36px;\\'>🏪</span>'" /></div>` : `<div class="cover-logo"><span style="font-size:36px;">🏪</span></div>`}
       <h1 class="store-name">${storeName}</h1>
       <div class="store-info">
         ${storeAddress ? `<span>📍 ${storeAddress}</span>` : ''}

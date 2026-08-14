@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 interface NavItem {
   value: string
@@ -323,6 +324,11 @@ function TopNavBar({ groups, activeTab, onTabChange, stockAlertCount }: {
 }) {
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const menuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [slotEl, setSlotEl] = useState<HTMLElement | null>(null)
+
+  useEffect(() => {
+    setSlotEl(document.getElementById('top-nav-slot'))
+  }, [])
 
   const handleMouseEnter = (groupId: string) => {
     if (menuTimeoutRef.current) clearTimeout(menuTimeoutRef.current)
@@ -339,7 +345,7 @@ function TopNavBar({ groups, activeTab, onTabChange, stockAlertCount }: {
     return () => document.removeEventListener('click', handler)
   }, [])
 
-  return (
+  const navContent = (
     <nav className="hidden lg:flex items-center gap-0.5">
       {groups.map((group) => {
         const isActiveInGroup = group.items.some(i => i.value === activeTab)
@@ -427,5 +433,10 @@ function TopNavBar({ groups, activeTab, onTabChange, stockAlertCount }: {
       })}
     </nav>
   )
+
+  if (slotEl) {
+    return createPortal(navContent, slotEl)
+  }
+  return navContent
 }
 

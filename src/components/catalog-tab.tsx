@@ -53,6 +53,10 @@ export default function CatalogTab({
   const [showDescription, setShowDescription] = useState(true);
   const [showStock, setShowStock] = useState(true);
   const [showBrand, setShowBrand] = useState(true);
+  const [selectedBg, setSelectedBg] = useState("solid");
+  const [customBgColor1, setCustomBgColor1] = useState("");
+  const [customBgColor2, setCustomBgColor2] = useState("");
+  const [coverLogoUrl, setCoverLogoUrl] = useState("");
 
   const templates = [
     { id: "modern", label: "Moderno", desc: "Gradientes y sombras", color: "#2563eb" },
@@ -99,6 +103,14 @@ export default function CatalogTab({
     { id: "medium", label: "Medianas" },
     { id: "large", label: "Grandes" },
   ];
+  const bgOptions = [
+    { id: "solid", label: "Solido", desc: "Color unico" },
+    { id: "gradient", label: "Degrade", desc: "Dos colores" },
+    { id: "radial", label: "Radial", desc: "Circular" },
+    { id: "pattern", label: "Patron", desc: "Repetitivo" },
+    { id: "geometric", label: "Geometrico", desc: "Formas" },
+    { id: "waves", label: "Ondas", desc: "Suaves" },
+  ];
 
   const loadData = useCallback(async () => {
     try {
@@ -142,6 +154,10 @@ export default function CatalogTab({
     if (!showDescription) params.set("hideDescription", "true");
     if (!showStock) params.set("hideStock", "true");
     if (!showBrand) params.set("hideBrand", "true");
+    if (selectedBg) params.set("bgStyle", selectedBg);
+    if (customBgColor1) params.set("bgColor1", customBgColor1);
+    if (customBgColor2) params.set("bgColor2", customBgColor2);
+    if (coverLogoUrl) params.set("coverLogo", coverLogoUrl);
     return params;
   };
 
@@ -442,6 +458,58 @@ export default function CatalogTab({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Cover logo */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Logo para portada del catalogo</label>
+            <div className="flex items-center gap-3">
+              <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center flex-shrink-0">
+                {coverLogoUrl ? (
+                  <img src={coverLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" onError={() => setCoverLogoUrl("")} />
+                ) : (
+                  <span className="text-2xl text-muted-foreground/50">📷</span>
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <div className="flex gap-2">
+                  <input type="text" value={coverLogoUrl} onChange={(e) => setCoverLogoUrl(e.target.value)} placeholder="URL del logo" className="flex-1 px-3 py-1.5 text-xs border rounded-lg bg-background" />
+                  <button onClick={() => setCoverLogoUrl(storeLogo || "")} className="px-3 py-1.5 text-xs rounded-lg border bg-muted hover:bg-accent transition-colors" title="Usar logo de la tienda">Tienda</button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Pega URL o usa el logo configurado en tu tienda</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Background style */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Fondo del catalogo</label>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {bgOptions.map(b => (
+                <button key={b.id} onClick={() => setSelectedBg(b.id)} className={`p-2.5 rounded-lg border-2 text-center transition-all ${selectedBg === b.id ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/30'}`}>
+                  <p className="text-xs font-semibold">{b.label}</p>
+                  <p className="text-[9px] text-muted-foreground">{b.desc}</p>
+                </button>
+              ))}
+            </div>
+            {selectedBg !== "solid" && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted-foreground">Color 1</label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <input type="color" value={customBgColor1 || "#2563eb"} onChange={(e) => setCustomBgColor1(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0" />
+                    <input type="text" value={customBgColor1} onChange={(e) => setCustomBgColor1(e.target.value)} placeholder="#2563eb" className="flex-1 px-2 py-1 text-xs border rounded bg-background" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <label className="text-[10px] text-muted-foreground">Color 2</label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <input type="color" value={customBgColor2 || "#7c3aed"} onChange={(e) => setCustomBgColor2(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0" />
+                    <input type="text" value={customBgColor2} onChange={(e) => setCustomBgColor2(e.target.value)} placeholder="#7c3aed" className="flex-1 px-2 py-1 text-xs border rounded bg-background" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <Separator />

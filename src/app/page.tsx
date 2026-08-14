@@ -454,21 +454,22 @@ export default function Home() {
 
       {/* HEADER */}
       <header className="border-b bg-card sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+        {/* ── Row 1: Store info + date + user (arriba) ── */}
+        <div className="container mx-auto px-4 py-2 flex items-center justify-between border-b border-border/50">
           <div className="flex items-center gap-3">
             <AppNav activeTab={activeTab} onTabChange={(v: string) => {
               const tab = availableTabs.find(t => t.value === v);
               if (!tab) return;
               if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
               safeSetTab(v);
-            }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon, restricted: t.restricted, plan: t.plan }))} stockAlertCount={stockAlertCount} currentUser={currentUser.fullName || currentUser.username} onLogout={handleLogout} version="2.9.45" />
+            }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon, restricted: t.restricted, plan: t.plan }))} stockAlertCount={stockAlertCount} currentUser={currentUser.fullName || currentUser.username} onLogout={handleLogout} version="2.9.47" />
             <div>
               <h1 className="text-xl font-bold text-primary">
                 {settings.storeName}
                 {showWatermark && <span className="text-xs font-normal text-yellow-600 ml-2">(TRIAL)</span>}
               </h1>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>v2.9.23 | 1$ =</span>
+                <span>v2.9.47 | 1$ =</span>
                 {editingBcv ? (
                   <input type="number" min="0" step="0.01" value={inlineBcv}
                     onChange={(e) => setInlineBcv(e.target.value)}
@@ -517,6 +518,10 @@ export default function Home() {
               </button>
             </div>
           </div>
+        </div>
+        {/* ── Row 2: Module menu (debajo) ── */}
+        <div className="container mx-auto px-4 py-1.5">
+          <div id="top-nav-slot" />
         </div>
       </header>
 
