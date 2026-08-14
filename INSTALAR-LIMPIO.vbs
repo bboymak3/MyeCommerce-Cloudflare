@@ -256,6 +256,12 @@ If isAdmin And objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
     WshShell.Run "cmd /c caddy.exe trust", 0, True
     WshShell.CurrentDirectory = strDir
     LogWrite "  OK: Certificado SSL instalado"
+    
+    ' Abrir puerto 8443 en el firewall para acceso movil (telefono -> camara)
+    LogWrite "  Abriendo puerto 8443 en firewall para acceso movil..."
+    WshShell.Run "cmd /c netsh advfirewall firewall delete rule name=""MyeCommerce POS Mobile 8443"" >nul 2>&1", 0, True
+    WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTPS para camara del telefono""", 0, True
+    LogWrite "  OK: Puerto 8443 abierto en firewall"
 End If
 WriteStatus 7, 8, "Caddy configurado", "HTTPS listo en myecommerce.ve", 87, "", ""
 

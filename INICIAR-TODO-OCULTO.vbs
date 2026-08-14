@@ -1,8 +1,8 @@
 ' ============================================================
-' MyeCommerce POS v2.9.16.5 - Iniciar TODO en modo oculto
+' MyeCommerce POS v2.9.48.2 - Iniciar TODO en modo oculto
 ' Inicia 3 servicios SIN abrir ventanas CMD:
 '   1. Printer-Agent (puerto 9100) - impresion termica
-'   2. Caddy (puerto 443) - HTTPS dominio local myecommerce.ve
+'   2. Caddy (puerto 443 + 8443) - HTTPS dominio + acceso movil
 '   3. Next.js (puerto 3000) - aplicacion web
 '
 ' Uso: doble clic, o acceso directo en el escritorio
@@ -52,7 +52,13 @@ For i = 1 To 10
     On Error GoTo 0
 Next
 
-' -- PASO 4: Iniciar Caddy (oculto, HTTPS) --
+' -- PASO 4: Abrir puerto 8443 en firewall (acceso movil telefono/camara) --
+On Error Resume Next
+WshShell.Run "cmd /c netsh advfirewall firewall delete rule name=""MyeCommerce POS Mobile 8443"" >nul 2>&1", 0, True
+WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTPS para camara del telefono""", 0, True
+On Error GoTo 0
+
+' -- PASO 5: Iniciar Caddy (oculto, HTTPS) --
 If objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
     WshShell.CurrentDirectory = strDir & "\caddy"
     WshShell.Run "cmd /c caddy.exe run --config Caddyfile", 0, False
@@ -64,7 +70,7 @@ End If
 
 WScript.Sleep 1000
 
-' -- PASO 5: Copiar static a standalone (si existe) --
+' -- PASO 6: Copiar static a standalone (si existe) --
 On Error Resume Next
 If objFSO.FolderExists(strDir & "\.next\standalone") Then
     If Not objFSO.FolderExists(strDir & "\.next\standalone\.next\static") Then
@@ -76,11 +82,11 @@ If objFSO.FolderExists(strDir & "\.next\standalone") Then
 End If
 On Error GoTo 0
 
-' -- PASO 6: Iniciar Next.js (oculto) --
+' -- PASO 7: Iniciar Next.js (oculto) --
 WshShell.CurrentDirectory = strDir
 WshShell.Run "cmd /c npx next start -p 3000", 0, False
 
-' -- PASO 7: Esperar a que Next.js responda --
+' -- PASO 8: Esperar a que Next.js responda --
 Set objHTTP = CreateObject("MSXML2.XMLHTTP")
 maxWait = 60
 waited = 0
@@ -99,7 +105,7 @@ Do While waited < maxWait And Not ready
     On Error GoTo 0
 Loop
 
-' -- PASO 8: Abrir navegador --
+' -- PASO 9: Abrir navegador --
 If caddyIniciado Then
     WshShell.Run "https://myecommerce.ve"
 Else
