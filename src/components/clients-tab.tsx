@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +70,13 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
   });
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ─── PAGINATION ───
+  const ITEMS_PER_PAGE = 25;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(clients.length / ITEMS_PER_PAGE));
+  const paginatedClients = clients.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  useEffect(() => { setPage(1); }, [search, filterType]);
+
   // ===== HISTORIAL DE COMPRAS =====
   const [histClient, setHistClient] = useState<Client | null>(null);
   const [histSales, setHistSales] = useState<any[]>([]);
@@ -77,6 +84,10 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
   const [histDateFrom, setHistDateFrom] = useState('');
   const [histDateTo, setHistDateTo] = useState('');
   const [detailSale, setDetailSale] = useState<any>(null);
+  // Client statistics
+  const [clientStats, setClientStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   const loadHistory = async (client: Client) => {
     setHistClient(client);
@@ -110,6 +121,18 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
     setHistDateFrom('');
     setHistDateTo('');
     if (histClient) loadHistory(histClient);
+  };
+
+  const loadClientStats = async () => {
+    if (clientStats) { setShowStats(!showStats); return; }
+    setStatsLoading(true);
+    try {
+      const res = await authFetch('/api/clients/stats');
+      const data = await res.json();
+      setClientStats(data);
+      setShowStats(true);
+    } catch { toast.error("Error al cargar estadisticas"); }
+    setStatsLoading(false);
   };
 
   const getSaleStatus = (sale: any) => {
@@ -493,6 +516,100 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
         </Button>
       </div>
 
+      {/* Estadisticas de Clientes */}
+      <div className="mb-2">
+        <Button variant="outline" size="sm" onClick={loadClientStats} disabled={statsLoading}>
+          {statsLoading ? "Cargando..." : showStats ? "Ocultar Estadisticas" : "Estadisticas de Clientes"}
+        </Button>
+      </div>
+
+      {showStats && clientStats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          {/* Top Compradores */}
+          <Card className="border-green-200">
+            <CardHeader className="pb-1 pt-2 px-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                &#127942; Top {Math.min(10, clientStats.topBuyers?.length || 0)} Mejores Compradores
+                <Badge variant="secondary" className="text-[9px]">{clientStats.totalClients} clientes</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-2">
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-green-50 sticky top-0">
+                    <tr>
+                      <th className="text-left p-1">#</th>
+                      <th className="text-left p-1">Cliente</th>
+                      <th className="text-right p-1">Compras</th>
+                      <th className="text-right p-1">Total $</th>
+                      <th className="text-right p-1">Prom. $</th>
+                      <th className="text-right p-1">Frecuencia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(clientStats.topBuyers || []).slice(0, 10).map((c: any, i: number) => (
+                      <tr key={c.clientId} className="border-t hover:bg-muted/30">
+                        <td className="p-1 font-bold">
+                          {i === 0 ? '&#129351;' : i === 1 ? '&#129352;' : i === 2 ? '&#129353;' : `${i + 1}`}
+                        </td>
+                        <td className="p-1">
+                          <div className="font-medium">{c.fullName}</div>
+                          {c.phone && <div className="text-[9px] text-muted-foreground">{c.phone}</div>}
+                        </td>
+                        <td className="p-1 text-right font-medium">{c.totalSales}</td>
+                        <td className="p-1 text-right font-bold text-green-600">${c.totalUsd.toFixed(2)}</td>
+                        <td className="p-1 text-right">${c.avgTicket.toFixed(2)}</td>
+                        <td className="p-1 text-right text-muted-foreground">{c.frequencyLabel}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Mas Frecuentes */}
+          <Card className="border-blue-200">
+            <CardHeader className="pb-1 pt-2 px-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                &#128197; Clientes Mas Frecuentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-2">
+              <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead className="bg-blue-50 sticky top-0">
+                    <tr>
+                      <th className="text-left p-1">#</th>
+                      <th className="text-left p-1">Cliente</th>
+                      <th className="text-right p-1">Compras</th>
+                      <th className="text-right p-1">Total $</th>
+                      <th className="text-left p-1">Frecuencia</th>
+                      <th className="text-right p-1">Ultima Compra</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(clientStats.topFrequent || []).slice(0, 10).map((c: any, i: number) => (
+                      <tr key={c.clientId} className="border-t hover:bg-muted/30">
+                        <td className="p-1 font-bold">{i + 1}</td>
+                        <td className="p-1">
+                          <div className="font-medium">{c.fullName}</div>
+                          {c.phone && <div className="text-[9px] text-muted-foreground">{c.phone}</div>}
+                        </td>
+                        <td className="p-1 text-right font-medium">{c.totalSales}</td>
+                        <td className="p-1 text-right font-bold text-blue-600">${c.totalUsd.toFixed(2)}</td>
+                        <td className="p-1 text-muted-foreground">{c.frequencyLabel}</td>
+                        <td className="p-1 text-right">{new Date(c.lastPurchase).toLocaleDateString('es-VE')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Tabla de Clientes */}
       <Card>
         <CardContent className="p-0">
@@ -512,7 +629,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
                 </tr>
               </thead>
               <tbody>
-                {clients.map((client) => (
+                {paginatedClients.map((client) => (
                   <tr key={client.id} className="border-t hover:bg-muted/30">
                     <td className="p-2">
                       <div className="font-medium">
@@ -577,6 +694,23 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
                       {loading ? "Cargando..." : "No se encontraron clientes"}
                     </td>
                   </tr>
+                )}
+                {totalPages > 1 && (
+                  <tr><td colSpan={9} className="p-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{clients.length} clientes - Pagina {page} de {totalPages}</span>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+                        {Array.from({length: totalPages}, (_, i) => i + 1).filter(p => Math.abs(p - page) <= 2 || p === 1 || p === totalPages).map((p, i, arr) => (
+                          <Fragment key={p}>
+                            {i > 0 && arr[i-1] !== p - 1 && <span className="text-xs text-muted-foreground px-1">...</span>}
+                            <Button variant={p === page ? "default" : "outline"} size="sm" className="h-7 w-7 text-xs p-0" onClick={() => setPage(p)}>{p}</Button>
+                          </Fragment>
+                        ))}
+                        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Siguiente</Button>
+                      </div>
+                    </div>
+                  </td></tr>
                 )}
               </tbody>
             </table>

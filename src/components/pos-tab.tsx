@@ -16,6 +16,7 @@ import { useCart } from "./pos/hooks/use-cart";
 import { useClients } from "./pos/hooks/use-clients";
 import { useScanner } from "./pos/hooks/use-scanner";
 import { useKeyboardShortcuts } from "./pos/hooks/use-keyboard-shortcuts";
+import { useBarcodeWedge } from "./pos/hooks/use-barcode-wedge";
 import { usePosCalculations } from "./pos/hooks/use-pos-calculations";
 
 // ─── Sub-components ─────────────────────────────────────────────
@@ -78,6 +79,13 @@ export default function PosTab(props: PosTabProps) {
     products,
     onProductFound: addToCart,
     onCodeDetected: (code) => { /* search state managed by parent if needed */ },
+  });
+
+  // ─── USB/Bluetooth barcode wedge scanner ──────────────────
+  useBarcodeWedge({
+    products,
+    onProductScanned: addToCart,
+    anyDialogOpen,
   });
 
   // ─── Local POS state ─────────────────────────────────────────

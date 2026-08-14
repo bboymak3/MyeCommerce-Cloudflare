@@ -14,6 +14,9 @@ import { printTicket } from "@/lib/ticket-printer";
 import type { TicketSettings } from "@/lib/ticket-printer";
 import { toast } from "sonner";
 import { authFetch } from "@/lib/auth-fetch";
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface ReportsTabProps {
   bcvRate: number;
@@ -588,6 +591,114 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
     }
   };
 
+  // ===== EXPORT EXCEL (XLSX) =====
+  const exportXlsx = () => {
+    if (sales.length === 0) { toast.error("No hay datos para exportar"); return; }
+    try {
+      const wb = XLSX.utils.book_new();
+      
+      // Sheet 1: Resumen
+      const summaryData = [
+        ["REPORTE DE VENTAS - MyeCommerce POS"],
+        ["Periodo", periodLabel],
+        ["Generado", new Date().toLocaleString("es-VE")],
+        ["Tasa", "1$ = " + bcvRate.toFixed(2) + " Bs"],
+        [],
+        ["RESUMEN"],
+        ["Ventas Brutas (Bs)", grossTotalBs.toFixed(2)],
+        ["Ventas Brutas ($)", grossTotalSales.toFixed(2)],
+        ["Entradas Netas (Bs)", totalBs.toFixed(2)],
+        ["Entradas Netas ($)", totalSales.toFixed(2)],
+        ["Num. Ventas", salesCount],
+        ["Ticket Promedio (Bs)", avgTicket.toFixed(2)],
+      ];
+      const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
+      XLSX.utils.book_append_sheet(wb, ws1, "Resumen");
+
+      // Sheet 2: Ventas Detalladas
+      const salesData = sales.map((s: any, i: number) => ({
+        "#": i + 1,
+        "Fecha": new Date(s.date).toLocaleDateString("es-VE"),
+        "Hora": new Date(s.date).toLocaleTimeString("es-VE"),
+        "Vendedor": s.sellerName || "",
+        "Cliente": s.clientName || s.customerName || "",
+        "Metodo": s.paymentMethod || "",
+        "Referencia": s.referenceNumber || "",
+        "Total $": s.total || 0,
+        "Total Bs": s.totalBs || 0,
+        "Descuento $": s.discount || 0,
+        "Nota": s.isCredit ? "CREDITO" : "",
+      }));
+      const ws2 = XLSX.utils.json_to_sheet(salesData);
+      XLSX.utils.book_append_sheet(wb, ws2, "Ventas");
+
+      // Sheet 3: Top Productos
+      if (topProducts && topProducts.length > 0) {
+        const prodData = topProducts.map((p: any, i: number) => ({
+          "#": i + 1,
+          "Producto": p.productName || p.name || "",
+          "Cantidad": p.quantity || 0,
+          "Total $": p.total || p.totalUsd || 0,
+          "Total Bs": ((p.total || p.totalUsd || 0) * bcvRate).toFixed(2),
+        }));
+        const ws3 = XLSX.utils.json_to_sheet(prodData);
+        XLSX.utils.book_append_sheet(wb, ws3, "Top Productos");
+      }
+
+      XLSX.writeFile(wb, `reporte-ventas-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success("Reporte Excel exportado");
+    } catch (e: any) { toast.error("Error al exportar Excel: " + e.message); }
+  };
+
+  // ===== EXPORT PDF =====
+  const exportPdf = () => {
+    if (sales.length === 0) { toast.error("No hay datos para exportar"); return; }
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      
+      // Title
+      doc.setFontSize(16);
+      doc.text("Reporte de Ventas - MyeCommerce POS", 14, 15);
+      doc.setFontSize(9);
+      doc.text(`Periodo: ${periodLabel}`, 14, 22);
+      doc.text(`Tasa: 1$ = ${bcvRate.toFixed(2)} Bs`, 14, 27);
+      doc.text(`Generado: ${new Date().toLocaleString("es-VE")}`, 14, 32);
+
+      // Summary box
+      doc.setFontSize(11);
+      doc.text("Resumen", 14, 40);
+      doc.setFontSize(9);
+      doc.text(`Ventas Brutas: Bs ${grossTotalBs.toFixed(2)} | $ ${grossTotalSales.toFixed(2)}`, 14, 46);
+      doc.text(`Entradas Netas: Bs ${totalBs.toFixed(2)} | $ ${totalSales.toFixed(2)}`, 14, 51);
+      doc.text(`Num. Ventas: ${salesCount} | Ticket Promedio: Bs ${avgTicket.toFixed(2)}`, 14, 56);
+
+      // Sales table
+      const tableData = sales.map((s: any, i: number) => [
+        i + 1,
+        new Date(s.date).toLocaleDateString("es-VE"),
+        new Date(s.date).toLocaleTimeString("es-VE", { hour: '2-digit', minute: '2-digit' }),
+        s.sellerName || "-",
+        (s.clientName || s.customerName || "Final").substring(0, 20),
+        s.paymentMethod || "",
+        `$${(s.total || 0).toFixed(2)}`,
+        `Bs${(s.totalBs || 0).toFixed(2)}`,
+      ]);
+
+      (doc as any).autoTable({
+        startY: 62,
+        head: [["#", "Fecha", "Hora", "Vendedor", "Cliente", "Metodo", "Total $", "Total Bs"]],
+        body: tableData,
+        styles: { fontSize: 7, cellPadding: 2 },
+        headStyles: { fillColor: [34, 197, 94], textColor: 255 },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: 14, right: 14 },
+      });
+
+      doc.save(`reporte-ventas-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success("Reporte PDF exportado");
+    } catch (e: any) { toast.error("Error al exportar PDF: " + e.message); }
+  };
+
   // Today for default date inputs
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -681,6 +792,12 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
             </Button>
             <Button variant="outline" size="sm" onClick={exportCsv} disabled={sales.length === 0}>
               CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportXlsx} disabled={sales.length === 0}>
+              Excel
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportPdf} disabled={sales.length === 0}>
+              PDF
             </Button>
             {(sellerFilter || roleFilter) && (
               <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => { setSellerFilter(""); setRoleFilter(""); }}>
@@ -1404,6 +1521,12 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={exportCsv} disabled={sales.length === 0} className="text-xs">
                 CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportXlsx} disabled={sales.length === 0} className="text-xs">
+                Excel
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportPdf} disabled={sales.length === 0} className="text-xs">
+                PDF
               </Button>
               <Button variant="outline" size="sm" onClick={printReport} disabled={sales.length === 0} className="text-xs">
                 Imprimir

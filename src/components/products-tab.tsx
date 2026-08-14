@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Fragment } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -107,6 +107,9 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   // Stock alerts
   const [stockAlerts, setStockAlerts] = useState<StockAlertsData | null>(null);
   const [showAlerts, setShowAlerts] = useState(true);
+  // Expiration alerts
+  const [expAlerts, setExpAlerts] = useState<any | null>(null);
+  const [showExpAlerts, setShowExpAlerts] = useState(true);
 
   // Stock adjustment dialog (kardex)
   const [showStockAdjustDialog, setShowStockAdjustDialog] = useState(false);
@@ -131,6 +134,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
 
   // ─── EFFECTS ───
   useEffect(() => { (async () => { try { const r = await authFetch('/api/products/stock-alerts'); const d = await r.json(); if (r.ok) { setStockAlerts(d); if (d.totalAlerts === 0) setShowAlerts(false); } } catch {} })(); }, []);
+  useEffect(() => { (async () => { try { const r = await authFetch('/api/products/expiration-alerts'); const d = await r.json(); if (r.ok) { setExpAlerts(d); if (d.totalAlerts === 0) setShowExpAlerts(false); } } catch {} })(); }, []);
 
   // ─── CALC HELPERS ───
   const calcPrice = (cost: string, margin: string) => { const c = parseFloat(cost) || 0, m = parseFloat(margin) || 0; return c > 0 && m >= 0 ? (c * (1 + m / 100)).toFixed(2) : ""; };
@@ -150,6 +154,13 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
 
   // ─── FILTERED PRODUCTS ───
   const filtered = products.filter(p => (p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)) && (!filterCategory || p.categoryId === filterCategory));
+
+  // ─── PAGINATION ───
+  const ITEMS_PER_PAGE = 25;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  useEffect(() => { setPage(1); }, [search, filterCategory]);
 
   // ─── FINANCE TOTALS ───
   // Solo considerar productos con stock > 0 y con precio > 0
@@ -422,6 +433,72 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
         </div>
       )}
 
+      {/* Alertas de Vencimiento */}
+      {showExpAlerts && expAlerts && expAlerts.totalAlerts > 0 && (
+        <Card className="border-red-200 bg-red-50/30">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">&#9888;&#65039;</span>
+                <span className="text-sm font-bold text-red-700">Alertas de Vencimiento ({expAlerts.totalAlerts})</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {expAlerts.expiredCount > 0 && <Badge variant="destructive" className="text-[9px]">{expAlerts.expiredCount} Vencidos</Badge>}
+                {expAlerts.warningSoonCount > 0 && <Badge className="text-[9px]" style={{backgroundColor:'#f59e0b',color:'#fff'}}>{expAlerts.warningSoonCount} &lt;15 dias</Badge>}
+                {expAlerts.warning30Count > 0 && <Badge className="text-[9px]" style={{backgroundColor:'#fb923c',color:'#fff'}}>{expAlerts.warning30Count} &lt;30 dias</Badge>}
+                <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowExpAlerts(false)}>Ocultar</Button>
+              </div>
+            </div>
+            <div className="overflow-x-auto max-h-48 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-red-100/50 sticky top-0">
+                  <tr>
+                    <th className="text-left p-1">Producto</th>
+                    <th className="text-left p-1">Categoria</th>
+                    <th className="text-right p-1">Stock</th>
+                    <th className="text-right p-1">Precio</th>
+                    <th className="text-right p-1">Vencimiento</th>
+                    <th className="text-right p-1">Dias</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(expAlerts.expired || []).map((p: any) => (
+                    <tr key={p.id} className="border-t bg-red-100/40">
+                      <td className="p-1 font-medium">{p.icon} {p.name}</td>
+                      <td className="p-1">{p.categoryName}</td>
+                      <td className="p-1 text-right">{p.stock}</td>
+                      <td className="p-1 text-right">${p.price.toFixed(2)}</td>
+                      <td className="p-1 text-right">{new Date(p.expirationDate).toLocaleDateString('es-VE')}</td>
+                      <td className="p-1 text-right font-bold text-red-700">{p.daysLeft <= 0 ? 'VENCIDO' : `${p.daysLeft}d`}</td>
+                    </tr>
+                  ))}
+                  {(expAlerts.warningSoon || []).map((p: any) => (
+                    <tr key={p.id} className="border-t bg-amber-50/40">
+                      <td className="p-1 font-medium">{p.icon} {p.name}</td>
+                      <td className="p-1">{p.categoryName}</td>
+                      <td className="p-1 text-right">{p.stock}</td>
+                      <td className="p-1 text-right">${p.price.toFixed(2)}</td>
+                      <td className="p-1 text-right">{new Date(p.expirationDate).toLocaleDateString('es-VE')}</td>
+                      <td className="p-1 text-right font-bold text-amber-700">{p.daysLeft}d</td>
+                    </tr>
+                  ))}
+                  {(expAlerts.warning30 || []).map((p: any) => (
+                    <tr key={p.id} className="border-t bg-orange-50/30">
+                      <td className="p-1 font-medium">{p.icon} {p.name}</td>
+                      <td className="p-1">{p.categoryName}</td>
+                      <td className="p-1 text-right">{p.stock}</td>
+                      <td className="p-1 text-right">${p.price.toFixed(2)}</td>
+                      <td className="p-1 text-right">{new Date(p.expirationDate).toLocaleDateString('es-VE')}</td>
+                      <td className="p-1 text-right font-bold text-orange-600">{p.daysLeft}d</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* PRODUCTS TABLE */}
       <Card>
         <CardContent className="p-0">
@@ -441,7 +518,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(product => {
+                {paginated.map(product => {
                   const mg = product.cost > 0 && product.price > 0 ? ((product.price - product.cost) / product.price * 100) : 0;
                   return (
                     <tr key={product.id} className="border-t hover:bg-muted/30 cursor-pointer" onDoubleClick={() => openEdit(product)}>
@@ -468,6 +545,23 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                   );
                 })}
                 {filtered.length === 0 && <tr><td colSpan={9} className="text-center p-8 text-muted-foreground">No se encontraron productos</td></tr>}
+                {totalPages > 1 && (
+                  <tr><td colSpan={9} className="p-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{filtered.length} productos - Pagina {page} de {totalPages}</span>
+                      <div className="flex gap-1">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+                        {Array.from({length: totalPages}, (_, i) => i + 1).filter(p => Math.abs(p - page) <= 2 || p === 1 || p === totalPages).map((p, i, arr) => (
+                          <Fragment key={p}>
+                            {i > 0 && arr[i-1] !== p - 1 && <span className="text-xs text-muted-foreground px-1">...</span>}
+                            <Button variant={p === page ? "default" : "outline"} size="sm" className="h-7 w-7 text-xs p-0" onClick={() => setPage(p)}>{p}</Button>
+                          </Fragment>
+                        ))}
+                        <Button variant="outline" size="sm" className="h-7 text-xs" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Siguiente</Button>
+                      </div>
+                    </div>
+                  </td></tr>
+                )}
               </tbody>
             </table>
           </div>
