@@ -1,27 +1,23 @@
 import { NextResponse } from "next/server";
 import os from "os";
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
 
 /**
  * GET /api/local-ip
  *
- * Returns the LAN IP of this machine so the POS can build a QR code
- * that lets a phone open the POS on the same Wi-Fi network.
+ * Returns the LAN IP and URLs for POS mobile access via QR.
  *
- * Also returns the HTTPS domain URL (https://myecommerce.ve) which is
- * required for camera/barcode scanner access on mobile browsers.
+ * - url:       HTTP fallback (camera won't work on phones)
+ * - secureUrl: HTTPS URL via Caddy :8443 (camera WORKS on phones)
+ * - domainUrl: HTTPS via domain (only works on PC or if phone has DNS)
  *
- * The response shape is:
- *   {
- *     url:       "http://192.168.x.x:3000",
- *     secureUrl: "https://myecommerce.ve",
- *     ip:        "192.168.x.x",
- *     port:      3000,
- *     hostname:  "...",
- *     domain:    "myecommerce.ve"
- *   }
+ * Phone MUST use secureUrl (https://IP:8443) for camera access.
+ * Browsers require Secure Context (HTTPS) for getUserMedia.
  */
 export async function GET() {
   const port = Number(process.env.PORT) || 3000;
+  const caddyPort = 8443;
   const ifaces = os.networkInterfaces();
   let bestIp = "";
 
@@ -48,15 +44,30 @@ export async function GET() {
   candidates.sort((a, b) => prefer(b) - prefer(a));
   bestIp = candidates[0] || "127.0.0.1";
 
+  // Try to read IP from Caddy startup script (more reliable on Windows)
+  try {
+    const ipFile = join(process.cwd(), 'caddy', 'local-ip.txt');
+    if (existsSync(ipFile)) {
+      const savedIp = readFileSync(ipFile, 'utf-8').trim();
+      if (savedIp && savedIp !== "127.0.0.1") {
+        bestIp = savedIp;
+      }
+    }
+  } catch { /* ignore */ }
+
   const url = `http://${bestIp}:${port}`;
+  // HTTPS via Caddy port 8443 - THIS is what phones need for camera
+  const secureUrl = `https://${bestIp}:${caddyPort}`;
   const domain = "myecommerce.ve";
-  const secureUrl = `https://${domain}`;
+  const domainUrl = `https://${domain}`;
 
   return NextResponse.json({
     url,
     secureUrl,
+    domainUrl,
     ip: bestIp,
     port,
+    caddyPort,
     hostname: os.hostname(),
     domain,
   });

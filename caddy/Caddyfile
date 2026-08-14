@@ -3,35 +3,45 @@
 # El navegador mostrara el candado verde (sin advertencias)
 # porque la CA de Caddy se instala en Windows con 'caddy trust'
 
-# Redirigir HTTP a HTTPS
+# Redirigir HTTP a HTTPS (dominio local)
 http://myecommerce.ve {
     redir https://myecommerce.ve{uri}
 }
 
-# Servir HTTPS con certificado interno
+# Servir HTTPS con certificado interno (acceso desde la PC)
 myecommerce.ve {
     tls internal
     reverse_proxy localhost:3000
 }
 
-# Acceso movil via IP local (HTTPS auto-certificado)
+# ============================================================
+# ACCESO MOVIL VIA IP LOCAL (HTTPS auto-certificado)
+# ============================================================
 # Los telefonos acceden via https://IP_DEL_SERVER:8443
 # Ejemplo: https://192.168.1.105:8443
-# Al primer acceso: navegador muestra advertencia > "Avanzado" > "Continuar"
-# IMPORTANTE: NO usar https://IP:3000 (HTTP no permite camara)
+#
+# Al primer acceso desde el telefono:
+#   1. El navegador muestra advertencia de certificado
+#   2. Toque "Avanzado" o "Detalles"
+#   3. Toque "Continuar" o "Acceder de todos modos"
+#   4. La camara del telefono funcionara para escanear codigos
+#
+# IMPORTANTE: NO usar http://IP:3000 (HTTP no permite camara)
+# Los navegadores requieren Secure Context (HTTPS) para getUserMedia
+# ============================================================
 :8443 {
     tls internal
     reverse_proxy localhost:3000
 
-    # Headers necesarios para acceso movil y camara
+    # Headers para acceso movil
     header {
-        # Permitir que el navegador use la camara desde cualquier IP local
-        Cross-Origin-Embedder-Policy "require-corp"
+        # Permitir iframe/embed desde cualquier origen local
+        Cross-Origin-Embedder-Policy "credentialless"
         Cross-Origin-Opener-Policy "same-origin"
         # Cache para assets estaticos en movil
         Cache-Control "public, max-age=3600"
         X-Content-Type-Options "nosniff"
-        # Permitir WebSocket (si se necesita en el futuro)
+        # Permitir WebSocket
         Upgrade "websocket"
         Connection "upgrade"
     }

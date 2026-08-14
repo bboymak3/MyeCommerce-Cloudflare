@@ -37,7 +37,7 @@ export function QrAccessDialog({ open, onOpenChange, localUrl, secureUrl }: QrAc
                 showSecure ? "bg-green-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              🔒 HTTPS (Recomendado)
+              🔒 HTTPS (Camara)
             </button>
             <button
               onClick={() => setShowSecure(false)}
@@ -45,21 +45,24 @@ export function QrAccessDialog({ open, onOpenChange, localUrl, secureUrl }: QrAc
                 !showSecure ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              🌐 HTTP (Local IP)
+              🌐 HTTP (Sin camara)
             </button>
           </div>
 
           {showSecure && (
             <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-2 w-full">
               <p className="text-[10px] text-green-700 dark:text-green-400 text-center font-medium">
-                ✅ Modo HTTPS: La camara del telefono funcionara para escanear codigos de barras y tomar fotos de productos.
+                ✅ Modo HTTPS : La camara del telefono funcionara para escanear codigos de barras.
+              </p>
+              <p className="text-[10px] text-green-600 dark:text-green-500 text-center mt-1">
+                Al primer acceso, acepta el certificado: Avanzado &gt; Continuar
               </p>
             </div>
           )}
           {!showSecure && (
             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-2 w-full">
               <p className="text-[10px] text-amber-700 dark:text-amber-400 text-center font-medium">
-                ⚠️ Modo HTTP: La camara del telefono NO funcionara para escanear codigos. Use HTTPS para acceso completo.
+                ⚠️ Modo HTTP : La camara del telefono NO funcionara. Use HTTPS para escanear.
               </p>
             </div>
           )}
@@ -80,7 +83,7 @@ export function QrAccessDialog({ open, onOpenChange, localUrl, secureUrl }: QrAc
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {showSecure
-                    ? "Acceso via dominio local. Requiere Caddy ejecutandose."
+                    ? "HTTPS via IP local :8443. Al primer acceso acepta el certificado del navegador."
                     : "Solo accesible desde dispositivos en la misma red WiFi/Local."}
                 </p>
               </div>
