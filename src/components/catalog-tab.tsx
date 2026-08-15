@@ -282,7 +282,7 @@ export default function CatalogTab({
           <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
             {storeLogo ? (
               <div className="w-12 h-12 rounded-xl overflow-hidden bg-card flex items-center justify-center flex-shrink-0">
-                <img src={storeLogo} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <img crossOrigin="anonymous" src={storeLogo} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
             ) : (
               <div className="w-12 h-12 rounded-xl bg-card flex items-center justify-center text-2xl">🏪</div>
@@ -496,7 +496,7 @@ export default function CatalogTab({
             <div className="flex items-center gap-3">
               <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center flex-shrink-0">
                 {coverLogoUrl ? (
-                  <img src={coverLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" onError={() => setCoverLogoUrl("")} />
+                  <img crossOrigin="anonymous" src={coverLogoUrl} alt="Logo" className="w-full h-full object-contain p-1" onError={() => setCoverLogoUrl("")} />
                 ) : (
                   <span className="text-2xl text-muted-foreground/50">📷</span>
                 )}

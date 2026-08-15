@@ -286,7 +286,7 @@ export default function AppNav({
         )}
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-slate-500 font-medium">
-            v{version || '2.9.49'}
+            v{version || '2.9.54'}
           </span>
           {onLogout && (
             <button

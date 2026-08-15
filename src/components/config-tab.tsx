@@ -441,6 +441,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
                 <div className="relative w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden bg-white dark:bg-gray-800 shrink-0">
                   {storeLogo ? (
                     <img
+                      crossOrigin="anonymous"
                       src={storeLogo}
                       alt="Logo"
                       className="w-full h-full object-contain p-1"
@@ -1199,7 +1200,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         <CardContent>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="text-muted-foreground">Version:</div>
-            <div className="font-medium">MyeCommerce POS v2.9.16</div>
+            <div className="font-medium">MyeCommerce POS v2.9.54</div>
             <div className="text-muted-foreground">Motor:</div>
             <div className="font-medium">Next.js 15 + SQLite</div>
             <div className="text-muted-foreground">Base de Datos:</div>

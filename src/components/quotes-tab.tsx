@@ -280,7 +280,7 @@ export default function QuotesTab({
     if (!clientSearch.trim()) return clients.slice(0, 15);
     const q = clientSearch.toLowerCase();
     return clients.filter(c =>
-      c.fullName.toLowerCase().includes(q) || c.docNumber.includes(q)
+      c.fullName.toLowerCase().includes(q) || c.docNumber.toLowerCase().includes(q)
     ).slice(0, 15);
   }, [clients, clientSearch]);
 
@@ -458,8 +458,8 @@ export default function QuotesTab({
   const filteredProducts = products.filter((p) => {
     const s = productSearch.toLowerCase();
     return p.name?.toLowerCase().includes(s)
-      || (p.barcode || '').includes(s)
-      || (p.secondaryBarcode || '').includes(s)
+      || (p.barcode || '').toLowerCase().includes(s)
+      || (p.secondaryBarcode || '').toLowerCase().includes(s)
       || (p.brand?.name || '').toLowerCase().includes(s)
       || (p.category?.name || '').toLowerCase().includes(s);
   });

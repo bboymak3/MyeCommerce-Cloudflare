@@ -14,35 +14,6 @@ myecommerce.ve {
     reverse_proxy localhost:3000
 }
 
-# ============================================================
-# ACCESO MOVIL VIA IP LOCAL (HTTPS auto-certificado)
-# ============================================================
-# Los telefonos acceden via https://IP_DEL_SERVER:8443
-# Ejemplo: https://192.168.1.105:8443
-#
-# Al primer acceso desde el telefono:
-#   1. El navegador muestra advertencia de certificado
-#   2. Toque "Avanzado" o "Detalles"
-#   3. Toque "Continuar" o "Acceder de todos modos"
-#   4. La camara del telefono funcionara para escanear codigos
-#
-# IMPORTANTE: NO usar http://IP:3000 (HTTP no permite camara)
-# Los navegadores requieren Secure Context (HTTPS) para getUserMedia
-# ============================================================
-:8443 {
-    tls internal
-    reverse_proxy localhost:3000
-
-    # Headers para acceso movil
-    header {
-        # Permitir iframe/embed desde cualquier origen local
-        Cross-Origin-Embedder-Policy "credentialless"
-        Cross-Origin-Opener-Policy "same-origin"
-        # Cache para assets estaticos en movil
-        Cache-Control "public, max-age=3600"
-        X-Content-Type-Options "nosniff"
-        # Permitir WebSocket
-        Upgrade "websocket"
-        Connection "upgrade"
-    }
-}
+# NOTA: El acceso movil por :8443 se maneja con un PROCESO INDEPENDIENTE
+# de Caddy usando Caddyfile-mobile. NO se incluye aqui para evitar
+# conflictos de puerto cuando ambos procesos arrancan simultaneamente.

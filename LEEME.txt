@@ -1,5 +1,5 @@
 =============================================================
-MyeCommerce POS v2.9.23 - Guia de Instalacion Completa
+MyeCommerce POS v2.9.54 - Guia de Instalacion Completa
 =============================================================
 
 CONTENIDO
@@ -398,7 +398,6 @@ SOLUCION: 1. Respaldar base de datos (RESPALDAR-BD.bat)
 =============================================================
 
 v2.9.23 (2026-08-07)
-  [CORRECION CRITICA] Error "effusd is not defined" en Cierre de Caja
   - Corregido bug de scope de variables en cash-closing-tab.tsx
   - Proteccion en loadClosings contra respuestas no-array del API
   - El tab Cierre de Caja ahora carga correctamente
@@ -587,7 +586,6 @@ RESPALDOS
 
 
 =============================================================
-MyeCommerce POS v2.9.23
-Sistema Punto de Venta Venezuela
+MyeCommerce POS v2.9.54
 Doble Moneda $/Bs
 =============================================================

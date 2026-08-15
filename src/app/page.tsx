@@ -462,14 +462,14 @@ export default function Home() {
               if (!tab) return;
               if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
               safeSetTab(v);
-            }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon, restricted: t.restricted, plan: t.plan }))} stockAlertCount={stockAlertCount} currentUser={currentUser.fullName || currentUser.username} onLogout={handleLogout} version="2.9.47" />
+            }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon, restricted: t.restricted, plan: t.plan }))} stockAlertCount={stockAlertCount} currentUser={currentUser.fullName || currentUser.username} onLogout={handleLogout} version="2.9.54" />
             <div>
               <h1 className="text-xl font-bold text-primary">
                 {settings.storeName}
                 {showWatermark && <span className="text-xs font-normal text-yellow-600 ml-2">(TRIAL)</span>}
               </h1>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>v2.9.47 | 1$ =</span>
+                <span>v2.9.54 | 1$ =</span>
                 {editingBcv ? (
                   <input type="number" min="0" step="0.01" value={inlineBcv}
                     onChange={(e) => setInlineBcv(e.target.value)}
@@ -496,7 +496,7 @@ export default function Home() {
             <Separator orientation="vertical" className="h-8" />
             <div className="flex items-center gap-2">
               {currentUser.avatar ? (
-                <img src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-primary/30" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <img crossOrigin="anonymous" src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-primary/30" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-primary/15 border border-primary/30 flex items-center justify-center text-primary text-xs font-bold">
                   {(currentUser.fullName || currentUser.username).split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
@@ -719,7 +719,7 @@ export default function Home() {
       {showWatermark && <div className="fixed bottom-12 right-4 text-yellow-500/30 text-6xl font-bold pointer-events-none select-none rotate-[-15deg] z-50">TRIAL</div>}
 
       <footer className="border-t py-2 text-center text-xs text-muted-foreground">
-        <p>MyeCommerce POS v2.9.23 - Sistema Punto de Venta Venezuela | Doble Moneda $/Bs{showWatermark && " | Version de Prueba"}</p>
+        <p>MyeCommerce POS v2.9.54 - Sistema Punto de Venta Venezuela | Doble Moneda $/Bs{showWatermark && " | Version de Prueba"}</p>
       </footer>
 
       {/* MODALES */}

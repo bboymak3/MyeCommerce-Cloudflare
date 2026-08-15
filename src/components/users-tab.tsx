@@ -84,6 +84,7 @@ function UserAvatar({ src, name, size = "md" }: { src?: string; name?: string; s
     return (
       <div className="relative">
         <img
+          crossOrigin="anonymous"
           src={src}
           alt={name || "Avatar"}
           className={`${sizeClasses[size]} rounded-full object-cover border-2 border-primary/30`}

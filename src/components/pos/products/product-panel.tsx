@@ -47,7 +47,7 @@ export function ProductPanel({
 
   // Filter products
   const filteredProducts = useMemo(() => products.filter((p) => {
-    const matchSearch = p.name?.toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').includes(search) || (p.brand?.name || '').toLowerCase().includes(search.toLowerCase());
+    const matchSearch = p.name?.toLowerCase().includes(search.toLowerCase()) || (p.barcode || '').toLowerCase().includes(search.toLowerCase()) || (p.brand?.name || '').toLowerCase().includes(search.toLowerCase());
     const matchCategory = !selectedCategory || p.category?.name === selectedCategory;
     const matchBrand = !selectedBrand || p.brand?.name === selectedBrand;
     const matchStock = allowZeroStock || p.noStock || p.stock > 0;

@@ -155,7 +155,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   // ─── FILTERED PRODUCTS ───
   const filtered = products.filter(p => {
     const s = search.toLowerCase();
-    const matchSearch = !s || p.name?.toLowerCase().includes(s) || (p.barcode || '').includes(s) || (p.secondaryBarcode || '').includes(s) || (p.description || '').toLowerCase().includes(s) || (p.brand?.name || '').toLowerCase().includes(s);
+    const matchSearch = !s || p.name?.toLowerCase().includes(s) || (p.barcode || '').toLowerCase().includes(s) || (p.secondaryBarcode || '').toLowerCase().includes(s) || (p.description || '').toLowerCase().includes(s) || (p.brand?.name || '').toLowerCase().includes(s);
     return matchSearch && (!filterCategory || p.categoryId === filterCategory);
   });
 

@@ -1,8 +1,12 @@
-# Caddyfile-mobile - MyeCommerce POS
+# Caddyfile-mobile - MyeCommerce POS v2.9.54
 # HTTPS en :8443 para telefono (camara como lector de barras)
 # Uso: caddy.exe run --config Caddyfile-mobile
 #
-# Si "admin off" falla, eliminar el bloque global y dejar solo :8443
+# INSTRUCCIONES MOVIL:
+#   1. Desde el telefono abrir: https://IP_DEL_SERVER:8443
+#   2. El navegador mostrara advertencia de certificado
+#   3. Toque "Avanzado" > "Continuar de todos modos"
+#   4. La camara funcionara para escanear codigos de barras
 
 {
 	admin off
@@ -11,17 +15,4 @@
 :8443 {
 	tls internal
 	reverse_proxy localhost:3000
-	header {
-		Cross-Origin-Embedder-Policy "credentialless"
-		Cross-Origin-Opener-Policy "same-origin"
-		Cache-Control "public, max-age=3600"
-		X-Content-Type-Options "nosniff"
-		Upgrade "websocket"
-		Connection "upgrade"
-	}
-	log {
-		output file caddy-mobile.log
-		format json
-		level INFO
-	}
 }

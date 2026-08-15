@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
-  title: "MyeCommerce POS v2.0",
+  title: "MyeCommerce POS v2.9.54",
   description: "Sistema Punto de Venta - Venezuela | Doble Moneda $/Bs",
   manifest: "/manifest.json",
 };

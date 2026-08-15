@@ -16,7 +16,7 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
-      version: '2.9.5',
+      version: '2.9.54',
       exportedAt: new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' }),
       products,
       categories,
