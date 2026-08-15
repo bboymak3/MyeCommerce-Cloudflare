@@ -14,7 +14,7 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
-      version: '2.9.54',
+      version: '2.9.55',
       products,
       categories,
       clients,

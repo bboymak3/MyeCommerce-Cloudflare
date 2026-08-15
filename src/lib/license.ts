@@ -1,4 +1,4 @@
-// Sistema de Licencias MyeCommerce POS v2.9.54
+// Sistema de Licencias MyeCommerce POS v2.9.55
 // Genera y valida claves de licencia con algoritmo propietario
 // Estructura: TRIAL (15 dias) | BASICA (365 dias) | PROFESIONAL (365 dias)
 
