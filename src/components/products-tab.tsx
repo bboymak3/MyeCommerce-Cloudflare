@@ -21,6 +21,7 @@ interface Product {
   id: string; name: string; description: string; barcode: string; secondaryBarcode: string;
   price: number; cost: number; marginPercent: number; taxType: string;
   stock: number; minStock: number; wholesalePrice: number; minWholesaleQty: number;
+  granMayorPrice: number; isGranMayor: boolean;
   noStock: boolean; vendePorPeso?: boolean; unidadPeso?: string;
   icon: string; image: string; location: string;
   expirationDate: string | null; lotNumber: string;
@@ -31,7 +32,7 @@ interface Product {
 }
 interface StockAlert { id: string; name: string; barcode: string; stock: number; minStock: number; price: number; cost: number; icon: string; categoryName: string; deficit: number; }
 interface StockAlertsData { totalAlerts: number; zeroStockCount: number; lowStockCount: number; zeroStock: StockAlert[]; lowStock: StockAlert[]; }
-interface ProductsTabProps { products: Product[]; categories: Category[]; brands: Brand[]; bcvRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; taxRate?: number; }
+interface ProductsTabProps { products: Product[]; categories: Category[]; brands: Brand[]; bcvRate: number; euroUsdtRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; taxRate?: number; }
 
 function CatBadge({ categoryName, categories }: { categoryName: string; categories: Category[] }) {
   const cat = categories.find(c => c.name === categoryName);
@@ -64,7 +65,7 @@ function Block({ title, icon, badge, defaultOpen = true, children }: { title: st
   );
 }
 
-export default function ProductsTab({ products, categories, brands, bcvRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional", taxRate = 0 }: ProductsTabProps) {
+export default function ProductsTab({ products, categories, brands, bcvRate, euroUsdtRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional", taxRate = 0 }: ProductsTabProps) {
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -73,7 +74,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   const [filterBrand, setFilterBrand] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [showBarcodePrint, setShowBarcodePrint] = useState(false);
-  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", brandId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
+  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", brandId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", granMayorPrice: "", isGranMayor: false, noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
   const [formData, setFormData] = useState(emptyForm);
   const [categoryName, setCategoryName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");
@@ -191,7 +192,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
 
   const openEdit = (p: Product) => {
     setEditingProduct(p);
-    setFormData({ name: p.name, description: p.description, barcode: p.barcode, secondaryBarcode: p.secondaryBarcode || "", price: p.price.toString(), cost: p.cost.toString(), marginPercent: (p.marginPercent || 0).toString(), taxType: p.taxType || "general", stock: p.stock.toString(), minStock: (p.minStock || 5).toString(), categoryId: p.categoryId || "", brandId: p.brandId || "", icon: p.icon || "", image: p.image || "", wholesalePrice: (p.wholesalePrice || 0).toString(), minWholesaleQty: (p.minWholesaleQty || 0).toString(), noStock: p.noStock || false, vendePorPeso: p.vendePorPeso || false, unidadPeso: p.unidadPeso || "kg", location: p.location || "", expirationDate: p.expirationDate ? p.expirationDate.split("T")[0] : "", lotNumber: p.lotNumber || "", isCombo: p.isCombo || false, loyaltyPoints: (p.loyaltyPoints || 0).toString(), unitsPerBox: (p.unitsPerBox || 0).toString(), boxPrice: (p.boxPrice || 0).toString(), boxMarginPercent: (p.boxMarginPercent || 0).toString() });
+    setFormData({ name: p.name, description: p.description, barcode: p.barcode, secondaryBarcode: p.secondaryBarcode || "", price: p.price.toString(), cost: p.cost.toString(), marginPercent: (p.marginPercent || 0).toString(), taxType: p.taxType || "general", stock: p.stock.toString(), minStock: (p.minStock || 5).toString(), categoryId: p.categoryId || "", brandId: p.brandId || "", icon: p.icon || "", image: p.image || "", wholesalePrice: (p.wholesalePrice || 0).toString(), minWholesaleQty: (p.minWholesaleQty || 0).toString(), granMayorPrice: (p.granMayorPrice || 0).toString(), isGranMayor: p.isGranMayor || false, noStock: p.noStock || false, vendePorPeso: p.vendePorPeso || false, unidadPeso: p.unidadPeso || "kg", location: p.location || "", expirationDate: p.expirationDate ? p.expirationDate.split("T")[0] : "", lotNumber: p.lotNumber || "", isCombo: p.isCombo || false, loyaltyPoints: (p.loyaltyPoints || 0).toString(), unitsPerBox: (p.unitsPerBox || 0).toString(), boxPrice: (p.boxPrice || 0).toString(), boxMarginPercent: (p.boxMarginPercent || 0).toString() });
     setShowProductDialog(true);
     if (p.isCombo && p.id) { (async () => { try { const r = await authFetch(`/api/products/combo-items?comboId=${p.id}`); if (r.ok) setComboItems(await r.json()); } catch { setComboItems([]); } })(); } else setComboItems([]);
   };
@@ -813,6 +814,55 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
               <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t">
                 <div><Label className="text-[10px]">P. Mayorista ({currency})</Label><Input type="number" step="0.01" min="0" value={formData.wholesalePrice} onChange={e => setFormData({ ...formData, wholesalePrice: e.target.value })} placeholder="0=desactivado" className="text-sm" /><p className="text-[8px] text-muted-foreground">Precio al mayor (tasa euro BCV)</p></div>
                 <div><Label className="text-[10px]">Cant. Min. Mayorista</Label><Input type="number" min="0" value={formData.minWholesaleQty} onChange={e => setFormData({ ...formData, minWholesaleQty: e.target.value })} className="text-sm" /><p className="text-[8px] text-muted-foreground">A partir de cuantas uds aplica</p></div>
+              </div>
+
+              {/* Gran Mayor (GM) */}
+              <div className="mt-2 pt-2 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <input
+                    type="checkbox"
+                    id="isGranMayor"
+                    checked={!!formData.isGranMayor}
+                    onChange={e => {
+                      const isGM = e.target.checked;
+                      let gmPrice = formData.granMayorPrice;
+                      if (isGM) {
+                        const price = parseFloat(formData.price) || 0;
+                        const bcv = bcvRate || 0;
+                        const euro = euroUsdtRate || 0;
+                        if (price > 0 && bcv > 0 && euro > 0) {
+                          gmPrice = (Math.round(price * (euro / bcv) * 10000) / 10000).toString();
+                        } else {
+                          toast.error("Configure las tasas BCV y Euro/USDT en Configuracion primero");
+                          return;
+                        }
+                      } else {
+                        gmPrice = "0";
+                      }
+                      setFormData({ ...formData, isGranMayor: isGM, granMayorPrice: gmPrice });
+                    }}
+                    className="rounded"
+                  />
+                  <Label htmlFor="isGranMayor" className="text-xs font-medium cursor-pointer">Gran Mayor (GM)</Label>
+                  <span className="text-[9px] text-muted-foreground ml-1">Precio basado en tasa Euro/USDT</span>
+                </div>
+                {formData.isGranMayor && (
+                  <div className="ml-6">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-[10px]">P. Gran Mayor ({currency})</Label>
+                        <Input type="number" step="0.01" min="0" value={formData.granMayorPrice} onChange={e => setFormData({ ...formData, granMayorPrice: e.target.value })} className="text-sm" placeholder="0" />
+                        <p className="text-[8px] text-muted-foreground">Se recalcula al activar con las tasas actuales</p>
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <div className="text-[10px] text-muted-foreground space-y-0.5">
+                          <p>Factor: {bcvRate > 0 && euroUsdtRate > 0 ? `x${(euroUsdtRate / bcvRate).toFixed(3)}` : '-'}</p>
+                          <p>BCV: {bcvRate} | Euro: {euroUsdtRate}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </Block>
 

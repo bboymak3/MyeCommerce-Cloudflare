@@ -52,7 +52,7 @@ export async function performBackup() {
   ]);
 
   const backup = {
-    version: '2.9.55',
+    version: '2.9.56',
     timestamp: new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' }),
     products,
     categories,

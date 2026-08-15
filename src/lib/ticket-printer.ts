@@ -1,5 +1,5 @@
 /**
- * ticket-printer.ts — Ticket Engine v8.0 (MyeCommerce POS v2.9.55)
+ * ticket-printer.ts — Ticket Engine v8.0 (MyeCommerce POS v2.9.56)
  *
  * MODO DUAL: ESC/POS via Agente Local + Fallback HTML
  * ─────────────────────────────────────────────────

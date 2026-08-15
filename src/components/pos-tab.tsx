@@ -35,7 +35,7 @@ import { Button } from "@/components/ui/button";
 
 export default function PosTab(props: PosTabProps) {
   const {
-    products, bcvRate, taxRate, storeName, storeAddress, storeRif, storePhone = "",
+    products, bcvRate, euroUsdtRate, taxRate, storeName, storeAddress, storeRif, storePhone = "",
     currency, allowZeroStock = false, enableDiscount = false, maxDiscountPct = 20,
     canSaleNotes = false, canFrequentCustomers = false,
     sellerName: propSellerName = "", sellerRole: propSellerRole = "",
@@ -51,11 +51,12 @@ export default function PosTab(props: PosTabProps) {
   } = props;
 
   // ─── Custom hooks ─────────────────────────────────────────────
-  const cartHook = useCart({ products, allowZeroStock, maxDiscountPct });
+  const cartHook = useCart({ products, allowZeroStock, maxDiscountPct, bcvRate, euroUsdtRate });
   const clientHook = useClients();
 
   const {
     addToCart, updateQuantity, removeFromCart, clearCart, toggleWholesale,
+    isGranMayorMode, toggleGranMayor,
     cart, subtotal, discount, setDiscount, notes, setNotes,
     paymentMethod, setPaymentMethod, referenceNumber, setReferenceNumber,
     cashReceived, setCashReceived, cashReceivedUsd, setCashReceivedUsd,
@@ -368,6 +369,7 @@ export default function PosTab(props: PosTabProps) {
         cart={cart} products={products} currency={currency} allowZeroStock={allowZeroStock}
         onClearCart={() => setShowClearCartConfirm(true)} onUpdateQty={updateQuantity} onRemove={removeFromCart}
         onToggleWholesale={toggleWholesale}
+        isGranMayorMode={isGranMayorMode} onToggleGranMayor={toggleGranMayor}
         selectedClient={selectedClient} onOpenClientDialog={() => setShowClientDialog(true)}
         onOpenQrModal={() => setShowQrModal(true)}
         paymentMethod={paymentMethod} setPaymentMethod={setPaymentMethod}

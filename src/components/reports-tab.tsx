@@ -451,7 +451,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
       ${bsRefRows ? `<h2>Bs Electronicos — Transferencia + Pago Movil</h2><table><thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto (Bs)</th></tr></thead><tbody>${bsRefRows}</tbody></table>` : ''}
       ${usdRefRows ? `<h2>USD Electronicos — Zelle + USDT</h2><table><thead><tr><th>Fecha/Hora</th><th>Cliente</th><th>Tipo</th><th>Referencia</th><th style="text-align:right">Monto ($)</th></tr></thead><tbody>${usdRefRows}</tbody></table>` : ''}
       ${topProducts.length > 0 ? `<h2>Top Productos</h2><table><thead><tr><th>#</th><th>Producto</th><th>Cant.</th><th>Total $</th><th>Total Bs</th></tr></thead><tbody>${topProducts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.productName || p.name || 'Producto'}</td><td>${p.quantity || 0}</td><td>$ ${(p.total || p.totalUsd || 0).toFixed(2)}</td><td>Bs ${((p.total || p.totalUsd || 0) * bcvRate).toFixed(2)}</td></tr>`).join('')}</tbody></table>` : ''}
-      <div class="footer">Reporte generado por MyeCommerce POS v2.9.55</div>
+      <div class="footer">Reporte generado por MyeCommerce POS v2.9.56</div>
       <script>window.onload=function(){window.print();}</script></body></html>`);
     printWindow.document.close();
   };
@@ -467,7 +467,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
 
       let csv = BOM;
       // Metadata header
-      csv += `Reporte de Ventas - MyeCommerce POS v2.9.55\n`;
+      csv += `Reporte de Ventas - MyeCommerce POS v2.9.56\n`;
       csv += `Periodo: ${periodLabel}${filterInfo ? ' | ' + filterInfo : ''}\n`;
       csv += `Generado: ${new Date().toLocaleString("es-VE")}\n`;
       csv += `Tasa: 1$ = ${bcvRate.toFixed(2)} Bs\n`;

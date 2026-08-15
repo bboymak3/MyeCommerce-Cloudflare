@@ -477,14 +477,14 @@ export default function Home() {
               if (!tab) return;
               if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
               safeSetTab(v);
-            }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon, restricted: t.restricted, plan: t.plan }))} stockAlertCount={stockAlertCount} currentUser={currentUser.fullName || currentUser.username} onLogout={handleLogout} version="2.9.55" />
+            }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon, restricted: t.restricted, plan: t.plan }))} stockAlertCount={stockAlertCount} currentUser={currentUser.fullName || currentUser.username} onLogout={handleLogout} version="2.9.56" />
             <div>
               <h1 className="text-xl font-bold text-primary">
                 {settings.storeName}
                 {showWatermark && <span className="text-xs font-normal text-yellow-600 ml-2">(TRIAL)</span>}
               </h1>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>v2.9.55 | 1$ =</span>
+                <span>v2.9.56 | 1$ =</span>
                 {editingBcv ? (
                   <input type="number" min="0" step="0.01" value={inlineBcv}
                     onChange={(e) => setInlineBcv(e.target.value)}
@@ -550,7 +550,7 @@ export default function Home() {
         </TabsContent>
         <TabsContent value="pos" activeTab={activeTab}>
           <ErrorBoundary name="Punto de Venta">
-            <PosTab products={products} bcvRate={settings.bcvRate ?? 36.5} taxRate={settings.taxRate ?? 0}
+            <PosTab products={products} bcvRate={settings.bcvRate ?? 36.5} euroUsdtRate={settings.euroUsdtRate ?? 0} taxRate={settings.taxRate ?? 0}
               storeName={settings.storeName} storeAddress={settings.storeAddress} storeRif={settings.storeRif}
               storePhone={settings.storePhone} currency={settings.currency} allowZeroStock={settings.allowZeroStock}
               enableDiscount={settings.enableDiscount} maxDiscountPct={settings.maxDiscountPct ?? 20}
@@ -625,7 +625,7 @@ export default function Home() {
         </TabsContent>
         <TabsContent value="products" activeTab={activeTab}>
           <ErrorBoundary name="Productos">
-            <ProductsTab products={products} categories={categories} brands={brands} bcvRate={settings.bcvRate ?? 36.5}
+            <ProductsTab products={products} categories={categories} brands={brands} bcvRate={settings.bcvRate ?? 36.5} euroUsdtRate={settings.euroUsdtRate ?? 0}
               currency={settings.currency} onRefresh={loadData} maxProducts={license?.maxProducts || 30} licenseType={license?.licenseType || "trial"} taxRate={settings.taxRate ?? 0} />
           </ErrorBoundary>
         </TabsContent>
@@ -735,7 +735,7 @@ export default function Home() {
       {showWatermark && <div className="fixed bottom-12 right-4 text-yellow-500/30 text-6xl font-bold pointer-events-none select-none rotate-[-15deg] z-50">TRIAL</div>}
 
       <footer className="border-t py-2 text-center text-xs text-muted-foreground">
-        <p>MyeCommerce POS v2.9.55 - Sistema Punto de Venta Venezuela | Doble Moneda $/Bs{showWatermark && " | Version de Prueba"}</p>
+        <p>MyeCommerce POS v2.9.56 - Sistema Punto de Venta Venezuela | Doble Moneda $/Bs{showWatermark && " | Version de Prueba"}</p>
       </footer>
 
       {/* MODALES */}

@@ -68,6 +68,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [storePhone, setStorePhone] = useState(settings.storePhone || "");
   const [storeRif, setStoreRif] = useState(settings.storeRif || "");
   const [bcvRate, setBcvRate] = useState((settings.bcvRate ?? 36.5).toString());
+  const [euroUsdtRate, setEuroUsdtRate] = useState((settings.euroUsdtRate ?? 0).toString());
   const [taxRate, setTaxRate] = useState(settings.taxRate.toString());
   const [currency, setCurrency] = useState(settings.currency);
   const [allowZeroStock, setAllowZeroStock] = useState(settings.allowZeroStock || false);
@@ -110,7 +111,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   useEffect(() => {
     setTheme(settings.theme || 'blue');
     setThemeMode(settings.themeMode || 'light');
-  }, [settings.theme, settings.themeMode]);
+    setEuroUsdtRate(String(settings.euroUsdtRate ?? 0));
+  }, [settings.theme, settings.themeMode, settings.euroUsdtRate]);
 
   // Auto-clamp fontSize when paper width changes
   useEffect(() => {
@@ -247,6 +249,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
       const payload: any = {
         storeName,
         bcvRate: parseFloat(bcvRate),
+        euroUsdtRate: parseFloat(euroUsdtRate) || 0,
         taxRate: parseFloat(taxRate || "0"),
         currency,
         storeAddress,
@@ -608,6 +611,22 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
                 Tasa actualizada del Banco Central de Venezuela
               </p>
             </div>
+            <div>
+              <Label>Tasa Euro/USDT (1 USD = ? Bs)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={euroUsdtRate}
+                onChange={(e) => setEuroUsdtRate(e.target.value)}
+                placeholder="0 = desactivado"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Tasa paralela para calculo de Gran Mayor (0 = desactivado)
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Impuesto IVA (%)</Label>
               <Input
@@ -1251,7 +1270,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         <CardContent>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div className="text-muted-foreground">Version:</div>
-            <div className="font-medium">MyeCommerce POS v2.9.55</div>
+            <div className="font-medium">MyeCommerce POS v2.9.56</div>
             <div className="text-muted-foreground">Motor:</div>
             <div className="font-medium">Next.js 15 + SQLite</div>
             <div className="text-muted-foreground">Base de Datos:</div>

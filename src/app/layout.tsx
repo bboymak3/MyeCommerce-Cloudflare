@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export const metadata: Metadata = {
-  title: "MyeCommerce POS v2.9.55",
+  title: "MyeCommerce POS v2.9.56",
   description: "Sistema Punto de Venta - Venezuela | Doble Moneda $/Bs",
   manifest: "/manifest.json",
 };

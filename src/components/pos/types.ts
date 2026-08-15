@@ -7,6 +7,8 @@ export interface Product {
   price: number;
   wholesalePrice: number;
   minWholesaleQty: number;
+  granMayorPrice: number;
+  isGranMayor: boolean;
   cost: number;
   stock: number;
   minStock: number;
@@ -80,6 +82,7 @@ export interface MixedEntry {
 export interface PosTabProps {
   products: Product[];
   bcvRate: number;
+  euroUsdtRate: number;
   taxRate: number;
   storeName: string;
   storeAddress: string;

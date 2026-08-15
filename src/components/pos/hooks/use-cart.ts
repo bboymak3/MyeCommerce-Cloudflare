@@ -9,9 +9,11 @@ interface UseCartOptions {
   products: Product[];
   allowZeroStock: boolean;
   maxDiscountPct: number;
+  bcvRate: number;
+  euroUsdtRate: number;
 }
 
-export function useCart({ products, allowZeroStock, maxDiscountPct }: UseCartOptions) {
+export function useCart({ products, allowZeroStock, maxDiscountPct, bcvRate, euroUsdtRate }: UseCartOptions) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState("");
@@ -20,6 +22,9 @@ export function useCart({ products, allowZeroStock, maxDiscountPct }: UseCartOpt
   const [cashReceived, setCashReceived] = useState("");
   const [cashReceivedUsd, setCashReceivedUsd] = useState("");
   const [mixedPayments, setMixedPayments] = useState<MixedEntry[]>([...DEFAULT_MIXED_PAYMENTS]);
+
+  // ── GM (Gran Mayor) global mode ──────────────────────────────
+  const [isGranMayorMode, setIsGranMayorMode] = useState(false);
 
   // ── Credit state ───────────────────────────────────────────────
   const [isCredit, setIsCredit] = useState(false);
@@ -64,9 +69,45 @@ export function useCart({ products, allowZeroStock, maxDiscountPct }: UseCartOpt
     [products],
   );
 
+  // ── Toggle GM (Gran Mayor) global mode ──────────────────────
+  const toggleGranMayor = useCallback(() => {
+    const newState = !isGranMayorMode;
+    if (newState) {
+      if (!euroUsdtRate || euroUsdtRate <= 0 || !bcvRate || bcvRate <= 0) {
+        toast.error("Configure la tasa Euro/USDT en Configuracion primero");
+        return;
+      }
+    }
+    setIsGranMayorMode(newState);
+    setCart((prev) =>
+      prev.map((item) => {
+        if (newState) {
+          // Activando GM — calcular precio GM
+          // Prioridad: isWholesale (mayorista manual) > GM > detal
+          if (item.isWholesale) return item; // No tocar si ya es mayorista
+          const product = products.find((p) => p.id === item.id);
+          const basePrice = product?.price || item.price;
+          const gmPrice = Math.round(basePrice * (euroUsdtRate / bcvRate) * 10000) / 10000;
+          return { ...item, price: gmPrice, total: item.quantity * gmPrice };
+        } else {
+          // Desactivando GM — volver a precio detal
+          if (item.isWholesale) return item; // No tocar si es mayorista
+          const product = products.find((p) => p.id === item.id);
+          const detalPrice = product?.price || 0;
+          return { ...item, price: detalPrice, total: item.quantity * detalPrice };
+        }
+      }),
+    );
+  }, [isGranMayorMode, euroUsdtRate, bcvRate, products]);
+
   // ── Add to cart ───────────────────────────────────────────────
   const addToCart = useCallback(
     (product: Product) => {
+      // Determine initial price based on GM mode
+      let initialPrice = product.price;
+      if (isGranMayorMode && euroUsdtRate > 0 && bcvRate > 0) {
+        initialPrice = Math.round(product.price * (euroUsdtRate / bcvRate) * 10000) / 10000;
+      }
       if (!product.noStock && product.stock > 0 && product.stock <= product.minStock) {
         toast.warning(`Stock bajo: ${product.name} (${product.stock} uds, min: ${product.minStock})`, {
           description: "Considerar reabastecer este producto",
@@ -83,7 +124,7 @@ export function useCart({ products, allowZeroStock, maxDiscountPct }: UseCartOpt
             toast.error("Producto sin stock");
             return prev;
           }
-          return [...prev, { ...product, quantity: 0, total: 0, isWholesale: false, pesoIngresado: false }];
+          return [...prev, { ...product, quantity: 0, total: 0, isWholesale: false, pesoIngresado: false, price: initialPrice }];
         });
         return;
       }
@@ -95,17 +136,17 @@ export function useCart({ products, allowZeroStock, maxDiscountPct }: UseCartOpt
             toast.error("Stock insuficiente");
             return prev;
           }
-          const price = existing.isWholesale ? product.wholesalePrice || product.price : product.price;
+          const price = existing.isWholesale ? product.wholesalePrice || product.price : (isGranMayorMode ? initialPrice : product.price);
           return prev.map((i) => (i.id === product.id ? { ...i, quantity: qty, price, total: qty * price } : i));
         }
         if (!allowZeroStock && !product.noStock && product.stock <= 0) {
           toast.error("Producto sin stock");
           return prev;
         }
-        return [...prev, { ...product, quantity: 1, total: product.price, isWholesale: false }];
+        return [...prev, { ...product, quantity: 1, total: initialPrice, isWholesale: false, price: initialPrice }];
       });
     },
-    [allowZeroStock],
+    [allowZeroStock, isGranMayorMode, euroUsdtRate, bcvRate],
   );
 
   // ── Update quantity ───────────────────────────────────────────
@@ -166,5 +207,6 @@ export function useCart({ products, allowZeroStock, maxDiscountPct }: UseCartOpt
     creditClientName, setCreditClientName, creditClientDebt, setCreditClientDebt,
     creditDays, setCreditDays,
     addToCart, updateQuantity, removeFromCart, clearCart, toggleWholesale,
+    isGranMayorMode, toggleGranMayor,
   };
 }

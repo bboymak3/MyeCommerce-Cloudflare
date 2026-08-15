@@ -18,6 +18,8 @@ interface CartPanelProps {
   onUpdateQty: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
   onToggleWholesale: (id: string) => void;
+  isGranMayorMode: boolean;
+  onToggleGranMayor: () => void;
 
   // Client
   selectedClient: ClientData | null;
@@ -87,6 +89,7 @@ interface CartPanelProps {
 export function CartPanel({
   cart, products, currency, allowZeroStock,
   onClearCart, onUpdateQty, onRemove, onToggleWholesale,
+  isGranMayorMode, onToggleGranMayor,
   selectedClient, onOpenClientDialog, onOpenQrModal,
   paymentMethod, setPaymentMethod, referenceNumber, setReferenceNumber,
   cashReceived, setCashReceived, cashReceivedUsd, setCashReceivedUsd,
@@ -107,6 +110,13 @@ export function CartPanel({
         <div className="flex items-center justify-between mb-2">
           <CardTitle className="text-lg font-bold">Carrito <span className="text-primary">({cart.length})</span></CardTitle>
           <div className="flex items-center gap-2">
+            <button onClick={onToggleGranMayor} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md font-bold text-[10px] border transition-all ${
+              isGranMayorMode
+                ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+            }`} title={isGranMayorMode ? "Desactivar Gran Mayor" : "Activar Gran Mayor (precio tasa Euro/USDT)"}>
+              GM
+            </button>
             <button onClick={onOpenQrModal} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-indigo-100 text-indigo-800 font-bold text-[10px] border border-indigo-200 hover:bg-indigo-200 transition-colors" title="Acceso movil via QR">
               Telefono QR
             </button>

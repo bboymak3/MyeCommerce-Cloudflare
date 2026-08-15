@@ -232,7 +232,7 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
           </Card>
 
           <p className="text-center text-slate-500 text-xs mt-6">
-            MyeCommerce POS v2.9.55
+            MyeCommerce POS v2.9.56
           </p>
         </div>
       </div>
@@ -318,7 +318,7 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
         </Card>
 
         <p className="text-center text-slate-500 text-xs mt-6">
-          MyeCommerce POS v2.9.55 &bull; Doble Moneda $/Bs
+          MyeCommerce POS v2.9.56 &bull; Doble Moneda $/Bs
         </p>
       </div>
     </div>
