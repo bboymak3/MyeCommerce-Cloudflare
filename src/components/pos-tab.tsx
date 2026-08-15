@@ -120,13 +120,15 @@ export default function PosTab(props: PosTabProps) {
     authFetch("/api/local-ip", {}).then((r) => r.json()).then((d) => { setLocalUrl(d.url || ""); setSecureUrl(d.secureUrl || ""); }).catch(() => { setLocalUrl(""); setSecureUrl(""); });
   }, []);
 
-  // Auto-focus cash input on payment method change
+  // Auto-focus cash input only on explicit payment method change (NOT on cart change)
+  const prevPaymentMethodRef = useRef(paymentMethod);
   useEffect(() => {
-    if (paymentMethod === "efectivo" && !isCredit && cart.length > 0) {
+    if (paymentMethod === "efectivo" && !isCredit && cart.length > 0 && prevPaymentMethodRef.current !== paymentMethod) {
       setTimeout(() => cashInputRef.current?.focus(), 100);
-    } else if (paymentMethod === "efectivo-usd" && !isCredit && cart.length > 0) {
+    } else if (paymentMethod === "efectivo-usd" && !isCredit && cart.length > 0 && prevPaymentMethodRef.current !== paymentMethod) {
       setTimeout(() => cashUsdInputRef.current?.focus(), 100);
     }
+    prevPaymentMethodRef.current = paymentMethod;
   }, [paymentMethod, isCredit, cart.length]);
 
   // Load initial cart from held sale / quote

@@ -22,7 +22,7 @@ export function useScanner({ products, onProductFound, onCodeDetected }: UseScan
   const handleScannedCode = useCallback(
     (code: string) => {
       if (scannerMode === "product") {
-        const found = products.find((p) => p.barcode === code);
+        const found = products.find((p) => p.barcode === code || p.secondaryBarcode === code);
         if (found) {
           onProductFound(found);
           toast.success(`Producto: ${found.name}`);

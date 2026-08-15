@@ -153,7 +153,11 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   const boxTotalStock = boxQtyBought * boxUnitsPerBox;
 
   // ─── FILTERED PRODUCTS ───
-  const filtered = products.filter(p => (p.name.toLowerCase().includes(search.toLowerCase()) || p.barcode.includes(search)) && (!filterCategory || p.categoryId === filterCategory));
+  const filtered = products.filter(p => {
+    const s = search.toLowerCase();
+    const matchSearch = !s || p.name.toLowerCase().includes(s) || p.barcode.includes(s) || p.secondaryBarcode.includes(s) || p.description.toLowerCase().includes(s) || (p.brand?.name || '').toLowerCase().includes(s);
+    return matchSearch && (!filterCategory || p.categoryId === filterCategory);
+  });
 
   // ─── PAGINATION ───
   const ITEMS_PER_PAGE = 25;
@@ -343,7 +347,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
       {/* TOOLBAR */}
       <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
         <div className="flex gap-2 flex-1 w-full sm:w-auto">
-          <Input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
+          <Input placeholder="Buscar por nombre, codigo, marca, descripcion..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
           <Select value={filterCategory} onChange={e => setFilterCategory((e.target as any).value)}>
             <option value="">Todas</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
