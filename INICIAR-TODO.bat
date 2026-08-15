@@ -60,7 +60,7 @@ echo.
 echo [4b/5] Iniciando Caddy Movil (HTTPS :8443 para telefono)...
 if exist "caddy\caddy.exe" (
     if exist "caddy\Caddyfile-mobile" (
-        start "Caddy-Mobile" /min cmd /c "cd /d %~dp0caddy && caddy.exe run --config Caddyfile-mobile --data-dir mobile-data > caddy-mobile.log 2>&1"
+        start "Caddy-Mobile" /min cmd /c "cd /d %~dp0caddy && caddy.exe run --config Caddyfile-mobile > caddy-mobile.log 2>&1"
         echo     OK - Movil: https://IP_LOCAL:8443 (puerto 8443)
     ) else (
         echo     OMITIDO - Caddyfile-mobile no encontrado

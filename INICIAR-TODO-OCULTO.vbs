@@ -84,7 +84,7 @@ caddyMovilIniciado = False
 If objFSO.FileExists(caddyDir & "\caddy.exe") Then
     If objFSO.FileExists(caddyDir & "\Caddyfile-mobile") Then
         WshShell.CurrentDirectory = caddyDir
-        WshShell.Run "cmd /c caddy.exe run --config Caddyfile-mobile --data-dir mobile-data > caddy-mobile.log 2>&1", 0, False
+        WshShell.Run "cmd /c caddy.exe run --config Caddyfile-mobile > caddy-mobile.log 2>&1", 0, False
         WshShell.CurrentDirectory = strDir
         caddyMovilIniciado = True
         
