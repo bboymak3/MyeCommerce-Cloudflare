@@ -73,6 +73,15 @@ interface CartPanelProps {
   cashInputRef: React.RefObject<HTMLInputElement | null>;
   cashUsdInputRef: React.RefObject<HTMLInputElement | null>;
   onCompleteSale: () => void;
+
+  // Shortcuts callbacks (for touch/click on mobile)
+  onSearchFocus?: () => void;
+  onToggleCredit?: () => void;
+  onSetCashUsd?: () => void;
+  onSetCashBs?: () => void;
+  onSetPagoMovil?: () => void;
+  onCharge?: () => void;
+  onHoldSale?: () => void;
 }
 
 export function CartPanel({
@@ -90,6 +99,7 @@ export function CartPanel({
   total, totalBs, taxAmount, taxRate, taxMode, effectiveDiscount,
   isUsdMethod, vuelto, vueltoUsd,
   cashInputRef, cashUsdInputRef, onCompleteSale,
+  onSearchFocus, onToggleCredit, onSetCashUsd, onSetCashBs, onSetPagoMovil, onCharge, onHoldSale,
 }: CartPanelProps) {
   return (
     <Card className="lg:col-span-3 flex flex-col h-full border-2 border-primary/30 shadow-lg">
@@ -108,7 +118,16 @@ export function CartPanel({
       </CardHeader>
       <CardContent className="flex-1 flex flex-col gap-3 overflow-hidden px-4 pb-4">
         {/* Keyboard shortcuts bar */}
-        <ShortcutsBar />
+        <ShortcutsBar
+          onSearch={onSearchFocus}
+          onToggleCredit={onToggleCredit}
+          onCashUsd={onSetCashUsd}
+          onCashBs={onSetCashBs}
+          onPagoMovil={onSetPagoMovil}
+          onCharge={onCharge}
+          onHoldSale={onHoldSale}
+          onClear={cart.length > 0 ? () => onClearCart() : undefined}
+        />
 
         {/* Selected client */}
         <div className="p-3 rounded-lg border bg-muted/30">

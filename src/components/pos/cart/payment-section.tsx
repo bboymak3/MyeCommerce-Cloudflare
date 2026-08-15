@@ -3,10 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Banknote, DollarSign, Smartphone, CreditCard, QrCode, Building, Landmark, ArrowLeftRight } from 'lucide-react';
 import type { ClientData, MixedEntry } from "../types";
 import { USD_METHODS, REF_REQUIRED_METHODS, getRefLabel, getRefPlaceholder } from "../types";
 
@@ -61,6 +61,19 @@ interface PaymentSectionProps {
   cartLength: number;
 }
 
+// ── Payment method button config ──
+const PAYMENT_METHODS: { value: string; label: string; shortLabel: string; icon: React.ReactNode; color: string }[] = [
+  { value: "efectivo", label: "Efectivo (Bs)", shortLabel: "Bs", icon: <Banknote className="w-3.5 h-3.5" />, color: "bg-green-600 hover:bg-green-700 shadow-green-600/20 text-white" },
+  { value: "efectivo-usd", label: "Efectivo ($)", shortLabel: "$", icon: <DollarSign className="w-3.5 h-3.5" />, color: "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20 text-white" },
+  { value: "cashea", label: "Cashea", shortLabel: "Cashea", icon: <Landmark className="w-3.5 h-3.5" />, color: "bg-teal-600 hover:bg-teal-700 shadow-teal-600/20 text-white" },
+  { value: "transferencia", label: "Transferencia", shortLabel: "Transf", icon: <Building className="w-3.5 h-3.5" />, color: "bg-blue-600 hover:bg-blue-700 shadow-blue-600/20 text-white" },
+  { value: "pago-movil", label: "Pago Movil", shortLabel: "PMovil", icon: <Smartphone className="w-3.5 h-3.5" />, color: "bg-violet-600 hover:bg-violet-700 shadow-violet-600/20 text-white" },
+  { value: "punto-de-venta", label: "Punto de Venta", shortLabel: "POS", icon: <CreditCard className="w-3.5 h-3.5" />, color: "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 text-white" },
+  { value: "zelle", label: "Zelle ($)", shortLabel: "Zelle", icon: <Landmark className="w-3.5 h-3.5" />, color: "bg-cyan-600 hover:bg-cyan-700 shadow-cyan-600/20 text-white" },
+  { value: "usdt", label: "USDT ($)", shortLabel: "USDT", icon: <QrCode className="w-3.5 h-3.5" />, color: "bg-orange-600 hover:bg-orange-700 shadow-orange-600/20 text-white" },
+  { value: "mixto", label: "Mixto", shortLabel: "Mixto", icon: <ArrowLeftRight className="w-3.5 h-3.5" />, color: "bg-pink-600 hover:bg-pink-700 shadow-pink-600/20 text-white" },
+];
+
 export function PaymentSection({
   paymentMethod, setPaymentMethod, referenceNumber, setReferenceNumber,
   cashReceived, setCashReceived, cashReceivedUsd, setCashReceivedUsd,
@@ -78,18 +91,30 @@ export function PaymentSection({
 
   return (
     <div className="space-y-3">
-      {/* Payment method selector */}
-      <Select value={paymentMethod} onChange={(e: any) => { setPaymentMethod(e.target.value); setReferenceNumber(""); }} className="h-12 text-base font-medium">
-        <option value="efectivo">Efectivo (Bs)</option>
-        <option value="efectivo-usd">Efectivo ($)</option>
-        <option value="cashea">Cashea</option>
-        <option value="transferencia">Transferencia</option>
-        <option value="pago-movil">Pago Movil</option>
-        <option value="punto-de-venta">Punto de Venta</option>
-        <option value="zelle">Zelle ($)</option>
-        <option value="usdt">USDT ($)</option>
-        <option value="mixto">Mixto (varios metodos)</option>
-      </Select>
+      {/* Payment method buttons */}
+      <div>
+        <Label className="text-sm font-medium mb-2 block">Metodo de Pago</Label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {PAYMENT_METHODS.map((m) => (
+            <button
+              key={m.value}
+              type="button"
+              onClick={() => { setPaymentMethod(m.value); setReferenceNumber(""); }}
+              className={`
+                flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg text-[11px] font-bold
+                transition-all duration-150 active:scale-[0.96] shadow-sm
+                ${paymentMethod === m.value
+                  ? m.color + ' ring-2 ring-offset-1 ring-current/30 scale-[1.02]'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                }
+              `}
+            >
+              {m.icon}
+              <span className="truncate">{m.shortLabel}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Vuelto efectivo Bs */}
       {paymentMethod === "efectivo" && !isCredit && cartLength > 0 && (
@@ -135,7 +160,7 @@ export function PaymentSection({
 
       {/* Mixed payment breakdown */}
       {paymentMethod === "mixto" && (
-        <div className="space-y-2 p-3 border rounded-lg bg-blue-50/50">
+        <div className="space-y-2 p-3 border rounded-xl bg-blue-50/50">
           <div className="flex items-center justify-between">
             <Label className="text-sm font-bold text-blue-800">Desglose de Pago Mixto</Label>
             <Badge variant={isMixedValid ? "default" : "destructive"} className="text-xs px-3 py-1">
@@ -143,9 +168,9 @@ export function PaymentSection({
             </Badge>
           </div>
           {mixedPayments.map((entry, idx) => (
-            <div key={idx} className="flex items-center gap-1 p-2 bg-background rounded border">
+            <div key={idx} className="flex items-center gap-1 p-2 bg-background rounded-lg border">
               <select value={entry.method} onChange={(e) => updateMixedEntry(idx, "method", e.target.value)}
-                className="h-9 text-xs rounded border px-2 flex-shrink-0 w-28">
+                className="h-9 text-xs rounded-lg border px-2 flex-shrink-0 w-28">
                 <option value="efectivo">Efectivo</option>
                 <option value="efectivo-usd">Efectivo ($)</option>
                 <option value="cashea">Cashea</option>
@@ -223,7 +248,7 @@ export function PaymentSection({
             <p className="text-sm text-yellow-600 font-medium">Se registrara como deuda del cliente. La venta NO genera cobro en caja.</p>
             <div className="flex gap-2">
               <select value={creditClientId} onChange={(e) => setCreditClientId(e.target.value)}
-                className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm">
+                className="flex-1 h-10 rounded-lg border border-input bg-background px-3 text-sm">
                 <option value="">Seleccionar Cliente...</option>
                 {clients.filter((c) => !c.isFinalClient).map((c) => (
                   <option key={c.id} value={c.id}>{c.fullName} ({c.docType}-{c.docNumber}){c.creditBalance && c.creditBalance > 0 ? ` — DEBE $${c.creditBalance.toFixed(2)}` : ""}</option>
@@ -276,7 +301,7 @@ export function PaymentSection({
         )}
       </div>
 
-      <Button className="w-full mt-2 text-xl py-6 font-black tracking-wide rounded-xl" size="lg" onClick={onCompleteSale} disabled={cartLength === 0}>
+      <Button variant="gradient" className="w-full mt-2 text-xl py-6 font-black tracking-wide rounded-xl" size="xl" onClick={onCompleteSale} disabled={cartLength === 0}>
         {isCredit ? `Registrar Credito $${total.toFixed(2)}` : isUsdMethod ? `Cobrar $ ${total.toFixed(2)}` : `Cobrar Bs ${totalBs.toFixed(2)}`}
       </Button>
     </div>

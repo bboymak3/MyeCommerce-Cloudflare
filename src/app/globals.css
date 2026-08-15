@@ -6,37 +6,37 @@
   /* ========== TEMA AZUL (DEFAULT) ========== */
   :root,
   :root[data-theme="blue"] {
-    --background: 0 0% 100%;
+    --background: 210 20% 98%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 96%;
+    --secondary: 214 32% 95%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
+    --muted: 214 32% 95%;
     --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
+    --accent: 214 32% 95%;
     --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
-    --radius: 0.5rem;
+    --border: 214 32% 90%;
+    --input: 214 32% 90%;
+    --ring: 217 91% 60%;
+    --radius: 0.75rem;
   }
 
   /* ========== TEMA VERDE ========== */
   :root[data-theme="green"] {
-    --background: 0 0% 100%;
+    --background: 150 20% 98%;
     --foreground: 152 20% 14%;
     --card: 0 0% 100%;
     --card-foreground: 152 20% 14%;
     --popover: 0 0% 100%;
     --popover-foreground: 152 20% 14%;
-    --primary: 160 84% 39%;
+    --primary: 142 71% 45%;
     --primary-foreground: 0 0% 100%;
     --secondary: 160 30% 95%;
     --secondary-foreground: 152 20% 14%;
@@ -48,41 +48,41 @@
     --destructive-foreground: 0 0% 100%;
     --border: 160 20% 90%;
     --input: 160 20% 90%;
-    --ring: 160 84% 39%;
+    --ring: 142 71% 45%;
   }
 
   /* ========== TEMA ROJO/CORAL ========== */
   :root[data-theme="red"] {
-    --background: 0 0% 100%;
+    --background: 0 20% 98%;
     --foreground: 0 30% 10%;
     --card: 0 0% 100%;
     --card-foreground: 0 30% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 30% 10%;
-    --primary: 0 72% 51%;
+    --primary: 0 78% 56%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 30% 96%;
+    --secondary: 0 30% 95%;
     --secondary-foreground: 0 30% 10%;
-    --muted: 0 30% 96%;
+    --muted: 0 30% 95%;
     --muted-foreground: 0 10% 46%;
-    --accent: 0 30% 96%;
+    --accent: 0 30% 95%;
     --accent-foreground: 0 30% 10%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 20% 90%;
     --input: 0 20% 90%;
-    --ring: 0 72% 51%;
+    --ring: 0 78% 56%;
   }
 
   /* ========== TEMA PURPURA ========== */
   :root[data-theme="purple"] {
-    --background: 0 0% 100%;
+    --background: 270 20% 98%;
     --foreground: 270 20% 10%;
     --card: 0 0% 100%;
     --card-foreground: 270 20% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 270 20% 10%;
-    --primary: 262 83% 58%;
+    --primary: 263 70% 58%;
     --primary-foreground: 0 0% 100%;
     --secondary: 270 30% 95%;
     --secondary-foreground: 270 20% 10%;
@@ -94,7 +94,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 270 20% 90%;
     --input: 270 20% 90%;
-    --ring: 262 83% 58%;
+    --ring: 263 70% 58%;
   }
 
   .dark {
@@ -126,6 +126,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
 
@@ -142,6 +143,41 @@ body,
 }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* ── Smooth scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.2);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.35);
+}
+
+/* ── Selection color ── */
+::selection {
+  background: hsl(var(--primary) / 0.2);
+  color: hsl(var(--foreground));
+}
+
+/* ── Card elevation ── */
+@layer utilities {
+  .card-shadow {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  }
+  .card-shadow-md {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  }
+  .card-shadow-lg {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  }
 }
 
 /* Print styles for ticket */

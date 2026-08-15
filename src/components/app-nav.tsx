@@ -2,6 +2,58 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import {
+  BarChart3, CreditCard, Package, Users, ShoppingCart, TrendingUp,
+  Settings, KeyRound, UserCircle, Database, Store, RefreshCcw,
+  Wallet, BoxesIcon, Pause, ClipboardList, Truck, Receipt,
+  BookOpen, CircleDollarSign, LogOut
+} from 'lucide-react'
+
+// ── Lucide icon mapping (replaces emoji strings) ──
+const ICON_MAP: Record<string, React.ElementType> = {
+  '📊': BarChart3,
+  '💳': CreditCard,
+  '📦': Package,
+  '👥': Users,
+  '🛒': ShoppingCart,
+  '📈': TrendingUp,
+  '⚙️': Settings,
+  '🔑': KeyRound,
+  '👤': UserCircle,
+  '💾': Database,
+  '🏪': Store,
+  '🔄': RefreshCcw,
+  '💰': Wallet,
+  '⏸️': Pause,
+  '📋': ClipboardList,
+  '🚚': Truck,
+  '💸': Receipt,
+  '📖': BookOpen,
+  'Cuentas por Cobrar': CreditCard,
+  'Inventario/Kardex': BoxesIcon,
+}
+
+const GROUP_ICON_MAP: Record<string, React.ElementType> = {
+  '📊': BarChart3,
+  '💳': CreditCard,
+  '📦': Package,
+  '👥': Users,
+  '🛒': ShoppingCart,
+  '📈': TrendingUp,
+  '⚙️': Settings,
+}
+
+function NavIcon({ emoji, className = "w-4 h-4" }: { emoji: string; className?: string }) {
+  const IconComponent = ICON_MAP[emoji]
+  if (IconComponent) return <IconComponent className={className} />
+  return <span className={className}>{emoji}</span>
+}
+
+function GroupIcon({ emoji, className = "w-4 h-4" }: { emoji: string; className?: string }) {
+  const IconComponent = GROUP_ICON_MAP[emoji]
+  if (IconComponent) return <IconComponent className={className} />
+  return <span className={className}>{emoji}</span>
+}
 
 interface NavItem {
   value: string
@@ -176,12 +228,12 @@ export default function AppNav({
                 onClick={() => toggleGroup(group.id)}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all text-left ${
                   isActiveInGroup
-                    ? 'text-white bg-white/10'
+                    ? 'text-white bg-white/10 shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
                 style={{ '--group-color': group.color } as React.CSSProperties}
               >
-                <span className="text-sm flex-shrink-0">{group.icon}</span>
+                <GroupIcon emoji={group.icon} className="w-4 h-4 flex-shrink-0" />
                 <span className="flex-1 truncate">{group.label}</span>
                 {hasBadge && <BadgeDot count={totalBadge} />}
                 <Chevron expanded={isExpanded} />
@@ -204,7 +256,7 @@ export default function AppNav({
                             : 'text-slate-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent'
                         }`}
                       >
-                        <span className="text-sm flex-shrink-0">{item.icon}</span>
+                        <NavIcon emoji={item.icon} className="w-4 h-4 flex-shrink-0" />
                         <span className="flex-1 truncate">{item.label}</span>
                         {item.restricted && item.plan && <PlanBadge plan={item.plan} />}
                         {item.badge && <BadgeDot count={parseInt(item.badge)} />}
@@ -234,16 +286,14 @@ export default function AppNav({
         )}
         <div className="flex items-center justify-between">
           <span className="text-[10px] text-slate-500 font-medium">
-            v{version || '2.9.44'}
+            v{version || '2.9.49'}
           </span>
           {onLogout && (
             <button
               onClick={() => { setOpen(false); onLogout() }}
               className="flex items-center gap-1 text-[10px] text-slate-500 hover:text-red-400 transition-colors px-2 py-1 rounded hover:bg-white/5"
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <LogOut className="w-3 h-3" />
               Salir
             </button>
           )}
@@ -364,11 +414,11 @@ function TopNavBar({ groups, activeTab, onTabChange, stockAlertCount }: {
               onClick={(e) => { e.stopPropagation(); setOpenMenu(isOpen ? null : group.id) }}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-semibold transition-all duration-150 ${
                 isActiveInGroup
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-primary/10 text-primary shadow-sm'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              <span className="text-sm">{group.icon}</span>
+              <GroupIcon emoji={group.icon} className="w-4 h-4" />
               <span>{group.label}</span>
               {totalBadge > 0 && (
                 <span className="text-[10px] font-bold rounded-full bg-red-500 text-white min-w-[16px] h-[16px] flex items-center justify-center px-1">
@@ -388,8 +438,9 @@ function TopNavBar({ groups, activeTab, onTabChange, stockAlertCount }: {
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {group.icon} {group.label}
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <GroupIcon emoji={group.icon} className="w-3.5 h-3.5" />
+                    {group.label}
                   </p>
                 </div>
                 <div className="py-1">
@@ -405,7 +456,7 @@ function TopNavBar({ groups, activeTab, onTabChange, stockAlertCount }: {
                             : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                         }`}
                       >
-                        <span className="text-base flex-shrink-0">{item.icon}</span>
+                        <NavIcon emoji={item.icon} className="w-4 h-4 flex-shrink-0" />
                         <span className="flex-1">{item.label}</span>
                         {item.restricted && item.plan && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
@@ -439,4 +490,3 @@ function TopNavBar({ groups, activeTab, onTabChange, stockAlertCount }: {
   }
   return navContent
 }
-

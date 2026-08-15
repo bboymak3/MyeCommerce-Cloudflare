@@ -389,6 +389,13 @@ export default function PosTab(props: PosTabProps) {
         vuelto={vuelto} vueltoUsd={vueltoUsd}
         cashInputRef={cashInputRef} cashUsdInputRef={cashUsdInputRef}
         onCompleteSale={completeSale}
+        onSearchFocus={() => searchInputRef.current?.focus()}
+        onToggleCredit={() => setIsCredit((p: boolean) => !p)}
+        onSetCashUsd={() => setPaymentMethod("efectivo-usd")}
+        onSetCashBs={() => setPaymentMethod("efectivo")}
+        onSetPagoMovil={() => setPaymentMethod("pago-movil")}
+        onCharge={() => completeSale()}
+        onHoldSale={() => holdCurrentSale()}
       />
 
       {/* Products (2/5) */}

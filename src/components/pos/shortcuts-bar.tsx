@@ -1,40 +1,65 @@
 "use client";
 
+import { Search, CreditCard, DollarSign, Banknote, Smartphone, ShoppingCart, PauseCircle, XCircle } from 'lucide-react';
+
 interface ShortcutsBarProps {
   onHoldSale?: () => void;
+  onSearch?: () => void;
+  onToggleCredit?: () => void;
+  onCashUsd?: () => void;
+  onCashBs?: () => void;
+  onPagoMovil?: () => void;
+  onCharge?: () => void;
+  onClear?: () => void;
 }
 
-export function ShortcutsBar({ onHoldSale }: ShortcutsBarProps) {
+interface ShortcutButtonProps {
+  label: string;
+  keyHint: string;
+  color: string;
+  icon: React.ReactNode;
+  onClick?: () => void;
+}
+
+function ShortcutButton({ label, keyHint, color, icon, onClick }: ShortcutButtonProps) {
   return (
-    <div className="flex flex-wrap gap-1.5 bg-muted/60 rounded-lg px-3 py-1.5">
-      <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-100 text-blue-800 font-bold text-xs border border-blue-200 shadow-sm">
-        <span className="text-[10px] opacity-70">F2</span> Buscar
-      </kbd>
-      <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-800 font-bold text-xs border border-amber-200 shadow-sm">
-        <span className="text-[10px] opacity-70">F4</span> Credito
-      </kbd>
-      <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-green-100 text-green-800 font-bold text-xs border border-green-200 shadow-sm">
-        <span className="text-[10px] opacity-70">F5</span> Efectivo$
-      </kbd>
-      <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 shadow-sm">
-        <span className="text-[10px] opacity-70">F6</span> Efectivo
-      </kbd>
-      <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-100 text-purple-800 font-bold text-xs border border-purple-200 shadow-sm">
-        <span className="text-[10px] opacity-70">F7</span> PMovil
-      </kbd>
-      <kbd
-        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-orange-100 text-orange-800 font-bold text-xs border border-orange-200 shadow-sm cursor-pointer"
-        onClick={onHoldSale}
-        title="Poner en Espera"
-      >
-        <span className="text-[10px] opacity-70">F9</span> Espera
-      </kbd>
-      <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-red-100 text-red-800 font-bold text-xs border border-red-200 shadow-sm">
-        <span className="text-[10px] opacity-70">F8</span> COBRAR
-      </kbd>
-      <kbd className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-gray-100 text-gray-700 font-bold text-xs border border-gray-200 shadow-sm">
-        <span className="text-[10px] opacity-70">Esc</span> Vaciar
-      </kbd>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`
+        inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold
+        shadow-sm hover:shadow-md active:shadow-sm active:scale-[0.96]
+        transition-all duration-150 select-none
+        ${color}
+        ${onClick ? 'cursor-pointer' : 'cursor-default'}
+      `}
+    >
+      {icon}
+      <span className="flex-shrink-0">{label}</span>
+      <kbd className="text-[9px] font-semibold opacity-60 bg-black/10 rounded px-1 py-0.5 leading-none">{keyHint}</kbd>
+    </button>
+  );
+}
+
+export function ShortcutsBar({ onHoldSale, onSearch, onToggleCredit, onCashUsd, onCashBs, onPagoMovil, onCharge, onClear }: ShortcutsBarProps) {
+  return (
+    <div className="flex flex-wrap gap-1.5 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800 rounded-xl px-3 py-2 border border-slate-200/60 dark:border-slate-700/60">
+      <ShortcutButton label="Buscar" keyHint="F2" color="bg-blue-500 text-white hover:bg-blue-600 shadow-blue-500/20"
+        icon={<Search className="w-3.5 h-3.5" />} onClick={onSearch} />
+      <ShortcutButton label="Credito" keyHint="F4" color="bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20"
+        icon={<CreditCard className="w-3.5 h-3.5" />} onClick={onToggleCredit} />
+      <ShortcutButton label="Efectivo$" keyHint="F5" color="bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20"
+        icon={<DollarSign className="w-3.5 h-3.5" />} onClick={onCashUsd} />
+      <ShortcutButton label="Efectivo" keyHint="F6" color="bg-green-500 text-white hover:bg-green-600 shadow-green-500/20"
+        icon={<Banknote className="w-3.5 h-3.5" />} onClick={onCashBs} />
+      <ShortcutButton label="PMovil" keyHint="F7" color="bg-violet-500 text-white hover:bg-violet-600 shadow-violet-500/20"
+        icon={<Smartphone className="w-3.5 h-3.5" />} onClick={onPagoMovil} />
+      <ShortcutButton label="COBRAR" keyHint="F8" color="bg-red-500 text-white hover:bg-red-600 shadow-red-500/20"
+        icon={<ShoppingCart className="w-3.5 h-3.5" />} onClick={onCharge} />
+      <ShortcutButton label="Espera" keyHint="F9" color="bg-orange-500 text-white hover:bg-orange-600 shadow-orange-500/20"
+        icon={<PauseCircle className="w-3.5 h-3.5" />} onClick={onHoldSale} />
+      <ShortcutButton label="Vaciar" keyHint="Esc" color="bg-slate-400 text-white hover:bg-slate-500 shadow-slate-400/20"
+        icon={<XCircle className="w-3.5 h-3.5" />} onClick={onClear} />
     </div>
   );
 }
