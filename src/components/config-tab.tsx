@@ -78,6 +78,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [theme, setTheme] = useState(settings.theme || 'blue');
+  const [themeMode, setThemeMode] = useState(settings.themeMode || 'light');
   // Ticket settings
   const [ticketFontSize, setTicketFontSize] = useState(() => {
     const preset = getPreset(settings.ticketPaperWidth || '58mm');
@@ -108,7 +109,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   // Sync theme from settings
   useEffect(() => {
     setTheme(settings.theme || 'blue');
-  }, [settings.theme]);
+    setThemeMode(settings.themeMode || 'light');
+  }, [settings.theme, settings.themeMode]);
 
   // Auto-clamp fontSize when paper width changes
   useEffect(() => {
@@ -254,6 +256,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         enableDiscount,
         maxDiscountPct: parseInt(maxDiscountPct) || 20,
         theme: theme || 'blue',
+        themeMode: themeMode || 'light',
         ticketFontSize,
         ticketFontFamily,
         ticketHeaderMsg,
@@ -372,10 +375,58 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>
-            Paleta de Colores
+            Apariencia del Sistema
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Theme mode selector: Light / Dark / Professional */}
+          <div>
+            <label className="text-sm font-medium mb-2 block">Modo de Interfaz</label>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { id: 'light', name: 'Claro', icon: '☀️', desc: 'Modo dia clasico' },
+                { id: 'dark', name: 'Oscuro', icon: '🌙', desc: 'Modo noche, descanso visual' },
+                { id: 'professional', name: 'Profesional', icon: '💼', desc: 'Elegante y corporativo' },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => {
+                    setThemeMode(m.id);
+                    // Apply immediately without saving
+                    if (m.id === 'dark') {
+                      document.documentElement.classList.add('dark');
+                      document.documentElement.removeAttribute('data-mode');
+                    } else if (m.id === 'professional') {
+                      document.documentElement.classList.remove('dark');
+                      document.documentElement.setAttribute('data-mode', 'professional');
+                    } else {
+                      document.documentElement.classList.remove('dark');
+                      document.documentElement.removeAttribute('data-mode');
+                    }
+                  }}
+                  className={`relative p-3 rounded-xl border-2 text-center transition-all hover:scale-[1.02] ${
+                    themeMode === m.id
+                      ? 'border-primary shadow-lg scale-[1.02] bg-primary/5'
+                      : 'border-muted hover:border-primary/30'
+                  }`}
+                >
+                  <span className="text-2xl block">{m.icon}</span>
+                  <span className="text-sm font-medium block mt-1">{m.name}</span>
+                  <span className="text-[10px] text-muted-foreground block">{m.desc}</span>
+                  {themeMode === m.id && (
+                    <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
           <p className="text-sm text-muted-foreground">
             Seleccione el color principal de su sistema. El cambio se aplicara inmediatamente a toda la interfaz.
           </p>

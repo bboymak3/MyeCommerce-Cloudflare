@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,9 +18,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Formato no soportado. Use PNG, JPG, GIF o WEBP' }, { status: 400 });
     }
 
-    // Validar tamano (max 512KB para impresora termica)
-    if (file.size > 512 * 1024) {
-      return NextResponse.json({ error: 'Imagen demasiado grande. Maximo 512KB' }, { status: 400 });
+    // Validar tamano (max 2MB para logo de tienda)
+    if (file.size > 2 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Imagen demasiado grande. Maximo 2MB' }, { status: 400 });
     }
 
     const bytes = await file.arrayBuffer();
@@ -32,14 +32,36 @@ export async function POST(req: NextRequest) {
       await mkdir(storeDir, { recursive: true });
     }
 
-    // Guardar con nombre fijo para que siempre se sobreescriba
-    const fileName = 'logo.png';
+    // Determinar extension correcta basada en el tipo MIME
+    const extMap: Record<string, string> = {
+      'image/png': 'png',
+      'image/jpeg': 'jpg',
+      'image/gif': 'gif',
+      'image/webp': 'webp',
+      'image/bmp': 'bmp',
+    };
+    const ext = extMap[file.type] || 'png';
+    const fileName = `logo.${ext}`;
     const filePath = join(storeDir, fileName);
+
+    // Limpiar archivos logo viejos con otras extensiones
+    const validExts = ['png', 'jpg', 'gif', 'webp', 'bmp'];
+    try {
+      const existing = readdirSync(storeDir);
+      for (const f of existing) {
+        if (f.startsWith('logo.') && f !== fileName) {
+          const oldExt = f.split('.').pop();
+          if (oldExt && validExts.includes(oldExt)) {
+            unlink(join(storeDir, f)).catch(() => {});
+          }
+        }
+      }
+    } catch {}
 
     await writeFile(filePath, buffer);
 
-    // Retornar la URL publica
-    const logoUrl = '/store/logo.png';
+    // Retornar la URL publica con extension correcta
+    const logoUrl = `/store/logo.${ext}`;
     return NextResponse.json({ url: logoUrl, message: 'Logo guardado correctamente' });
   } catch (error) {
     console.error('Error uploading logo:', error);

@@ -592,7 +592,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                     <tr key={product.id} className="border-t hover:bg-muted/30 cursor-pointer" onDoubleClick={() => openEdit(product)}>
                       <td className="p-2">{product.image ? <img src={product.image} alt="" crossOrigin="anonymous" className="w-7 h-7 rounded object-cover" /> : <span className="text-base">{product.icon || ''}</span>}</td>
                       <td className="p-2">
-                        <div className="font-medium truncate max-w-[160px]">{product.name}
+                        <div className="font-medium whitespace-normal min-w-[200px]">{product.name}
                           <div className="flex gap-1 mt-0.5">
                             {product.noStock && <Badge variant="secondary" className="text-[7px] px-1 py-0">S/Stock</Badge>}
                             {product.isCombo && <Badge variant="outline" className="text-[7px] px-1 py-0 text-orange-600">KIT</Badge>}

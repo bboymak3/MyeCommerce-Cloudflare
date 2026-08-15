@@ -94,7 +94,7 @@ export default function Home() {
     ticketMarginLeft: 0, ticketMarginRight: 0,
     ticketUseAgent: true, ticketAgentUrl: 'http://localhost:9100',
     ticketCurrencyMode: 'dual',
-    storeLogo: '', businessType: 'general', taxMode: 'included',
+    storeLogo: '', businessType: 'general', taxMode: 'included', themeMode: 'light',
   });
   const [license, setLicense] = useState<LicenseInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,12 +141,26 @@ export default function Home() {
     }
   };
 
-  // Apply theme on mount and settings change
+  // Apply theme + mode on mount and settings change (immediate, no reload)
   useEffect(() => {
     if (settings.theme) {
       document.documentElement.setAttribute('data-theme', settings.theme);
     }
   }, [settings.theme]);
+
+  useEffect(() => {
+    const mode = settings.themeMode || 'light';
+    if (mode === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.removeAttribute('data-mode');
+    } else if (mode === 'professional') {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.setAttribute('data-mode', 'professional');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.removeAttribute('data-mode');
+    }
+  }, [settings.themeMode]);
 
   // Auth: load user from localStorage
   useEffect(() => {

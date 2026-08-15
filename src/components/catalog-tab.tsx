@@ -56,8 +56,15 @@ export default function CatalogTab({
   const [selectedBg, setSelectedBg] = useState("solid");
   const [customBgColor1, setCustomBgColor1] = useState("");
   const [customBgColor2, setCustomBgColor2] = useState("");
-  const [coverLogoUrl, setCoverLogoUrl] = useState("");
+  const [coverLogoUrl, setCoverLogoUrl] = useState(storeLogo || "");
   const coverLogoInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync coverLogoUrl with storeLogo when storeLogo changes
+  useEffect(() => {
+    if (storeLogo && !coverLogoUrl) {
+      setCoverLogoUrl(storeLogo);
+    }
+  }, [storeLogo]);
 
   const handleCoverLogoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -282,7 +289,7 @@ export default function CatalogTab({
           <div className="flex items-center gap-4 p-3 bg-muted rounded-lg">
             {storeLogo ? (
               <div className="w-12 h-12 rounded-xl overflow-hidden bg-card flex items-center justify-center flex-shrink-0">
-                <img crossOrigin="anonymous" src={storeLogo} alt="" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                <img crossOrigin="anonymous" src={storeLogo} alt="" className="w-full h-full object-contain p-1" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               </div>
             ) : (
               <div className="w-12 h-12 rounded-xl bg-card flex items-center justify-center text-2xl">🏪</div>

@@ -94,6 +94,7 @@ export async function PUT(req: NextRequest) {
       storeLogo: body.storeLogo || '',
       businessType: body.businessType || 'general',
       taxMode: body.taxMode || 'included',
+      themeMode: body.themeMode || 'light',
       promoActive: body.promoActive !== false,
       promoLabel: body.promoLabel || 'PRECIO EXCLUSIVO',
       promoOldPrice: parseFloat(body.promoOldPrice) || 280,

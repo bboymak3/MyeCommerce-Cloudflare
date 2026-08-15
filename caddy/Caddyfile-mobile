@@ -1,18 +1,39 @@
-# Caddyfile-mobile - MyeCommerce POS v2.9.54
-# HTTPS en :8443 para telefono (camara como lector de barras)
-# Uso: caddy.exe run --config Caddyfile-mobile
+# Caddyfile-mobile - MyeCommerce POS
+# ============================================================================
+# Acceso movil via HTTP :3000 (sin certificados, sin HTTPS)
 #
-# INSTRUCCIONES MOVIL:
-#   1. Desde el telefono abrir: https://IP_DEL_SERVER:8443
-#   2. El navegador mostrara advertencia de certificado
-#   3. Toque "Avanzado" > "Continuar de todos modos"
-#   4. La camara funcionara para escanear codigos de barras
+# Uso:  caddy.exe run --config Caddyfile-mobile
+# ============================================================================
 
+# Desactivar admin API (no necesitamos panel de admin en movil)
 {
 	admin off
 }
 
+# HTTP en puerto 8443 para TODAS las interfaces (0.0.0.0)
+# SIN certificados TLS - acceso directo via http://IP:8443
 :8443 {
-	tls internal
+
+	# Proxy a Next.js
 	reverse_proxy localhost:3000
+
+	# Headers optimizados para acceso movil
+	header {
+		# Permitir recursos crossorigin (COEP credentialless = no bloquea)
+		Cross-Origin-Embedder-Policy "credentialless"
+		Cross-Origin-Opener-Policy "same-origin"
+		# Cache para assets estaticos
+		Cache-Control "public, max-age=3600"
+		X-Content-Type-Options "nosniff"
+		# WebSocket support (Next.js HMR en dev)
+		Upgrade "websocket"
+		Connection "upgrade"
+	}
+
+	# Log a archivo para depuracion
+	log {
+		output file caddy-mobile.log
+		format json
+		level INFO
+	}
 }

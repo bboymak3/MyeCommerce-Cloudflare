@@ -41,7 +41,7 @@ echo.
 :: Abrir puerto 8443 en firewall
 echo [3b/5] Abriendo puerto 8443 en firewall para acceso movil...
 netsh advfirewall firewall delete rule name="MyeCommerce POS Mobile 8443" >nul 2>&1
-netsh advfirewall firewall add rule name="MyeCommerce POS Mobile 8443" dir=in action=allow protocol=TCP localport=8443 profile=private,public description="MyeCommerce POS - Acceso movil HTTPS para camara del telefono" >nul 2>&1
+netsh advfirewall firewall add rule name="MyeCommerce POS Mobile 8443" dir=in action=allow protocol=TCP localport=8443 profile=private,public description="MyeCommerce POS - Acceso movil HTTP para telefono" >nul 2>&1
 echo     OK
 echo.
 
@@ -56,12 +56,12 @@ if exist "caddy\caddy.exe" (
 )
 echo.
 
-:: Iniciar Caddy Movil (HTTPS :8443) - PROCESO INDEPENDIENTE
-echo [4b/5] Iniciando Caddy Movil (HTTPS :8443 para telefono)...
+:: Iniciar Caddy Movil (HTTP :8443) - PROCESO INDEPENDIENTE
+echo [4b/5] Iniciando Caddy Movil (HTTP :8443 para telefono)...
 if exist "caddy\caddy.exe" (
     if exist "caddy\Caddyfile-mobile" (
         start "Caddy-Mobile" /min cmd /c "cd /d %~dp0caddy && caddy.exe run --config Caddyfile-mobile > caddy-mobile.log 2>&1"
-        echo     OK - Movil: https://IP_LOCAL:8443 (puerto 8443)
+        echo     OK - Movil: http://IP_LOCAL:8443 (puerto 8443)
     ) else (
         echo     OMITIDO - Caddyfile-mobile no encontrado
     )

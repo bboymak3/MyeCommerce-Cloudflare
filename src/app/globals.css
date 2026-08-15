@@ -157,6 +157,59 @@
     --warning: 38 85% 48%;
     --info: 215 80% 45%;
   }
+
+  /* ========== MODO PROFESIONAL ========== */
+  :root[data-mode="professional"] {
+    --background: 210 20% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --secondary: 214 32% 93%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 214 32% 93%;
+    --muted-foreground: 215 16% 40%;
+    --accent: 214 32% 93%;
+    --accent-foreground: 222 47% 11%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+  }
+
+  /* ========== DARK + PROFESIONAL ========== */
+  .dark[data-mode="professional"] {
+    --background: 222 47% 9%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 13%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 13%;
+    --popover-foreground: 210 40% 98%;
+    --secondary: 217 33% 15%;
+    --secondary-foreground: 210 40% 85%;
+    --muted: 223 47% 11%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 216 34% 15%;
+    --accent-foreground: 210 40% 85%;
+    --border: 216 34% 15%;
+    --input: 216 34% 15%;
+  }
+
+  /* Dark mode overrides per color theme */
+  .dark[data-theme="green"] {
+    --primary: 142 71% 45%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 142 71% 45%;
+  }
+  .dark[data-theme="red"] {
+    --primary: 0 78% 56%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 0 78% 56%;
+  }
+  .dark[data-theme="purple"] {
+    --primary: 263 70% 58%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 263 70% 58%;
+  }
 }
 
 @layer base {

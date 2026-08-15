@@ -175,6 +175,8 @@ model Settings {
   businessType         String  @default("general")
   // IVA global
   taxMode              String  @default("included")
+  // Theme mode (light, dark, professional)
+  themeMode            String  @default("light")
   // Promo configurable
   promoActive          Boolean @default(true)
   promoLabel           String  @default("PRECIO EXCLUSIVO")

@@ -13,10 +13,9 @@ interface QrAccessDialogProps {
   secureUrl: string;
 }
 
-export function QrAccessDialog({ open, onOpenChange, localUrl, secureUrl }: QrAccessDialogProps) {
-  // Por defecto mostrar HTTPS (necesario para camara en movil)
-  const [showSecure, setShowSecure] = useState(true);
-  const activeUrl = showSecure ? secureUrl : localUrl;
+export function QrAccessDialog({ open, onOpenChange, localUrl }: QrAccessDialogProps) {
+  // Solo HTTP — acceso movil sin certificados
+  const activeUrl = localUrl;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -29,43 +28,15 @@ export function QrAccessDialog({ open, onOpenChange, localUrl, secureUrl }: QrAc
             Escanea este codigo con la camara de tu telefono para acceder al TPV desde cualquier dispositivo.
           </p>
 
-          {/* Toggle HTTPS / HTTP */}
-          <div className="flex gap-1 p-1 bg-muted rounded-lg">
-            <button
-              onClick={() => setShowSecure(true)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                showSecure ? "bg-green-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              🔒 HTTPS (Camara)
-            </button>
-            <button
-              onClick={() => setShowSecure(false)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                !showSecure ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              🌐 HTTP (Sin camara)
-            </button>
+          {/* Info banner */}
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-2 w-full">
+            <p className="text-[10px] text-blue-700 dark:text-blue-400 text-center font-medium">
+              Modo HTTP : Acceso directo via red local.
+            </p>
+            <p className="text-[10px] text-blue-600 dark:text-blue-500 text-center mt-1">
+              Solo accesible desde dispositivos en la misma red WiFi/Local.
+            </p>
           </div>
-
-          {showSecure && (
-            <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-2 w-full">
-              <p className="text-[10px] text-green-700 dark:text-green-400 text-center font-medium">
-                ✅ Modo HTTPS : La camara del telefono funcionara para escanear codigos de barras.
-              </p>
-              <p className="text-[10px] text-green-600 dark:text-green-500 text-center mt-1">
-                Al primer acceso, acepta el certificado: Avanzado &gt; Continuar
-              </p>
-            </div>
-          )}
-          {!showSecure && (
-            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-2 w-full">
-              <p className="text-[10px] text-amber-700 dark:text-amber-400 text-center font-medium">
-                ⚠️ Modo HTTP : La camara del telefono NO funcionara. Use HTTPS para escanear.
-              </p>
-            </div>
-          )}
 
           {activeUrl ? (
             <>
@@ -82,9 +53,7 @@ export function QrAccessDialog({ open, onOpenChange, localUrl, secureUrl }: QrAc
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  {showSecure
-                    ? "HTTPS via IP local :8443. Al primer acceso acepta el certificado del navegador."
-                    : "Solo accesible desde dispositivos en la misma red WiFi/Local."}
+                  Solo accesible desde dispositivos en la misma red WiFi/Local.
                 </p>
               </div>
             </>

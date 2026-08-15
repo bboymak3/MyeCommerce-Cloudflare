@@ -3,12 +3,12 @@
 ' Inicia 4 servicios SIN abrir ventanas CMD:
 '   1. Printer-Agent (puerto 9100) - impresion termica
 '   2. Caddy Dominio (puerto 443) - HTTPS myecommerce.ve (PC)
-'   3. Caddy Movil (puerto 8443) - HTTPS IP local (telefono/camara)
+'   3. Caddy Movil (puerto 8443) - HTTP IP local (telefono)
 '   4. Next.js (puerto 3000) - aplicacion web
 '
 ' IMPORTANTE: Caddy Movil es INDEPENDIENTE del Caddy Dominio.
 ' Si el Caddy del dominio falla (puerto 80/443 en uso), el movil
-' sigue funcionando en :8443 para la camara del telefono.
+' sigue funcionando en :8443 para acceso desde el telefono.
 '
 ' Uso: doble clic, o acceso directo en el escritorio
 ' ============================================================
@@ -59,10 +59,10 @@ For i = 1 To 10
     On Error GoTo 0
 Next
 
-' -- PASO 5: Abrir puerto 8443 en firewall (acceso movil telefono/camara) --
+' -- PASO 5: Abrir puerto 8443 en firewall (acceso movil telefono HTTP) --
 On Error Resume Next
 WshShell.Run "cmd /c netsh advfirewall firewall delete rule name=""MyeCommerce POS Mobile 8443"" >nul 2>&1", 0, True
-WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTPS para camara del telefono""", 0, True
+WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTP para telefono""", 0, True
 On Error GoTo 0
 
 ' -- PASO 6: Iniciar Caddy Dominio (oculto, HTTPS myecommerce.ve) --
@@ -77,9 +77,8 @@ If objFSO.FileExists(caddyDir & "\caddy.exe") Then
     caddyIniciado = True
 End If
 
-' -- PASO 7: Iniciar Caddy Movil (oculto, HTTPS :8443) --
-' PROCESO INDEPENDIENTE - este ES critico para la camara del telefono
-' Usa su propio Caddyfile-mobile y su propio data-dir para certificados
+' -- PASO 7: Iniciar Caddy Movil (oculto, HTTP :8443) --
+' PROCESO INDEPENDIENTE - acceso movil via HTTP sin certificados
 caddyMovilIniciado = False
 If objFSO.FileExists(caddyDir & "\caddy.exe") Then
     If objFSO.FileExists(caddyDir & "\Caddyfile-mobile") Then
@@ -95,12 +94,12 @@ If objFSO.FileExists(caddyDir & "\caddy.exe") Then
             WScript.Sleep 1000
             On Error Resume Next
             Set objHTTP2 = CreateObject("MSXML2.XMLHTTP")
-            ' Intentar conexion HTTPS (esperamos error de certificado, NO de conexion)
-            objHTTP2.Open "GET", "https://localhost:8443", False
+            ' Intentar conexion HTTP directa
+            objHTTP2.Open "GET", "http://localhost:8443", False
             On Error Resume Next
             objHTTP2.send ""
-            ' Si el status es algo (incluso error TLS), significa que Caddy esta escuchando
-            If Err.Number = 0 Or InStr(1, Err.Description, "certificate") > 0 Or InStr(1, Err.Description, "certificado") > 0 Then
+            ' Si responde 200 u otro status, Caddy esta escuchando
+            If objHTTP2.Status > 0 Then
                 caddyMovilOk = True
                 Exit For
             End If
