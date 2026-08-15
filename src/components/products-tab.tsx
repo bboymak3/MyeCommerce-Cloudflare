@@ -512,6 +512,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                 <tr>
                   <th className="text-left p-2 font-medium w-8"></th>
                   <th className="text-left p-2 font-medium">Producto</th>
+                  <th className="text-left p-2 font-medium">Marca / Cat.</th>
                   <th className="text-right p-2 font-medium">USD</th>
                   <th className="text-right p-2 font-medium">Bs</th>
                   <th className="text-right p-2 font-medium">Costo</th>
@@ -526,7 +527,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                   const mg = product.cost > 0 && product.price > 0 ? ((product.price - product.cost) / product.price * 100) : 0;
                   return (
                     <tr key={product.id} className="border-t hover:bg-muted/30 cursor-pointer" onDoubleClick={() => openEdit(product)}>
-                      <td className="p-2">{product.image ? <img src={product.image} alt="" className="w-7 h-7 rounded object-cover" /> : <span className="text-base">{product.icon || ''}</span>}</td>
+                      <td className="p-2">{product.image ? <img src={product.image} alt="" crossOrigin="anonymous" className="w-7 h-7 rounded object-cover" /> : <span className="text-base">{product.icon || ''}</span>}</td>
                       <td className="p-2">
                         <div className="font-medium truncate max-w-[160px]">{product.name}
                           <div className="flex gap-1 mt-0.5">
@@ -538,6 +539,10 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                           </div>
                         </div>
                       </td>
+                      <td className="p-2 text-muted-foreground">
+                        <div className="truncate max-w-[100px]">{product.brand?.name || '-'}</div>
+                        <div className="truncate max-w-[100px] text-[10px]">{product.category?.name || ''}</div>
+                      </td>
                       <td className="p-2 text-right font-bold text-green-600">{product.price.toFixed(2)}</td>
                       <td className="p-2 text-right text-muted-foreground">{(product.price * bcvRate).toFixed(2)}</td>
                       <td className="p-2 text-right">{product.cost.toFixed(2)}</td>
@@ -548,9 +553,9 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
                     </tr>
                   );
                 })}
-                {filtered.length === 0 && <tr><td colSpan={9} className="text-center p-8 text-muted-foreground">No se encontraron productos</td></tr>}
+                {filtered.length === 0 && <tr><td colSpan={10} className="text-center p-8 text-muted-foreground">No se encontraron productos</td></tr>}
                 {totalPages > 1 && (
-                  <tr><td colSpan={9} className="p-2">
+                  <tr><td colSpan={10} className="p-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">{filtered.length} productos - Pagina {page} de {totalPages}</span>
                       <div className="flex gap-1">
@@ -752,7 +757,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
             <Block title="Foto y Codigos de Barras" icon="📸" defaultOpen={false}>
               <div className="flex items-start gap-3">
                 <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
-                  {formData.image ? <img src={formData.image} alt="Producto" className="w-full h-full object-cover" /> : <span className="text-2xl text-gray-300">📷</span>}
+                  {formData.image ? <img src={formData.image} alt="Producto" crossOrigin="anonymous" className="w-full h-full object-cover" /> : <span className="text-2xl text-gray-300">📷</span>}
                 </div>
                 <div className="space-y-2 flex-1">
                   <div className="flex gap-2">

@@ -455,9 +455,14 @@ export default function QuotesTab({
 
   // ── Filtered products for search ─────────────────────────────────────────
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  const filteredProducts = products.filter((p) => {
+    const s = productSearch.toLowerCase();
+    return p.name.toLowerCase().includes(s)
+      || p.barcode.includes(s)
+      || p.secondaryBarcode.includes(s)
+      || (p.brand?.name || '').toLowerCase().includes(s)
+      || (p.category?.name || '').toLowerCase().includes(s);
+  });
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -842,7 +847,7 @@ export default function QuotesTab({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   className="pl-9"
-                  placeholder="Buscar producto por nombre..."
+                  placeholder="Buscar por nombre, codigo, marca, categoria..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                 />
@@ -861,7 +866,12 @@ export default function QuotesTab({
                         className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center justify-between gap-2 transition-colors cursor-pointer"
                         onClick={() => addProduct(p.id)}
                       >
-                        <span className="truncate text-slate-700">{p.name}</span>
+                        <div className="truncate">
+                          <span className="text-slate-700">{p.name}</span>
+                          {(p.brand?.name || p.category?.name) && (
+                            <span className="text-slate-400 text-xs ml-1">{p.brand?.name ? p.brand.name : ''}{p.brand?.name && p.category?.name ? ' · ' : ''}{p.category?.name || ''}</span>
+                          )}
+                        </div>
                         <span className="text-slate-500 flex-shrink-0">
                           {formatUSD(p.price)}
                         </span>

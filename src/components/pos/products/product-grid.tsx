@@ -40,7 +40,7 @@ export function ProductGrid({ products, currency, bcvRate, allowZeroStock, onAdd
             {/* Image or icon */}
             <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
               {product.image ? (
-                <img src={product.image} alt={product.name} className="w-full h-full object-cover"
+                <img src={product.image} alt={product.name} crossOrigin="anonymous" className="w-full h-full object-cover"
                   onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden"); }} />
               ) : null}
               {product.icon ? (

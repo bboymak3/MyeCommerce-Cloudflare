@@ -13,10 +13,8 @@
 # ============================================================================
 
 # Desactivar admin API (no necesitamos panel de admin en movil)
-# data_dir separado para certificados del movil (evita conflicto con Caddy dominio)
 {
         admin off
-        data_dir mobile-data
 }
 
 # HTTPS en puerto 8443 para TODAS las interfaces (0.0.0.0)
