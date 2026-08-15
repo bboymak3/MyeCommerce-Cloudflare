@@ -26,6 +26,9 @@
     --input: 214 32% 90%;
     --ring: 217 91% 60%;
     --radius: 0.75rem;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 217 91% 60%;
   }
 
   /* ========== TEMA VERDE ========== */
@@ -49,6 +52,9 @@
     --border: 160 20% 90%;
     --input: 160 20% 90%;
     --ring: 142 71% 45%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 142 71% 45%;
   }
 
   /* ========== TEMA ROJO/CORAL ========== */
@@ -72,6 +78,9 @@
     --border: 0 20% 90%;
     --input: 0 20% 90%;
     --ring: 0 78% 56%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 0 78% 56%;
   }
 
   /* ========== TEMA PURPURA ========== */
@@ -95,28 +104,58 @@
     --border: 270 20% 90%;
     --input: 270 20% 90%;
     --ring: 263 70% 58%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 263 70% 58%;
   }
 
+  /* ========== DARK MODE (aplica a cualquier color) ========== */
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 15%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 15%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 90%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 216 34% 17%;
-    --accent-foreground: 210 40% 90%;
+    --background: 224 30% 8%;
+    --foreground: 210 20% 95%;
+    --card: 224 25% 12%;
+    --card-foreground: 210 20% 95%;
+    --popover: 224 25% 12%;
+    --popover-foreground: 210 20% 95%;
+    --secondary: 220 20% 18%;
+    --secondary-foreground: 210 20% 90%;
+    --muted: 220 20% 16%;
+    --muted-foreground: 215 15% 55%;
+    --accent: 220 25% 18%;
+    --accent-foreground: 210 20% 90%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 216 34% 17%;
-    --input: 216 34% 17%;
-    --ring: 224 76% 48%;
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --success: 142 60% 50%;
+    --warning: 38 80% 50%;
+  }
+
+  /* ========== TEMA PROFESIONAL (azul corporativo limpio) ========== */
+  :root[data-mode="professional"] {
+    --background: 0 0% 99%;
+    --foreground: 215 25% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+    --primary: 215 80% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 215 20% 95%;
+    --secondary-foreground: 215 25% 15%;
+    --muted: 215 20% 96%;
+    --muted-foreground: 215 15% 45%;
+    --accent: 215 20% 95%;
+    --accent-foreground: 215 25% 15%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 20% 92%;
+    --input: 215 20% 92%;
+    --ring: 215 80% 45%;
+    --radius: 0.5rem;
+    --success: 152 65% 42%;
+    --warning: 38 85% 48%;
+    --info: 215 80% 45%;
   }
 }
 
@@ -179,6 +218,63 @@ body,
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.04);
   }
 }
+
+/* ── Elegant table styles ── */
+.elegant-table {
+  @apply w-full text-sm;
+}
+.elegant-table thead {
+  @apply bg-muted/60 sticky top-0 z-10;
+}
+.elegant-table thead th {
+  @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b;
+}
+.elegant-table tbody tr {
+  @apply border-b transition-colors hover:bg-muted/30 cursor-pointer;
+}
+.elegant-table tbody td {
+  @apply px-4 py-3;
+}
+
+/* ── Search bar elegant ── */
+.search-bar {
+  @apply flex items-center gap-2 px-4 py-2.5 rounded-xl border bg-card shadow-sm transition-all focus-within:border-primary/50 focus-within:shadow-md focus-within:ring-2 focus-within:ring-primary/10;
+}
+.search-bar input {
+  @apply bg-transparent border-none outline-none w-full text-sm placeholder:text-muted-foreground;
+}
+
+/* ── Metric card ── */
+.metric-card {
+  @apply rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md;
+}
+.metric-card .metric-label {
+  @apply text-xs font-medium text-muted-foreground uppercase tracking-wide;
+}
+.metric-card .metric-value {
+  @apply text-lg font-bold;
+}
+
+/* ── Alert cards ── */
+.alert-card-danger {
+  @apply border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/20 rounded-xl p-3;
+}
+.alert-card-warning {
+  @apply border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/20 rounded-xl p-3;
+}
+
+/* ── Dark mode: adapt hardcoded light colors ── */
+.dark .bg-white { background-color: hsl(var(--card)); }
+.dark .bg-gray-50 { background-color: hsl(var(--muted)); }
+.dark .bg-red-50 { background-color: hsl(0 30% 12%); }
+.dark .bg-orange-50 { background-color: hsl(25 30% 12%); }
+.dark .bg-green-50 { background-color: hsl(142 20% 12%); }
+.dark .bg-blue-50 { background-color: hsl(217 20% 12%); }
+.dark .border-red-100 { border-color: hsl(0 25% 20%); }
+.dark .border-orange-100 { border-color: hsl(25 25% 20%); }
+.dark .hover\:bg-gray-100:hover { background-color: hsl(var(--accent)); }
+.dark .text-gray-700 { color: hsl(var(--foreground)); }
+.dark .text-gray-500 { color: hsl(var(--muted-foreground)); }
 
 /* Print styles for ticket */
 @media print {

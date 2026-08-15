@@ -1,9 +1,9 @@
 @echo off
-title MyeCommerce POS v2.9.54 - Generador de Licencias
+title MyeCommerce POS v2.9.55 - Generador de Licencias
 color 0B
 echo.
 echo ============================================================
-echo          MyeCommerce POS v2.9.54
+echo          MyeCommerce POS v2.9.55
 echo          Generador de Licencias
 echo ============================================================
 echo.

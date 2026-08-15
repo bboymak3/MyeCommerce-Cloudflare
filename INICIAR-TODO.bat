@@ -1,10 +1,10 @@
 @echo off
 setlocal enabledelayedexpansion
-title MyeCommerce POS v2.9.54 - Iniciar Todo
+title MyeCommerce POS v2.9.55 - Iniciar Todo
 color 0A
 echo.
 echo ============================================================
-echo     MyeCommerce POS v2.9.54 - Iniciando todos los servicios
+echo     MyeCommerce POS v2.9.55 - Iniciando todos los servicios
 echo ============================================================
 echo.
 cd /d "%~dp0"

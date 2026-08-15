@@ -1,5 +1,5 @@
 ' ============================================================
-' MyeCommerce POS v2.9.54 - Iniciar TODO en modo oculto
+' MyeCommerce POS v2.9.55 - Iniciar TODO en modo oculto
 ' Inicia 4 servicios SIN abrir ventanas CMD:
 '   1. Printer-Agent (puerto 9100) - impresion termica
 '   2. Caddy Dominio (puerto 443) - HTTPS myecommerce.ve (PC)

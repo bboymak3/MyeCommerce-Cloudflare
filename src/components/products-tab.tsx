@@ -54,12 +54,12 @@ function MarginBar({ margin }: { margin: number }) {
 function Block({ title, icon, badge, defaultOpen = true, children }: { title: string; icon: string; badge?: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border rounded-lg overflow-hidden">
-      <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition text-left">
-        <div className="flex items-center gap-2"><span>{icon}</span><span className="text-sm font-semibold text-gray-700">{title}</span>{badge && <Badge variant="secondary" className="text-[9px]">{badge}</Badge>}</div>
+    <div className="border rounded-xl overflow-hidden card-shadow">
+      <button type="button" onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3 bg-muted/30 hover:bg-muted/60 transition text-left">
+        <div className="flex items-center gap-2"><span>{icon}</span><span className="text-sm font-semibold">{title}</span>{badge && <Badge variant="secondary" className="text-[10px]">{badge}</Badge>}</div>
         <Chevron open={open} />
       </button>
-      {open && <div className="px-3 py-3 space-y-3">{children}</div>}
+      {open && <div className="px-4 py-4 space-y-3">{children}</div>}
     </div>
   );
 }
@@ -70,6 +70,8 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
+  const [filterBrand, setFilterBrand] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [showBarcodePrint, setShowBarcodePrint] = useState(false);
   const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", brandId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
   const [formData, setFormData] = useState(emptyForm);
@@ -156,7 +158,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   const filtered = products.filter(p => {
     const s = search.toLowerCase();
     const matchSearch = !s || p.name?.toLowerCase().includes(s) || (p.barcode || '').toLowerCase().includes(s) || (p.secondaryBarcode || '').toLowerCase().includes(s) || (p.description || '').toLowerCase().includes(s) || (p.brand?.name || '').toLowerCase().includes(s);
-    return matchSearch && (!filterCategory || p.categoryId === filterCategory);
+    return matchSearch && (!filterCategory || p.categoryId === filterCategory) && (!filterBrand || p.brandId === filterBrand);
   });
 
   // ─── PAGINATION ───
@@ -164,7 +166,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
   const paginated = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-  useEffect(() => { setPage(1); }, [search, filterCategory]);
+  useEffect(() => { setPage(1); }, [search, filterCategory, filterBrand]);
 
   // ─── FINANCE TOTALS ───
   // Solo considerar productos con stock > 0 y con precio > 0
@@ -344,53 +346,114 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
 
   return (
     <div className="space-y-3">
-      {/* TOOLBAR */}
-      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
-        <div className="flex gap-2 flex-1 w-full sm:w-auto">
-          <Input placeholder="Buscar por nombre, codigo, marca, descripcion..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
-          <Select value={filterCategory} onChange={e => setFilterCategory((e.target as any).value)}>
-            <option value="">Todas</option>
+      {/* ─── TOOLBAR: SEARCH + FILTERS + ACTIONS ─── */}
+      <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center justify-between">
+        {/* Search Bar + Filters */}
+        <div className="flex gap-2 flex-1 w-full sm:w-auto items-center">
+          {/* Main Search */}
+          <div className="search-bar flex-1">
+            <svg className="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              placeholder="Buscar por nombre, codigo, marca, descripcion..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              autoFocus
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {/* Category Filter */}
+          <select
+            value={filterCategory}
+            onChange={e => setFilterCategory(e.target.value)}
+            className="h-10 rounded-xl border bg-card px-3 text-xs font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all min-w-[110px]"
+          >
+            <option value="">Categorias</option>
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
+          </select>
+          {/* Brand Filter */}
+          <select
+            value={filterBrand}
+            onChange={e => setFilterBrand(e.target.value)}
+            className="h-10 rounded-xl border bg-card px-3 text-xs font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all min-w-[110px]"
+          >
+            <option value="">Marcas</option>
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
         </div>
+        {/* Action Buttons */}
         <div className="flex gap-1 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setShowCategoryDialog(true)} className="text-xs">Categorias</Button>
-          <Button variant="outline" size="sm" onClick={() => { setBulkPreview([]); setBulkApplied(false); setBulkPercentage(""); setShowBulkPrice(true); }} className="text-xs text-orange-600">Ajuste Precios</Button>
-          <Button variant="outline" size="sm" onClick={() => importFileRef.current?.click()} disabled={importing} className="text-xs">Importar</Button>
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="text-xs">Exportar</Button>
-          <Button variant="outline" size="sm" onClick={() => setShowBarcodePrint(true)} className="text-xs">Etiquetas</Button>
-          <Button size="sm" onClick={openCreate} className="text-xs">+ Producto</Button>
+          <Button variant="outline" size="sm" onClick={() => setShowCategoryDialog(true)} className="text-xs h-9">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
+            Categorias
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setBulkPreview([]); setBulkApplied(false); setBulkPercentage(""); setShowBulkPrice(true); }} className="text-xs h-9 text-orange-600 border-orange-200 hover:bg-orange-50">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+            Ajuste Precios
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => importFileRef.current?.click()} disabled={importing} className="text-xs h-9">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            Importar
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="text-xs h-9">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            Exportar
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowBarcodePrint(true)} className="text-xs h-9">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" /></svg>
+            Etiquetas
+          </Button>
+          <Button size="sm" onClick={openCreate} className="text-xs h-9 shadow-sm">
+            <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+            Producto
+          </Button>
           <input type="file" ref={importFileRef} accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
         </div>
       </div>
 
+      {/* Search result count */}
+      {(search || filterCategory || filterBrand) && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span>{filtered.length} producto{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</span>
+          <button onClick={() => { setSearch(""); setFilterCategory(""); setFilterBrand(""); }} className="text-primary hover:underline font-medium">Limpiar filtros</button>
+        </div>
+      )}
+
       {/* FINANCE SUMMARY */}
-      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-        <CardContent className="p-3">
-          <div className="flex items-center justify-between mb-2">
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 to-transparent card-shadow">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-bold">Resumen del Inventario</span>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] text-muted-foreground">{totals.withStock} productos con stock • {noStockCount} sin stock</span>
-              <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowFinance(!showFinance)}>{showFinance ? 'Ocultar' : 'Mostrar'}</Button>
+              <span className="text-[11px] text-muted-foreground">{totals.withStock} productos con stock &bull; {noStockCount} sin stock</span>
+              <Button variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setShowFinance(!showFinance)}>{showFinance ? 'Ocultar' : 'Mostrar'}</Button>
             </div>
           </div>
           {showFinance && (
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-white rounded border p-2 text-center">
-                <p className="text-[9px] text-muted-foreground uppercase">Valor Inventario</p>
-                <p className="text-sm font-bold text-blue-600">{currency} {totals.val.toFixed(2)}</p>
-                <p className="text-[8px] text-muted-foreground">Precio venta x {totals.units.toFixed(0)} uds</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="metric-card text-center">
+                <p className="metric-label">Valor Inventario</p>
+                <p className="metric-value text-blue-600 dark:text-blue-400">{currency} {totals.val.toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Precio venta x {totals.units.toFixed(0)} uds</p>
               </div>
-              <div className="bg-white rounded border p-2 text-center">
-                <p className="text-[9px] text-muted-foreground uppercase">Capital Invertido</p>
-                <p className="text-sm font-bold text-orange-600">{currency} {totals.inv.toFixed(2)}</p>
-                <p className="text-[8px] text-muted-foreground">Costo compra x {totals.units.toFixed(0)} uds</p>
+              <div className="metric-card text-center">
+                <p className="metric-label">Capital Invertido</p>
+                <p className="metric-value text-orange-600 dark:text-orange-400">{currency} {totals.inv.toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Costo compra x {totals.units.toFixed(0)} uds</p>
               </div>
-              <div className="bg-white rounded border p-2 text-center">
-                <p className="text-[9px] text-muted-foreground uppercase">Ganancia Potencial</p>
-                <p className={`text-sm font-bold ${gain >= 0 ? 'text-green-600' : 'text-red-600'}`}>{currency} {gain.toFixed(2)}</p>
-                <div className="mt-1"><MarginBar margin={avgMargin} /></div>
-                <p className="text-[9px] text-muted-foreground">Margen {avgMargin.toFixed(1)}%</p>
+              <div className="metric-card text-center">
+                <p className="metric-label">Ganancia Potencial</p>
+                <p className={`metric-value ${gain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{currency} {gain.toFixed(2)}</p>
+                <div className="mt-1.5"><MarginBar margin={avgMargin} /></div>
+                <p className="text-[10px] text-muted-foreground">Margen {avgMargin.toFixed(1)}%</p>
               </div>
             </div>
           )}
@@ -409,26 +472,26 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
             <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setShowAlerts(false)}>Ocultar</Button>
           </div>
           {stockAlerts.zeroStock.length > 0 && (
-            <div className="border border-red-200 bg-red-50 rounded-lg p-2">
-              <p className="text-[10px] font-bold text-red-700 mb-1">SIN STOCK ({stockAlerts.zeroStock.length})</p>
-              <div className="space-y-0.5 max-h-24 overflow-y-auto">
+            <div className="alert-card-danger">
+              <p className="text-xs font-bold text-red-700 dark:text-red-400 mb-2">SIN STOCK ({stockAlerts.zeroStock.length})</p>
+              <div className="space-y-1 max-h-28 overflow-y-auto">
                 {stockAlerts.zeroStock.map(p => (
-                  <div key={p.id} className="flex items-center justify-between text-[10px] bg-white rounded px-2 py-1 border border-red-100">
-                    <div className="flex items-center gap-1"><span dangerouslySetInnerHTML={{ __html: p.icon || '' }} /><span className="truncate">{p.name}</span></div>
-                    <span className="text-red-600 font-bold">0 uds</span>
+                  <div key={p.id} className="flex items-center justify-between text-xs bg-white dark:bg-card rounded-lg px-3 py-1.5 border border-red-100 dark:border-red-900/30">
+                    <div className="flex items-center gap-1.5"><span dangerouslySetInnerHTML={{ __html: p.icon || '' }} /><span className="truncate font-medium">{p.name}</span></div>
+                    <span className="text-red-600 dark:text-red-400 font-bold">0 uds</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
           {stockAlerts.lowStock.length > 0 && (
-            <div className="border border-orange-200 bg-orange-50 rounded-lg p-2">
-              <p className="text-[10px] font-bold text-orange-700 mb-1">STOCK BAJO ({stockAlerts.lowStock.length})</p>
-              <div className="space-y-0.5 max-h-24 overflow-y-auto">
+            <div className="alert-card-warning">
+              <p className="text-xs font-bold text-amber-700 dark:text-amber-400 mb-2">STOCK BAJO ({stockAlerts.lowStock.length})</p>
+              <div className="space-y-1 max-h-28 overflow-y-auto">
                 {stockAlerts.lowStock.map(p => (
-                  <div key={p.id} className="flex items-center justify-between text-[10px] bg-white rounded px-2 py-1 border border-orange-100">
-                    <div className="flex items-center gap-1"><span dangerouslySetInnerHTML={{ __html: p.icon || '' }} /><span className="truncate">{p.name}</span></div>
-                    <div className="flex items-center gap-1"><span className="text-orange-600 font-bold">{p.stock}</span><span className="text-muted-foreground">falta {p.deficit}</span></div>
+                  <div key={p.id} className="flex items-center justify-between text-xs bg-white dark:bg-card rounded-lg px-3 py-1.5 border border-amber-100 dark:border-amber-900/30">
+                    <div className="flex items-center gap-1.5"><span dangerouslySetInnerHTML={{ __html: p.icon || '' }} /><span className="truncate font-medium">{p.name}</span></div>
+                    <div className="flex items-center gap-1"><span className="text-amber-600 dark:text-amber-400 font-bold">{p.stock}</span><span className="text-muted-foreground">falta {p.deficit}</span></div>
                   </div>
                 ))}
               </div>
@@ -504,22 +567,22 @@ export default function ProductsTab({ products, categories, brands, bcvRate, cur
       )}
 
       {/* PRODUCTS TABLE */}
-      <Card>
+      <Card className="card-shadow">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/50">
+            <table className="elegant-table">
+              <thead>
                 <tr>
-                  <th className="text-left p-2 font-medium w-8"></th>
-                  <th className="text-left p-2 font-medium">Producto</th>
-                  <th className="text-left p-2 font-medium">Marca / Cat.</th>
-                  <th className="text-right p-2 font-medium">USD</th>
-                  <th className="text-right p-2 font-medium">Bs</th>
-                  <th className="text-right p-2 font-medium">Costo</th>
-                  <th className="text-right p-2 font-medium">Margen</th>
-                  <th className="text-right p-2 font-medium">Stock</th>
-                  <th className="text-left p-2 font-medium">IVA</th>
-                  <th className="text-center p-2 font-medium w-20">Acc.</th>
+                  <th className="w-8"></th>
+                  <th>Producto</th>
+                  <th>Marca / Cat.</th>
+                  <th className="text-right">USD</th>
+                  <th className="text-right">Bs</th>
+                  <th className="text-right">Costo</th>
+                  <th className="text-right">Margen</th>
+                  <th className="text-right">Stock</th>
+                  <th>IVA</th>
+                  <th className="text-center w-20">Acc.</th>
                 </tr>
               </thead>
               <tbody>

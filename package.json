@@ -1,6 +1,6 @@
 {
   "name": "my-ecommerce",
-  "version": "2.9.54",
+  "version": "2.9.55",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -25,6 +25,7 @@
     "jspdf-autotable": "3.8.4",
     "lucide-react": "^0.460.0",
     "next": "15.3.3",
+    "next-themes": "^0.4.4",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^19.0.0",

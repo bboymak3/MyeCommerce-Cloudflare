@@ -1,5 +1,5 @@
 /**
- * escpos-buffer.ts — ESC/POS Buffer Generator v2.0 (MyeCommerce POS v2.9.54)
+ * escpos-buffer.ts — ESC/POS Buffer Generator v2.0 (MyeCommerce POS v2.9.55)
  *
  * REGLA CRITICA: cmdSize(0x01) o (0x11) duplica el ANCHO de cada caracter.
  *   - En 58mm (32 chars normales), con doble ancho solo caben 16 chars por linea.

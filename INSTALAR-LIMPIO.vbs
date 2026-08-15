@@ -1,5 +1,5 @@
 ' ==========================================================
-' MyeCommerce POS v2.9.54 - Instalador con Progreso Visible
+' MyeCommerce POS v2.9.55 - Instalador con Progreso Visible
 '
 ' Ejecutar como Administrador.
 ' Ventana de progreso se mantiene abierta durante toda la instalacion.
@@ -72,7 +72,7 @@ End If
 On Error GoTo 0
 
 Dim bienvenida
-bienvenida = "MyeCommerce POS v2.9.54" & vbCrLf & vbCrLf & _
+bienvenida = "MyeCommerce POS v2.9.55" & vbCrLf & vbCrLf & _
   "Sistema Punto de Venta - Venezuela" & vbCrLf & _
   "Doble Moneda USD/Bs con tasa BCV" & vbCrLf & _
   "Impresion Termica ESC/POS (agente v3.1 winspool)" & vbCrLf & _
@@ -93,7 +93,7 @@ If resultado <> vbYes Then WScript.Quit
 On Error Resume Next
 objFSO.DeleteFile logFile
 On Error GoTo 0
-LogWrite "=== INSTALACION LIMPIA v2.9.54 ==="
+LogWrite "=== INSTALACION LIMPIA v2.9.55 ==="
 LogWrite "Carpeta: " & strDir
 
 WriteStatus 1, 8, "Verificando permisos...", "", 0, "", ""
@@ -328,7 +328,7 @@ strDesktop = WshShell.SpecialFolders("Desktop")
 Set oLink = WshShell.CreateShortcut(strDesktop & "\MyeCommerce POS.lnk")
 oLink.TargetPath = strDir & "\INICIAR-TODO-OCULTO.vbs"
 oLink.WorkingDirectory = strDir
-oLink.Description = "MyeCommerce POS v2.9.54"
+oLink.Description = "MyeCommerce POS v2.9.55"
 oLink.IconLocation = "shell32.dll,14"
 oLink.Save
 On Error GoTo 0
@@ -361,4 +361,4 @@ finale = "INSTALACION COMPLETADA" & vbCrLf & vbCrLf & _
   "  caddy\caddy-mobile.log     - Log de Caddy movil" & vbCrLf & _
   "  install-log.txt            - Log de esta instalacion"
 
-MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.54 - Listo"
+MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.55 - Listo"
