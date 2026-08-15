@@ -14,6 +14,15 @@ const nextConfig = {
     };
     return config;
   },
+  // Rewrite /uploads/products/file.jpg al API endpoint que sirve desde data/
+  async rewrites() {
+    return [
+      {
+        source: '/uploads/products/:file',
+        destination: '/api/product-images?file=:file',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

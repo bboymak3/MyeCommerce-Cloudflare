@@ -457,9 +457,9 @@ export default function QuotesTab({
 
   const filteredProducts = products.filter((p) => {
     const s = productSearch.toLowerCase();
-    return p.name.toLowerCase().includes(s)
-      || p.barcode.includes(s)
-      || p.secondaryBarcode.includes(s)
+    return p.name?.toLowerCase().includes(s)
+      || (p.barcode || '').includes(s)
+      || (p.secondaryBarcode || '').includes(s)
       || (p.brand?.name || '').toLowerCase().includes(s)
       || (p.category?.name || '').toLowerCase().includes(s);
   });

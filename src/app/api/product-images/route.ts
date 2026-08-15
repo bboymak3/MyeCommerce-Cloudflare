@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile, stat } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-const UPLOADS_DIR = join(process.cwd(), 'public', 'uploads', 'products');
+// Buscar en ambas ubicaciones: data/ (nuevo) y public/ (legacy)
+const DATA_DIR = join(process.cwd(), 'data', 'uploads', 'products');
+const PUBLIC_DIR = join(process.cwd(), 'public', 'uploads', 'products');
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,10 +14,17 @@ export async function GET(req: NextRequest) {
     if (!file || file.includes('..') || file.includes('/') || file.includes('\\')) {
       return NextResponse.json({ error: 'Invalid file name' }, { status: 400 });
     }
-    const filePath = join(UPLOADS_DIR, file);
+
+    // Buscar primero en data/ (nuevo), luego en public/ (legacy)
+    let filePath = join(DATA_DIR, file);
+    if (!existsSync(filePath)) {
+      filePath = join(PUBLIC_DIR, file);
+    }
+
     if (!existsSync(filePath)) {
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
+
     const fileBuffer = await readFile(filePath);
     const ext = file.split('.').pop()?.toLowerCase();
     const mimeMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp' };
@@ -24,6 +33,7 @@ export async function GET(req: NextRequest) {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
       },
     });
   } catch (error) {

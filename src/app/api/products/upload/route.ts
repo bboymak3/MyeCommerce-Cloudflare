@@ -3,7 +3,8 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-const UPLOADS_DIR = join(process.cwd(), 'public', 'uploads', 'products');
+// Guardar FUERA de public/ para evitar problemas con next build/cache
+const UPLOADS_DIR = join(process.cwd(), 'data', 'uploads', 'products');
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,8 +41,8 @@ export async function POST(req: NextRequest) {
 
     await writeFile(filePath, buffer);
 
-    // Retornar la URL publica (compatible con product-images GET route)
-    const imageUrl = `/uploads/products/${fileName}`;
+    // Retornar URL a traves del API endpoint (siempre funciona, sin depender de public/)
+    const imageUrl = `/api/product-images?file=${fileName}`;
     return NextResponse.json({ imageUrl, message: 'Imagen subida correctamente' });
   } catch (error) {
     console.error('Error uploading product image:', error);
