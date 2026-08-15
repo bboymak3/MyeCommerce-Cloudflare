@@ -1,9 +1,14 @@
 ' ============================================================
-' MyeCommerce POS v2.9.48.2 - Iniciar TODO en modo oculto
-' Inicia 3 servicios SIN abrir ventanas CMD:
+' MyeCommerce POS v2.9.49 - Iniciar TODO en modo oculto
+' Inicia 4 servicios SIN abrir ventanas CMD:
 '   1. Printer-Agent (puerto 9100) - impresion termica
-'   2. Caddy (puerto 443 + 8443) - HTTPS dominio + acceso movil
-'   3. Next.js (puerto 3000) - aplicacion web
+'   2. Caddy Dominio (puerto 443) - HTTPS myecommerce.ve (PC)
+'   3. Caddy Movil (puerto 8443) - HTTPS IP local (telefono/camara)
+'   4. Next.js (puerto 3000) - aplicacion web
+'
+' IMPORTANTE: Caddy Movil es INDEPENDIENTE del Caddy Dominio.
+' Si el Caddy del dominio falla (puerto 80/443 en uso), el movil
+' sigue funcionando en :8443 para la camara del telefono.
 '
 ' Uso: doble clic, o acceso directo en el escritorio
 ' ============================================================
@@ -29,15 +34,17 @@ Next
 On Error GoTo 0
 WScript.Sleep 2000
 
-' -- PASO 2: Iniciar Printer-Agent (oculto) --
+' -- PASO 2: Detectar IP local y guardarla --
+WshShell.Run "cmd /c powershell -NoProfile -Command ""$ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like '192.168.*' -or $_.IPAddress -like '10.*' } | Select-Object -First 1 -ExpandProperty IPAddress); if (-not $ip) { $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { -not $_.Loopback -and $_.PrefixOrigin -ne 'WellKnown' } | Select-Object -First 1 -ExpandProperty IPAddress) }; Write-Output $ip"" > """ & strDir & "\caddy\local-ip.txt"" 2>nul", 0, True
+
+' -- PASO 3: Iniciar Printer-Agent (oculto) --
 ' NOTA: agent.js SOLO usa modulos built-in de Node (http, fs, path).
 ' NO necesita node_modules para arrancar. serialport es opcional.
-' Se agrega log para depuracion.
 WshShell.CurrentDirectory = strDir & "\printer-agent"
 WshShell.Run "cmd /c node agent.js > agent-startup.log 2>&1", 0, False
 WshShell.CurrentDirectory = strDir
 
-' -- PASO 3: Esperar agente (verificar puerto 9100) --
+' -- PASO 4: Esperar agente (verificar puerto 9100) --
 agentOk = False
 For i = 1 To 10
     WScript.Sleep 1000
@@ -52,25 +59,64 @@ For i = 1 To 10
     On Error GoTo 0
 Next
 
-' -- PASO 4: Abrir puerto 8443 en firewall (acceso movil telefono/camara) --
+' -- PASO 5: Abrir puerto 8443 en firewall (acceso movil telefono/camara) --
 On Error Resume Next
 WshShell.Run "cmd /c netsh advfirewall firewall delete rule name=""MyeCommerce POS Mobile 8443"" >nul 2>&1", 0, True
 WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTPS para camara del telefono""", 0, True
 On Error GoTo 0
 
-' -- PASO 5: Iniciar Caddy (oculto, HTTPS) --
-If objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
-    WshShell.CurrentDirectory = strDir & "\caddy"
-    WshShell.Run "cmd /c caddy.exe run --config Caddyfile", 0, False
+' -- PASO 6: Iniciar Caddy Dominio (oculto, HTTPS myecommerce.ve) --
+' Este puede fallar si puerto 80 o 443 estan en uso - NO es critico
+caddyDir = strDir & "\caddy"
+caddyIniciado = False
+If objFSO.FileExists(caddyDir & "\caddy.exe") Then
+    ' Intentar iniciar Caddy del dominio (puede fallar silenciosamente)
+    WshShell.CurrentDirectory = caddyDir
+    WshShell.Run "cmd /c caddy.exe run --config Caddyfile > caddy-domain.log 2>&1", 0, False
     WshShell.CurrentDirectory = strDir
     caddyIniciado = True
-Else
-    caddyIniciado = False
 End If
 
-WScript.Sleep 1000
+' -- PASO 7: Iniciar Caddy Movil (oculto, HTTPS :8443) --
+' PROCESO INDEPENDIENTE - este ES critico para la camara del telefono
+' Usa su propio Caddyfile-mobile y su propio data-dir para certificados
+caddyMovilIniciado = False
+If objFSO.FileExists(caddyDir & "\caddy.exe") Then
+    If objFSO.FileExists(caddyDir & "\Caddyfile-mobile") Then
+        WshShell.CurrentDirectory = caddyDir
+        WshShell.Run "cmd /c caddy.exe run --config Caddyfile-mobile --data-dir mobile-data > caddy-mobile.log 2>&1", 0, False
+        WshShell.CurrentDirectory = strDir
+        caddyMovilIniciado = True
+        
+        ' Esperar 3 segundos y verificar que Caddy movil esta escuchando en 8443
+        WScript.Sleep 3000
+        caddyMovilOk = False
+        For i = 1 To 10
+            WScript.Sleep 1000
+            On Error Resume Next
+            Set objHTTP2 = CreateObject("MSXML2.XMLHTTP")
+            ' Intentar conexion HTTPS (esperamos error de certificado, NO de conexion)
+            objHTTP2.Open "GET", "https://localhost:8443", False
+            On Error Resume Next
+            objHTTP2.send ""
+            ' Si el status es algo (incluso error TLS), significa que Caddy esta escuchando
+            If Err.Number = 0 Or InStr(1, Err.Description, "certificate") > 0 Or InStr(1, Err.Description, "certificado") > 0 Then
+                caddyMovilOk = True
+                Exit For
+            End If
+            ' Si el error es de conexion rechazada, Caddy no esta escuchando
+            On Error GoTo 0
+        Next
+    Else
+        ' Caddyfile-mobile no existe, usar el Caddyfile principal como fallback
+        WshShell.CurrentDirectory = caddyDir
+        WshShell.Run "cmd /c caddy.exe run --config Caddyfile > caddy-mobile.log 2>&1", 0, False
+        WshShell.CurrentDirectory = strDir
+        caddyMovilIniciado = True
+    End If
+End If
 
-' -- PASO 6: Copiar static a standalone (si existe) --
+' -- PASO 8: Copiar static a standalone (si existe) --
 On Error Resume Next
 If objFSO.FolderExists(strDir & "\.next\standalone") Then
     If Not objFSO.FolderExists(strDir & "\.next\standalone\.next\static") Then
@@ -82,11 +128,11 @@ If objFSO.FolderExists(strDir & "\.next\standalone") Then
 End If
 On Error GoTo 0
 
-' -- PASO 7: Iniciar Next.js (oculto) --
+' -- PASO 9: Iniciar Next.js (oculto) --
 WshShell.CurrentDirectory = strDir
 WshShell.Run "cmd /c npx next start -p 3000", 0, False
 
-' -- PASO 8: Esperar a que Next.js responda --
+' -- PASO 10: Esperar a que Next.js responda --
 Set objHTTP = CreateObject("MSXML2.XMLHTTP")
 maxWait = 60
 waited = 0
@@ -105,7 +151,7 @@ Do While waited < maxWait And Not ready
     On Error GoTo 0
 Loop
 
-' -- PASO 9: Abrir navegador --
+' -- PASO 11: Abrir navegador --
 If caddyIniciado Then
     WshShell.Run "https://myecommerce.ve"
 Else

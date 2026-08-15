@@ -1,0 +1,47 @@
+# Caddyfile-mobile - MyeCommerce POS
+# ============================================================================
+# Caddy INDEPENDIENTE exclusivo para acceso movil via HTTPS :8443
+# 
+# Este archivo se usa con un PROCESO Caddy separado del dominio.
+# Si el Caddy del dominio (myecommerce.ve) falla por conflictos de puerto 80/443,
+# este Caddy movil sigue funcionando porque usa SU PROPIO puerto 8443.
+#
+# Los telefonos acceden via https://IP_DEL_SERVER:8443
+# La camara del telefono necesita HTTPS (Secure Context) para getUserMedia.
+#
+# Uso:  caddy.exe run --config Caddyfile-mobile
+# ============================================================================
+
+# Desactivar admin API (no necesitamos panel de admin en movil)
+{
+	admin off
+}
+
+# HTTPS en puerto 8443 para TODAS las interfaces (0.0.0.0)
+# tls internal = certificado auto-firmado por la CA interna de Caddy
+:8443 {
+	tls internal
+
+	# Proxy a Next.js
+	reverse_proxy localhost:3000
+
+	# Headers optimizados para acceso movil
+	header {
+		# Permitir recursos crossorigin (COEP credentialless = no bloquea)
+		Cross-Origin-Embedder-Policy "credentialless"
+		Cross-Origin-Opener-Policy "same-origin"
+		# Cache para assets estaticos
+		Cache-Control "public, max-age=3600"
+		X-Content-Type-Options "nosniff"
+		# WebSocket support (Next.js HMR en dev)
+		Upgrade "websocket"
+		Connection "upgrade"
+	}
+
+	# Log a archivo para depuracion
+	log {
+		output file caddy-mobile.log
+		format json
+		level INFO
+	}
+}

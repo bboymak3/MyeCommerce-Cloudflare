@@ -1,5 +1,13 @@
 # MyeCommerce v2.9.x - Registro de Versiones
 
+## v2.9.49 (2026-08-15)
+- **fix**: Caddy movil independiente — Caddyfile-mobile separado del dominio para :8443
+- **fix**: ERR_SSL_PROTOCOL_ERROR — Caddy dominio y movil ahora son procesos independientes
+- **fix**: Si Caddy dominio falla (puerto 80/443 en uso), el movil sigue funcionando
+- **feat**: Deteccion de IP local automatica guardada en caddy/local-ip.txt
+- **feat**: Log de Caddy movil en caddy/caddy-mobile.log para depuracion
+- **feat**: Log de Caddy dominio en caddy/caddy-domain.log para depuracion
+
 ## v2.9.48 (2026-08-14)
 - **feat**: Header 2 filas — nombre tienda + datos fiscales en fila superior, navegacion en fila inferior
 - **feat**: Catalogo logo personalizado — upload logo desde configuracion de catalogo

@@ -1,5 +1,5 @@
 ' ==========================================================
-' MyeCommerce POS v2.9.47.4 - Instalador con Progreso Visible
+' MyeCommerce POS v2.9.49 - Instalador con Progreso Visible
 '
 ' Ejecutar como Administrador.
 ' Ventana de progreso se mantiene abierta durante toda la instalacion.
@@ -72,11 +72,12 @@ End If
 On Error GoTo 0
 
 Dim bienvenida
-bienvenida = "MyeCommerce POS v2.9.47.4" & vbCrLf & vbCrLf & _
+bienvenida = "MyeCommerce POS v2.9.49" & vbCrLf & vbCrLf & _
   "Sistema Punto de Venta - Venezuela" & vbCrLf & _
   "Doble Moneda USD/Bs con tasa BCV" & vbCrLf & _
   "Impresion Termica ESC/POS (agente v3.1 winspool)" & vbCrLf & _
-  "Dominio local https://myecommerce.ve" & vbCrLf & vbCrLf & _
+  "Dominio local https://myecommerce.ve" & vbCrLf & _
+  "Acceso movil HTTPS :8443 (camara telefono)" & vbCrLf & vbCrLf & _
   "REQUISITOS:" & vbCrLf & _
   "  - Node.js 20+ instalado" & vbCrLf & _
   "  - Conexion a internet (solo para instalar deps)" & vbCrLf & _
@@ -92,7 +93,7 @@ If resultado <> vbYes Then WScript.Quit
 On Error Resume Next
 objFSO.DeleteFile logFile
 On Error GoTo 0
-LogWrite "=== INSTALACION LIMPIA v2.9.47.4 ==="
+LogWrite "=== INSTALACION LIMPIA v2.9.49 ==="
 LogWrite "Carpeta: " & strDir
 
 WriteStatus 1, 8, "Verificando permisos...", "", 0, "", ""
@@ -131,6 +132,8 @@ objFSO.DeleteFile strDir & "\prisma\dev.db-journal"
 objFSO.DeleteFile strDir & "\prisma\dev.db-wal"
 objFSO.DeleteFile strDir & "\prisma\dev.db-shm"
 Call RunHidden("if exist printer-agent\spool rmdir /s /q printer-agent\spool")
+' Limpiar data de Caddy movil
+Call RunHidden("if exist caddy\mobile-data rmdir /s /q caddy\mobile-data")
 On Error GoTo 0
 LogWrite "  OK: Limpieza completada"
 
@@ -143,7 +146,7 @@ On Error GoTo 0
 If Not objFSO.FolderExists(strDir & "\espaldos") Then
     objFSO.CreateFolder strDir & "\espaldos"
 End If
-WriteStatus 3, 8, "Limpieza completada", "node_modules, .next, DB eliminados", 37, "", ""
+WriteStatus 3, 8, "Limpieza completada", "node_modules, .next, DB, Caddy data eliminados", 37, "", ""
 
 WriteStatus 4, 8, "Verificando Node.js...", "", 37, "", ""
 LogWrite "PASO 4: Verificando Node.js..."
@@ -217,7 +220,7 @@ LogWrite "  OK: Base de datos lista"
 WriteStatus 6, 8, "Base de datos lista", "Prisma generado + DB creada", 75, "", ""
 
 WriteStatus 7, 8, "Configurando Caddy y HTTPS...", "Descargando Caddy si es necesario...", 75, "", ""
-LogWrite "PASO 7: Caddy + dominio..."
+LogWrite "PASO 7: Caddy + dominio + movil..."
 
 If isAdmin Then
     hostsFile = WshShell.ExpandEnvironmentStrings("%SystemRoot%") & "\System32\drivers\etc\hosts"
@@ -249,6 +252,35 @@ If Not objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
     LogWrite "  OK: Caddy descargado"
 End If
 
+' Verificar que Caddyfile-mobile existe
+If objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
+    If Not objFSO.FileExists(strDir & "\caddy\Caddyfile-mobile") Then
+        LogWrite "  WARN: Caddyfile-mobile no encontrado, creando..."
+        ' Crear Caddyfile-mobile basico si no existe
+        Set cf = objFSO.CreateTextFile(strDir & "\caddy\Caddyfile-mobile", True)
+        cf.WriteLine "{"
+        cf.WriteLine "    admin off"
+        cf.WriteLine "}"
+        cf.WriteLine ""
+        cf.WriteLine ":8443 {"
+        cf.WriteLine "    tls internal"
+        cf.WriteLine "    reverse_proxy localhost:3000"
+        cf.WriteLine "    header {"
+        cf.WriteLine "        Cross-Origin-Embedder-Policy ""credentialless"""
+        cf.WriteLine "        Cross-Origin-Opener-Policy ""same-origin"""
+        cf.WriteLine "        Cache-Control ""public, max-age=3600"""
+        cf.WriteLine "        X-Content-Type-Options ""nosniff"""
+        cf.WriteLine "        Upgrade ""websocket"""
+        cf.WriteLine "        Connection ""upgrade"""
+        cf.WriteLine "    }"
+        cf.WriteLine "}"
+        cf.Close
+        LogWrite "  OK: Caddyfile-mobile creado"
+    Else
+        LogWrite "  OK: Caddyfile-mobile ya existe"
+    End If
+End If
+
 If isAdmin And objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
     LogWrite "  Instalando certificado SSL (caddy trust)..."
     WriteStatus 7, 8, "Instalando certificado SSL...", "caddy trust...", 85, "", ""
@@ -263,7 +295,7 @@ If isAdmin And objFSO.FileExists(strDir & "\caddy\caddy.exe") Then
     WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTPS para camara del telefono""", 0, True
     LogWrite "  OK: Puerto 8443 abierto en firewall"
 End If
-WriteStatus 7, 8, "Caddy configurado", "HTTPS listo en myecommerce.ve", 87, "", ""
+WriteStatus 7, 8, "Caddy configurado", "HTTPS dominio + movil listo", 87, "", ""
 
 WriteStatus 8, 8, "Compilando para produccion...", "next build (este paso tarda 1-2 min)...", 87, "", ""
 LogWrite "PASO 8: next build..."
@@ -296,7 +328,7 @@ strDesktop = WshShell.SpecialFolders("Desktop")
 Set oLink = WshShell.CreateShortcut(strDesktop & "\MyeCommerce POS.lnk")
 oLink.TargetPath = strDir & "\INICIAR-TODO-OCULTO.vbs"
 oLink.WorkingDirectory = strDir
-oLink.Description = "MyeCommerce POS v2.9.47.4"
+oLink.Description = "MyeCommerce POS v2.9.49"
 oLink.IconLocation = "shell32.dll,14"
 oLink.Save
 On Error GoTo 0
@@ -312,14 +344,21 @@ finale = "INSTALACION COMPLETADA" & vbCrLf & vbCrLf & _
   "El sistema iniciara SIN ventanas CMD." & vbCrLf & _
   "Se abrira el navegador automaticamente." & vbCrLf & vbCrLf & _
   "URLs de acceso:" & vbCrLf & _
-  "  https://myecommerce.ve     (con dominio local)" & vbCrLf & _
-  "  http://localhost:3000     (alternativa)" & vbCrLf & vbCrLf & _
+  "  https://myecommerce.ve     (con dominio local - PC)" & vbCrLf & _
+  "  https://IP_LOCAL:8443     (telefono - camara barcode)" & vbCrLf & _
+  "  http://localhost:3000     (alternativa sin HTTPS)" & vbCrLf & vbCrLf & _
+  "ACCESO MOVIL (camara telefono):" & vbCrLf & _
+  "  1. Desde la PC vaya a Config > QR Acceso" & vbCrLf & _
+  "  2. Escanee el QR con el telefono (modo HTTPS)" & vbCrLf & _
+  "  3. Al primer acceso acepte el certificado SSL" & vbCrLf & _
+  "     Avanzado > Continuar" & vbCrLf & vbCrLf & _
   "USUARIO: admin   CLAVE: admin" & vbCrLf & vbCrLf & _
   "Archivos importantes:" & vbCrLf & _
   "  INSTALAR-LIMPIO.vbs        - Reinstalar desde cero" & vbCrLf & _
   "  INICIAR-TODO-OCULTO.vbs   - Iniciar sin ventanas" & vbCrLf & _
   "  INICIAR-TODO.bat           - Iniciar con ventanas (debug)" & vbCrLf & _
   "  DETENER-TODO.bat           - Detener servicios" & vbCrLf & _
+  "  caddy\caddy-mobile.log     - Log de Caddy movil" & vbCrLf & _
   "  install-log.txt            - Log de esta instalacion"
 
-MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.47.4 - Listo"
+MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.49 - Listo"
