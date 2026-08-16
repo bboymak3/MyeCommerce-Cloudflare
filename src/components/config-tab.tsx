@@ -64,6 +64,90 @@ interface ConfigTabProps {
   };
 }
 
+// ─── Version Checker ───────────────────────────────────────────
+function VersionChecker() {
+  const [checking, setChecking] = useState(false);
+  const [versionInfo, setVersionInfo] = useState<{
+    localVersion: string;
+    latestVersion: string;
+    hasUpdate: boolean;
+    downloadUrl: string;
+    releasesUrl: string;
+  } | null>(null);
+
+  const checkVersion = async () => {
+    setChecking(true);
+    try {
+      const res = await authFetch('/api/check-version');
+      const data = await res.json();
+      setVersionInfo(data);
+    } catch {
+      toast.error('No se pudo verificar la version');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <Button
+        variant="outline"
+        className="w-full text-sm"
+        onClick={checkVersion}
+        disabled={checking}
+      >
+        {checking ? 'Verificando...' : 'Buscar Actualizaciones'}
+      </Button>
+
+      {versionInfo && (
+        <div className={`p-3 rounded-lg border text-sm space-y-2 ${
+          versionInfo.hasUpdate ? 'bg-green-50 border-green-200' : 'bg-muted/50'
+        }`}>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Version instalada:</span>
+            <span className="font-mono font-bold">{versionInfo.localVersion}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Version mas reciente:</span>
+            <span className="font-mono font-bold">{versionInfo.latestVersion}</span>
+          </div>
+
+          {versionInfo.hasUpdate ? (
+            <>
+              <div className="pt-2 space-y-2">
+                <p className="font-semibold text-green-700">
+                  Hay una nueva version disponible!
+                </p>
+                <div className="text-xs space-y-1 text-muted-foreground">
+                  <p className="font-medium">Para actualizar:</p>
+                  <ol className="list-decimal list-inside space-y-0.5">
+                    <li>Descargue el ZIP del link de abajo</li>
+                    <li>Coloque el archivo en la carpeta del sistema</li>
+                    <li>Ejecute ACTUALIZAR.bat (doble clic)</li>
+                    <li>El sistema hara un respaldo automatico</li>
+                  </ol>
+                </div>
+                <a
+                  href={versionInfo.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full text-center bg-green-600 text-white rounded-lg px-3 py-2 text-xs font-semibold hover:bg-green-700 transition-colors"
+                >
+                  Descargar v{versionInfo.latestVersion}
+                </a>
+              </div>
+            </>
+          ) : (
+            <p className="text-center text-muted-foreground pt-1">
+              Su sistema esta actualizado
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ConfigTab({ settings, onSettingsChange, licenseFeatures }: ConfigTabProps) {
   const [storeName, setStoreName] = useState(settings.storeName);
   const [storeAddress, setStoreAddress] = useState(settings.storeAddress || "");
@@ -1284,6 +1368,16 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ====== Actualizaciones ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Actualizaciones</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <VersionChecker />
         </CardContent>
       </Card>
 
