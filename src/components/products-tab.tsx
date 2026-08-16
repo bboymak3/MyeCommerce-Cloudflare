@@ -20,7 +20,7 @@ interface ComboItemData { id: string; comboId: string; productId: string; quanti
 interface Product {
   id: string; name: string; description: string; barcode: string; secondaryBarcode: string;
   price: number; cost: number; marginPercent: number; taxType: string;
-  stock: number; minStock: number; wholesalePrice: number; minWholesaleQty: number;
+  stock: number; minStock: number; wholesalePrice: number; wholesaleCost: number; wholesaleMarginPercent: number; minWholesaleQty: number;
   granMayorPrice: number; isGranMayor: boolean;
   noStock: boolean; vendePorPeso?: boolean; unidadPeso?: string;
   icon: string; image: string; location: string;
@@ -74,7 +74,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
   const [filterBrand, setFilterBrand] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [showBarcodePrint, setShowBarcodePrint] = useState(false);
-  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", brandId: "", icon: "", image: "", wholesalePrice: "", minWholesaleQty: "", granMayorPrice: "", isGranMayor: false, noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
+  const emptyForm = { name: "", description: "", barcode: "", secondaryBarcode: "", price: "", cost: "", marginPercent: "", taxType: "general", stock: "", minStock: "5", categoryId: "", brandId: "", icon: "", image: "", wholesalePrice: "", wholesaleCost: "", wholesaleMarginPercent: "", minWholesaleQty: "", granMayorPrice: "", isGranMayor: false, noStock: false, vendePorPeso: false, unidadPeso: "kg", location: "", expirationDate: "", lotNumber: "", isCombo: false, loyaltyPoints: "", unitsPerBox: "", boxPrice: "", boxMarginPercent: "", stockMode: "unit", boxQty: "" };
   const [formData, setFormData] = useState(emptyForm);
   const [categoryName, setCategoryName] = useState("");
   const [newCatIcon, setNewCatIcon] = useState("");
@@ -146,6 +146,9 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
   const autoPrice = formData.cost && formData.marginPercent ? calcPrice(formData.cost, formData.marginPercent) : "";
   const autoMargin = formData.price && formData.cost ? calcMargin(formData.price, formData.cost) : "";
   const autoBoxPrice = formData.cost && formData.boxMarginPercent && formData.unitsPerBox ? calcBoxPrice(formData.cost, formData.boxMarginPercent, formData.unitsPerBox) : "";
+  // Calculo automatico precio mayorista (igual logica que detal)
+  const autoWholesalePrice = formData.wholesaleCost && formData.wholesaleMarginPercent ? calcPrice(formData.wholesaleCost, formData.wholesaleMarginPercent) : "";
+  const autoWholesaleMargin = formData.wholesalePrice && formData.wholesaleCost ? calcMargin(formData.wholesalePrice, formData.wholesaleCost) : "";
   // Calculos bulto: costo unitario del bulto, precio venta unitario, stock total
   const boxUnitsPerBox = parseInt(formData.unitsPerBox) || 0;
   const boxCostPerBox = parseFloat(formData.boxPrice) || 0;
@@ -192,7 +195,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
 
   const openEdit = (p: Product) => {
     setEditingProduct(p);
-    setFormData({ name: p.name, description: p.description, barcode: p.barcode, secondaryBarcode: p.secondaryBarcode || "", price: p.price.toString(), cost: p.cost.toString(), marginPercent: (p.marginPercent || 0).toString(), taxType: p.taxType || "general", stock: p.stock.toString(), minStock: (p.minStock || 5).toString(), categoryId: p.categoryId || "", brandId: p.brandId || "", icon: p.icon || "", image: p.image || "", wholesalePrice: (p.wholesalePrice || 0).toString(), minWholesaleQty: (p.minWholesaleQty || 0).toString(), granMayorPrice: (p.granMayorPrice || 0).toString(), isGranMayor: p.isGranMayor || false, noStock: p.noStock || false, vendePorPeso: p.vendePorPeso || false, unidadPeso: p.unidadPeso || "kg", location: p.location || "", expirationDate: p.expirationDate ? p.expirationDate.split("T")[0] : "", lotNumber: p.lotNumber || "", isCombo: p.isCombo || false, loyaltyPoints: (p.loyaltyPoints || 0).toString(), unitsPerBox: (p.unitsPerBox || 0).toString(), boxPrice: (p.boxPrice || 0).toString(), boxMarginPercent: (p.boxMarginPercent || 0).toString() });
+    setFormData({ name: p.name, description: p.description, barcode: p.barcode, secondaryBarcode: p.secondaryBarcode || "", price: p.price.toString(), cost: p.cost.toString(), marginPercent: (p.marginPercent || 0).toString(), taxType: p.taxType || "general", stock: p.stock.toString(), minStock: (p.minStock || 5).toString(), categoryId: p.categoryId || "", brandId: p.brandId || "", icon: p.icon || "", image: p.image || "", wholesalePrice: (p.wholesalePrice || 0).toString(), wholesaleCost: (p.wholesaleCost || 0).toString(), wholesaleMarginPercent: (p.wholesaleMarginPercent || 0).toString(), minWholesaleQty: (p.minWholesaleQty || 0).toString(), granMayorPrice: (p.granMayorPrice || 0).toString(), isGranMayor: p.isGranMayor || false, noStock: p.noStock || false, vendePorPeso: p.vendePorPeso || false, unidadPeso: p.unidadPeso || "kg", location: p.location || "", expirationDate: p.expirationDate ? p.expirationDate.split("T")[0] : "", lotNumber: p.lotNumber || "", isCombo: p.isCombo || false, loyaltyPoints: (p.loyaltyPoints || 0).toString(), unitsPerBox: (p.unitsPerBox || 0).toString(), boxPrice: (p.boxPrice || 0).toString(), boxMarginPercent: (p.boxMarginPercent || 0).toString() });
     setShowProductDialog(true);
     if (p.isCombo && p.id) { (async () => { try { const r = await authFetch(`/api/products/combo-items?comboId=${p.id}`); if (r.ok) setComboItems(await r.json()); } catch { setComboItems([]); } })(); } else setComboItems([]);
   };
@@ -810,10 +813,44 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
                 </div>
               )}
 
-              {/* Precio Mayorista (separado, tasa euro) */}
-              <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t">
-                <div><Label className="text-[10px]">P. Mayorista ({currency})</Label><Input type="number" step="0.01" min="0" value={formData.wholesalePrice} onChange={e => setFormData({ ...formData, wholesalePrice: e.target.value })} placeholder="0=desactivado" className="text-sm" /><p className="text-[8px] text-muted-foreground">Precio al mayor (tasa euro BCV)</p></div>
-                <div><Label className="text-[10px]">Cant. Min. Mayorista</Label><Input type="number" min="0" value={formData.minWholesaleQty} onChange={e => setFormData({ ...formData, minWholesaleQty: e.target.value })} className="text-sm" /><p className="text-[8px] text-muted-foreground">A partir de cuantas uds aplica</p></div>
+              {/* Precio Mayorista (misma logica que detal: costo + % ganancia = precio sugerido) */}
+              <div className="mt-2 pt-2 border-t">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-orange-700 dark:text-orange-400">💰 Precio al Mayor</span>
+                  <span className="text-[9px] text-muted-foreground">Igual que Detal: Costo + % Ganancia = Precio Sugerido</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  <div>
+                    <Label className="text-[10px]">Costo Mayor ({currency})</Label>
+                    <Input type="number" step="0.01" min="0" value={formData.wholesaleCost} onChange={e => { const c = e.target.value, nf = { ...formData, wholesaleCost: c }; if (c && formData.wholesaleMarginPercent) nf.wholesalePrice = calcPrice(c, formData.wholesaleMarginPercent); setFormData(nf); }} placeholder="0.00" className="text-sm font-mono" />
+                    <p className="text-[8px] text-muted-foreground">Costo al que compras al mayor</p>
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">Margen Ganancia %</Label>
+                    <Input type="number" step="0.1" value={formData.wholesaleMarginPercent} onChange={e => { const m = e.target.value, nf = { ...formData, wholesaleMarginPercent: m }; if (formData.wholesaleCost && m) nf.wholesalePrice = calcPrice(formData.wholesaleCost, m); setFormData(nf); }} placeholder="20" className="text-sm font-mono" />
+                    <p className="text-[8px] text-muted-foreground">Ganancia deseada al mayor</p>
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">P. Mayorista ({currency})</Label>
+                    <Input type="number" step="0.01" min="0" value={autoWholesalePrice || formData.wholesalePrice} onChange={e => { const p = e.target.value, nf = { ...formData, wholesalePrice: p }; if (p && formData.wholesaleCost) nf.wholesaleMarginPercent = calcMargin(p, formData.wholesaleCost); setFormData(nf); }} className="text-sm font-mono font-bold text-orange-600" />
+                    {autoWholesalePrice && <p className="text-[8px] text-blue-600">Auto-calculado</p>}
+                  </div>
+                  <div>
+                    <Label className="text-[10px]">Cant. Min. Mayorista</Label>
+                    <Input type="number" min="0" value={formData.minWholesaleQty} onChange={e => setFormData({ ...formData, minWholesaleQty: e.target.value })} className="text-sm" />
+                    <p className="text-[8px] text-muted-foreground">A partir de cuantas uds aplica</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-1">
+                  <div>
+                    <div className="flex justify-between text-[9px] text-muted-foreground mb-1"><span>Margen real mayor</span><span className={`font-bold ${parseFloat(autoWholesaleMargin) >= 30 ? 'text-green-600' : parseFloat(autoWholesaleMargin) >= 15 ? 'text-yellow-600' : 'text-red-600'}`}>{autoWholesaleMargin}%</span></div>
+                    <MarginBar margin={parseFloat(autoWholesaleMargin) || 0} />
+                  </div>
+                  <div className="text-right">
+                    {formData.wholesalePrice && bcvRate > 0 && <p className="text-xs text-orange-700 font-medium">Bs {(parseFloat(formData.wholesalePrice) * bcvRate).toFixed(2)}</p>}
+                    {autoWholesalePrice && <p className="text-[9px] text-blue-600">Precio sugerido mayor: {currency} {autoWholesalePrice}</p>}
+                  </div>
+                </div>
               </div>
 
               {/* Gran Mayor (GM) */}

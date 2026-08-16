@@ -1,48 +1,35 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Venta por peso - Verificar implementación + agregar badge visual + mejorar iconos de negocio
+Task: Implementar arreglos para primer cliente: Precio mayorista con costo+margen, landscape tablets, logos, migración BD
 
 Work Log:
-- Analizado el código completo del sistema POS
-- Confirmado que "vender por peso" ya estaba implementado (schema, formulario, POS, tickets)
-- Agregado badge visual (kg/g/lb) en tabla de productos para identificar productos por peso
-- Grid de iconos de negocio mejorada: gap-0.5 (antes gap-1), 10 columnas en sm (antes 8), max-h-24 (antes max-h-20)
-- Expandido BUSINESS_TYPES de 32 a 48 tipos de negocio
-- Sincronizado BUSINESS_EMOJIS en ticket-printer.ts con los 48 tipos
-- Build exitoso, commit y push a GitHub
+- Leído código completo del proyecto (schema, APIs, components, hooks)
+- Analizada imagen adjunta mostrando formulario de producto
+- Agregados campos wholesaleCost y wholesaleMarginPercent al schema de Product
+- Push schema a DB con prisma db push
+- Actualizado API de productos (POST y PUT) para incluir nuevos campos
+- Actualizado products-tab.tsx: interface, emptyForm, openEdit, calculos y formulario
+- Implementado formulario de precio al mayor con 4 campos: costo, % ganancia, precio sugerido, cant min
+- Cambiado POS layout de lg:grid-cols-5 a md:grid-cols-5 para tablets landscape
+- Cambiado CartPanel de lg:col-span-3 a md:col-span-3
+- Cambiado ProductPanel de lg:col-span-2 a md:col-span-2
+- Mejorado store-logo API: agregado GET method para servir logos desde filesystem
+- Cambiado URL de logo de /store/logo.ext a /api/store-logo para evitar cache
+- Config-tab: auto-guardar logo en Settings al subir
+- Creado sistema de migración de BD (src/lib/db-migration.ts)
+- Migraciones se ejecutan automáticamente en instrumentation.ts al iniciar
+- Tabla _migration_history para tracking
+- Backup automático de BD antes de cada migración
+- Primera migración v2.9.56: agregar wholesaleCost y wholesaleMarginPercent
+- Versión actualizada a v2.9.56 en package.json
+- Build exitoso
+- ZIP generado: MyeCommerce-v2.9.20-2.9.56.zip (41MB)
 
 Stage Summary:
-- v2.9.31 commiteada y subida a GitHub
-- ZIPs generados: MyeCommerce-v2.9.31.zip (134MB) + MyeCommerce-POS-v2.9.31-clean-install.zip (41MB)
-- 3 archivos modificados: products-tab.tsx, config-tab.tsx, ticket-printer.ts
----
-Task ID: 1
-Agent: Main Agent
-Task: Implementar autenticacion y autorizacion en rutas API
-
-Work Log:
-- Analice estructura del proyecto: 30 rutas API sin proteccion
-- Verifique existencia de sistema de auth frontend (login screen con localStorage)
-- Instale dependencia jsonwebtoken para generacion de tokens JWT
-- Cree src/lib/session.ts con funciones createSessionToken y verifySessionToken
-- Cree src/lib/auth-fetch.ts como wrapper centralizado con inyeccion automatica de token
-- Cree src/middleware.ts con middleware Next.js que protege todas las rutas /api/*
-  - Rutas publicas: /api/auth
-  - Rutas admin: /api/users, /api/roles, /api/backup, /api/license
-  - Verificacion JWT con Web Crypto API (Edge Runtime compatible)
-  - Headers: Authorization Bearer, cookie httpOnly, query param
-- Actualice src/app/api/auth/route.ts para generar JWT en login
-- Actualice src/components/login-screen.tsx para guardar token JWT
-- Actualice src/app/page.tsx para usar authFetch en todas las llamadas API
-- Reemplace fetch() por authFetch() en 15 componentes frontend
-- Build exitoso: Middleware compilado a 33.7 kB
-- Commit v2.9.34, tag, push, y GitHub release creado
-
-Stage Summary:
-- Vulnerabilidad critica CORREGIDA: Todas las rutas API ahora requieren autenticacion JWT
-- Token JWT con expiracion de 24h
-- Cookie httpOnly session_token como capa adicional de seguridad
-- Deteccion automatica de sesion expirada con logout forzado
-- Rutas admin protegidas por verificacion de rol
-- Release: https://github.com/csglider/MyeCommerce-v2.9.20/releases/tag/v2.9.34
+- Precio al Mayor ahora usa misma lógica que Detal: Costo + % Ganancia = Precio Sugerido
+- Tablets en landscape (768px+) ahora muestran carrito y productos lado a lado como PC
+- Logo se sirve via API route (/api/store-logo) para evitar problemas de caché
+- Logo se auto-guarda en Settings al subir
+- Sistema de migración automático para futuras versiones
+- ZIP de distribución generado en /download/MyeCommerce-v2.9.20-2.9.56.zip

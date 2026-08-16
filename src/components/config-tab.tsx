@@ -232,6 +232,14 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
       const data = await res.json();
       if (res.ok) {
         setStoreLogo(data.url);
+        // Auto-guardar en Settings para persistir el logo
+        try {
+          await authFetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...settings, storeLogo: data.url }),
+          });
+        } catch { /* silent */ }
         toast.success('Logo guardado correctamente');
       } else {
         toast.error(data.error || 'Error al subir logo');

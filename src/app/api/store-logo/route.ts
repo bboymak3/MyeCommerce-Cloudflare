@@ -1,8 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir, unlink } from 'fs/promises';
+import { writeFile, mkdir, unlink, readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync, readdirSync } from 'fs';
 
+const STORE_DIR = () => join(process.cwd(), 'public', 'store');
+const VALID_EXTS = ['png', 'jpg', 'gif', 'webp', 'bmp'];
+
+function findLogoFile(): string | null {
+  const dir = STORE_DIR();
+  if (!existsSync(dir)) return null;
+  try {
+    const files = readdirSync(dir);
+    for (const ext of VALID_EXTS) {
+      const name = `logo.${ext}`;
+      if (files.includes(name)) return join(dir, name);
+    }
+  } catch {}
+  return null;
+}
+
+// GET — serve logo from filesystem (avoids Next.js static cache issues)
+export async function GET() {
+  try {
+    const logoPath = findLogoFile();
+    if (!logoPath) {
+      return NextResponse.json({ error: 'No hay logo' }, { status: 404 });
+    }
+    const buffer = await readFile(logoPath);
+    const ext = logoPath.split('.').pop() || 'png';
+    const mimeMap: Record<string, string> = {
+      png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+    };
+    // Cache for 60 seconds so browser refreshes get updates
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': mimeMap[ext] || 'image/png',
+        'Cache-Control': 'public, max-age=60',
+        'Content-Disposition': `inline; filename="logo.${ext}"`,
+      },
+    });
+  } catch {
+    return NextResponse.json({ error: 'Error al leer logo' }, { status: 500 });
+  }
+}
+
+// POST — upload logo
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -27,7 +69,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     // Crear directorio si no existe
-    const storeDir = join(process.cwd(), 'public', 'store');
+    const storeDir = STORE_DIR();
     if (!existsSync(storeDir)) {
       await mkdir(storeDir, { recursive: true });
     }
@@ -45,13 +87,12 @@ export async function POST(req: NextRequest) {
     const filePath = join(storeDir, fileName);
 
     // Limpiar archivos logo viejos con otras extensiones
-    const validExts = ['png', 'jpg', 'gif', 'webp', 'bmp'];
     try {
       const existing = readdirSync(storeDir);
       for (const f of existing) {
         if (f.startsWith('logo.') && f !== fileName) {
           const oldExt = f.split('.').pop();
-          if (oldExt && validExts.includes(oldExt)) {
+          if (oldExt && VALID_EXTS.includes(oldExt)) {
             unlink(join(storeDir, f)).catch(() => {});
           }
         }
@@ -60,8 +101,8 @@ export async function POST(req: NextRequest) {
 
     await writeFile(filePath, buffer);
 
-    // Retornar la URL publica con extension correcta
-    const logoUrl = `/store/logo.${ext}`;
+    // Retornar la URL via API route para evitar cache de static files
+    const logoUrl = `/api/store-logo`;
     return NextResponse.json({ url: logoUrl, message: 'Logo guardado correctamente' });
   } catch (error) {
     console.error('Error uploading logo:', error);

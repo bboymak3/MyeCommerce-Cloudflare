@@ -363,8 +363,8 @@ export default function PosTab(props: PosTabProps) {
 
   // ─── Render ───────────────────────────────────────────────────
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
-      {/* Cart (3/5) */}
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 h-full">
+      {/* Cart (3/5) — on md+ (tablets landscape & desktop) side by side */}
       <CartPanel
         cart={cart} products={products} currency={currency} allowZeroStock={allowZeroStock}
         onClearCart={() => setShowClearCartConfirm(true)} onUpdateQty={updateQuantity} onRemove={removeFromCart}

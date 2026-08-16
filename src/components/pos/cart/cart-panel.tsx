@@ -105,7 +105,7 @@ export function CartPanel({
   onSearchFocus, onToggleCredit, onSetCashUsd, onSetCashBs, onSetPagoMovil, onCharge, onHoldSale,
 }: CartPanelProps) {
   return (
-    <Card className="lg:col-span-3 flex flex-col h-full border-2 border-primary/30 shadow-lg">
+    <Card className="md:col-span-3 flex flex-col h-full border-2 border-primary/30 shadow-lg">
       <CardHeader className="pb-2 pt-4 px-4">
         <div className="flex items-center justify-between mb-2">
           <CardTitle className="text-lg font-bold">Carrito <span className="text-primary">({cart.length})</span></CardTitle>

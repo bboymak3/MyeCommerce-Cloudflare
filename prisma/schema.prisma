@@ -22,6 +22,8 @@ model Product {
   icon              String     @default("")
   image             String     @default("")
   wholesalePrice    Float      @default(0)
+  wholesaleCost     Float      @default(0)
+  wholesaleMarginPercent Float @default(0)
   minWholesaleQty   Int        @default(0)
   noStock           Boolean    @default(false)
   vendePorPeso      Boolean    @default(false)

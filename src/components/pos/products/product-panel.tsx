@@ -55,7 +55,7 @@ export function ProductPanel({
   }), [products, search, selectedCategory, selectedBrand, allowZeroStock]);
 
   return (
-    <div className="lg:col-span-2 flex flex-col gap-2">
+    <div className="md:col-span-2 flex flex-col gap-2">
       {/* Search bar */}
       <div className="flex flex-col gap-2">
         <div className="relative">
