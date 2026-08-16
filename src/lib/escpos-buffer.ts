@@ -546,36 +546,8 @@ export function generateEscposBuffer(params: {
     parts.push(textLine('$: ' + fmtN(receipt.total) + ' | Tasa: 1$=' + receipt.exchangeRate + 'Bs'));
   }
 
-  // ═══ EFECTIVO / VUELTO ═══
-  if (settings.ticketShowCashReceived === true && !isCreditSale && (receipt.paymentMethod === 'efectivo' || receipt.paymentMethod === 'efectivo-usd') && (receipt.cashReceived ?? 0) > 0) {
-    parts.push(separatorLine(maxChars));
-    const currSymbol = receipt.paymentMethod === 'efectivo' ? 'Bs' : '$';
-    parts.push(textLine(padR('Recibido:', 10) + padL(currSymbol + ' ' + fmtN(receipt.cashReceived!), maxChars - 10)));
-
-    if ((receipt.vuelto ?? 0) > 0) {
-      // Vuelto: igual que TOTAL, doble ancho solo en 80mm
-      parts.push(cmdBold(true));
-      if (halfChars >= 20) {
-        parts.push(cmdSize(0x01));
-        {
-          const vLabel = 'Vuelto:';
-          const vVal = currSymbol + ' ' + fmtN(receipt.vuelto!);
-          const vStr = padR(vLabel, 8) + padL(vVal, halfChars - 8);
-          parts.push(textLine(truncate(vStr, halfChars)));
-        }
-        parts.push(cmdSize(0x00));
-      } else {
-        // 58mm: tamano normal
-        {
-          const vLabel = 'Vuelto:';
-          const vVal = currSymbol + ' ' + fmtN(receipt.vuelto!);
-          const vStr = padR(vLabel, 8) + padL(vVal, maxChars - 8);
-          parts.push(textLine(vStr));
-        }
-      }
-      parts.push(cmdBold(false));
-    }
-  }
+  // ═══ EFECTIVO / VUELTO — Eliminado del ticket ═══
+  // No se muestra monto recibido ni vuelto en el ticket
 
   // ═══ PIE DE PAGINA — tamano normal ═══
   parts.push(doubleLine(maxChars));

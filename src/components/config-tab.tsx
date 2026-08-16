@@ -1036,16 +1036,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
                   <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                 </label>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg border">
-                <div className="flex-1">
-                  <Label className="font-medium text-sm">Mostrar Monto Recibido</Label>
-                  <p className="text-xs text-muted-foreground">Muestra cuanto pago el cliente y el vuelto</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={ticketShowCashReceived} onChange={(e) => setTicketShowCashReceived(e.target.checked)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                </label>
-              </div>
+              {/* Monto recibido y vuelto eliminados permanentemente del ticket */}
               <div className="flex items-center justify-between p-3 rounded-lg border">
                 <div className="flex-1">
                   <Label className="font-medium text-sm">Mostrar Logo</Label>
@@ -1296,27 +1287,20 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         </CardContent>
       </Card>
 
-      {/* ====== Info del Sistema ====== */}
+      {/* ====== Soporte ====== */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Informacion del Sistema</CardTitle>
+          <CardTitle className="text-lg">Soporte</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="text-muted-foreground">Version:</div>
-            <div className="font-medium">MyeCommerce POS v2.9.56</div>
-            <div className="text-muted-foreground">Motor:</div>
-            <div className="font-medium">Next.js 15 + SQLite</div>
-            <div className="text-muted-foreground">Base de Datos:</div>
-            <div className="font-medium">prisma/dev.db</div>
-            <div className="text-muted-foreground">Tasa BCV:</div>
-            <div className="font-medium">{(settings.bcvRate ?? 36.5).toFixed(2)} Bs por $1</div>
-            <div className="text-muted-foreground">Tema:</div>
-            <div className="font-medium capitalize">{theme === 'blue' ? 'Azul' : theme === 'green' ? 'Verde' : theme === 'red' ? 'Rojo' : theme === 'purple' ? 'Purpura' : theme}</div>
-            <div className="text-muted-foreground">Stock en 0:</div>
-            <div className={`font-medium ${allowZeroStock ? "text-green-600" : "text-red-500"}`}>
-              {allowZeroStock ? "Permitido" : "Bloqueado"}
-            </div>
+          <div className="text-sm text-center space-y-2 py-3">
+            <p className="text-muted-foreground">Para pedidos y soporte comuníquese:</p>
+            <p className="font-semibold">Desarrollado by Inversiones Valencia Mundonet FP</p>
+            <p className="text-primary">
+              <a href="mailto:valenciamundonet@gmail.com" className="hover:underline">
+                valenciamundonet@gmail.com
+              </a>
+            </p>
           </div>
         </CardContent>
       </Card>

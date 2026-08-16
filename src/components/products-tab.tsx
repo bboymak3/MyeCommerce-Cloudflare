@@ -324,10 +324,16 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
   const stopScanner = async () => { try { if (scannerRef.current) { if (scannerRef.current.getState() === 2) await scannerRef.current.stop(); scannerRef.current.clear(); scannerRef.current = null; } } catch {} setShowScanner(false); setScannerError(""); };
 
   // Image — con compresion automatica para fotos grandes de celular
-  const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<File> => {
+  const compressImage = (file: File, maxWidth = 800, quality = 0.7): Promise<File> => {
     return new Promise((resolve, reject) => {
-      if (file.size < 500 * 1024 || !file.type.startsWith('image/')) {
-        resolve(file); // No comprimir si es menor a 500KB
+      // Comprimir siempre que sea imagen (aunque sea menor a 500KB) para optimizar red móvil
+      if (!file.type.startsWith('image/')) {
+        resolve(file);
+        return;
+      }
+      // Solo saltar compresión si ya es muy pequeña (< 100KB)
+      if (file.size < 100 * 1024) {
+        resolve(file);
         return;
       }
       const img = new window.Image();
@@ -336,15 +342,26 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
         img.onload = () => {
           const canvas = document.createElement('canvas');
           let w = img.width, h = img.height;
+          // Reducir más agresivamente para carga rápida en móvil
           if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+          if (h > maxWidth) { w = (w * maxWidth) / h; h = maxWidth; }
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           if (!ctx) { resolve(file); return; }
           ctx.drawImage(img, 0, 0, w, h);
           canvas.toBlob((blob) => {
             if (!blob) { resolve(file); return; }
-            const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
-            resolve(compressed);
+            // Usar WebP si el browser soporta, es más ligero
+            const mimeType = canvas.toDataURL('image/webp').startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+            canvas.toBlob((webpBlob) => {
+              if (webpBlob && webpBlob.size < blob.size) {
+                const compressed = new File([webpBlob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp', lastModified: Date.now() });
+                resolve(compressed);
+              } else {
+                const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+                resolve(compressed);
+              }
+            }, mimeType, quality);
           }, 'image/jpeg', quality);
         };
         img.onerror = () => resolve(file);

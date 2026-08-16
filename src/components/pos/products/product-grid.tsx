@@ -11,6 +11,52 @@ interface ProductGridProps {
   onAddToCart: (product: Product) => void;
 }
 
+// Genera URL con parámetro thumb para cargar versión pequeña
+function getThumbUrl(imageUrl: string): string {
+  if (!imageUrl) return '';
+  const sep = imageUrl.includes('?') ? '&' : '?';
+  return `${imageUrl}${sep}thumb=true`;
+}
+
+// Componente de imagen optimizada: lazy load + placeholder + fallback
+function ProductImage({ src, alt, icon }: { src: string; alt: string; icon?: string }) {
+  return (
+    <div className="w-full h-full flex items-center justify-center relative">
+      {/* Placeholder gris mientras carga */}
+      <div className="absolute inset-0 bg-muted animate-pulse rounded-lg" />
+      <img
+        src={getThumbUrl(src)}
+        alt={alt}
+        crossOrigin="anonymous"
+        loading="lazy"
+        decoding="async"
+        className="w-full h-full object-cover relative z-[1]"
+        style={{ minHeight: '48px', minWidth: '48px' }}
+        onLoad={(e) => {
+          // Ocultar placeholder cuando la imagen carga
+          const placeholder = (e.target as HTMLImageElement).previousElementSibling;
+          if (placeholder) (placeholder as HTMLElement).style.display = 'none';
+        }}
+        onError={(e) => {
+          // Ocultar placeholder e imagen, mostrar icono fallback
+          const img = e.target as HTMLImageElement;
+          const placeholder = img.previousElementSibling;
+          if (placeholder) (placeholder as HTMLElement).style.display = 'none';
+          img.style.display = 'none';
+          const fallback = img.nextElementSibling;
+          if (fallback) (fallback as HTMLElement).classList.remove('hidden');
+        }}
+      />
+      {/* Fallback: emoji o icono */}
+      {icon ? (
+        <span className="hidden text-2xl z-[2]">{icon}</span>
+      ) : (
+        <span className="hidden text-2xl text-muted-foreground z-[2]">📦</span>
+      )}
+    </div>
+  );
+}
+
 export function ProductGrid({ products, currency, bcvRate, allowZeroStock, onAddToCart }: ProductGridProps) {
   if (products.length === 0) {
     return <div className="col-span-full text-center text-muted-foreground py-8 text-sm">No se encontraron productos</div>;
@@ -40,14 +86,12 @@ export function ProductGrid({ products, currency, bcvRate, allowZeroStock, onAdd
             {/* Image or icon */}
             <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
               {product.image ? (
-                <img src={product.image} alt={product.name} crossOrigin="anonymous" className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).nextElementSibling?.classList.remove("hidden"); }} />
-              ) : null}
-              {product.icon ? (
-                <span className={product.image ? "hidden text-2xl" : "text-2xl"}>{product.icon}</span>
-              ) : !product.image ? (
+                <ProductImage src={product.image} alt={product.name} icon={product.icon} />
+              ) : product.icon ? (
+                <span className="text-2xl">{product.icon}</span>
+              ) : (
                 <span className="text-2xl text-muted-foreground">📦</span>
-              ) : null}
+              )}
             </div>
             <span className="text-[10px] font-medium leading-tight block truncate w-full">{product.name}</span>
             <span className="text-xs font-bold text-primary">

@@ -511,16 +511,7 @@ ${ticketShowExchange ? `
   <div class="s" style="margin-top:1px">$: ${fmtN(receipt.total)} | Tasa: 1$=${receipt.exchangeRate}Bs</div>
 ` : ''}
 
-${ticketShowCashReceived === true && !isCreditSale && (receipt.paymentMethod === 'efectivo' || receipt.paymentMethod === 'efectivo-usd') && (receipt.cashReceived ?? 0) > 0 ? `
-  <div class="ln"></div>
-  ${receipt.paymentMethod === 'efectivo' ? `
-    <div class="r"><span class="k">Recibido:</span><span class="v">Bs ${fmtN(receipt.cashReceived!)}</span></div>
-    ${(receipt.vuelto ?? 0) > 0 ? `<div class="r"><span class="k b" style="font-size:${totalSize}px">Vuelto:</span><span class="v b" style="font-size:${totalSize}px">Bs ${fmtN(receipt.vuelto!)}</span></div>` : ''}
-  ` : `
-    <div class="r"><span class="k">Recibido:</span><span class="v">$ ${fmtN(receipt.cashReceived!)}</span></div>
-    ${(receipt.vuelto ?? 0) > 0 ? `<div class="r"><span class="k b" style="font-size:${totalSize}px">Vuelto:</span><span class="v b" style="font-size:${totalSize}px">$ ${fmtN(receipt.vuelto!)}</span></div>` : ''}
-  `}
-` : ''}
+${/* Monto recibido y vuelto eliminados del ticket */ ''}
 
 <div class="ln2"></div>
 
