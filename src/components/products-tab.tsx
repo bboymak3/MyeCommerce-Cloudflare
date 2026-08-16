@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, Fragment } from "react";
+import { CropDialog } from "@/components/crop-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -961,13 +962,13 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
                 </div>
                 <div className="space-y-2 flex-1">
                   <div className="flex gap-2">
-                    <input type="file" ref={camRef} accept="image/*" capture="environment" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ""; }} />
+                    <input type="file" ref={camRef} accept="image/*" capture="environment" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) { const url = URL.createObjectURL(f); setCropImageSrc(url); setShowCrop(true); } e.target.value = ""; }} />
                     <Button type="button" variant="outline" size="sm" className="text-[10px]" onClick={() => camRef.current?.click()} disabled={uploading}>{uploading ? "..." : "📷 Tomar Foto"}</Button>
-                    <input type="file" ref={fileRef} accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = ""; }} />
+                    <input type="file" ref={fileRef} accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) { const url = URL.createObjectURL(f); setCropImageSrc(url); setShowCrop(true); } e.target.value = ""; }} />
                     <Button type="button" variant="outline" size="sm" className="text-[10px]" onClick={() => fileRef.current?.click()} disabled={uploading}>📁 Galeria</Button>
                     {formData.image && <Button type="button" variant="outline" size="sm" className="text-[10px] text-red-500" onClick={() => setFormData(p => ({ ...p, image: "" }))}>X</Button>}
                   </div>
-                  <p className="text-[9px] text-muted-foreground">Use la camara del celular. Buena iluminacion recomendada.</p>
+                  <p className="text-[9px] text-muted-foreground">Tome la foto y recortela para enfocar solo el producto.</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-2">
@@ -1191,6 +1192,22 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de recorte de imagen */}
+      <CropDialog
+        open={showCrop}
+        imageSrc={cropImageSrc}
+        onCropComplete={(blob) => {
+          setShowCrop(false);
+          URL.revokeObjectURL(cropImageSrc);
+          const file = new File([blob], "cropped.jpg", { type: "image/jpeg" });
+          uploadImage(file);
+        }}
+        onCancel={() => {
+          setShowCrop(false);
+          URL.revokeObjectURL(cropImageSrc);
+        }}
+      />
     </div>
   );
 }
