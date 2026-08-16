@@ -1,37 +1,44 @@
 /**
- * Sistema de Migración de Base de Datos
+ * Sistema de Migracion de Base de Datos
  * 
- * Este sistema permite migrar de una versión a otra sin reinstalar
- * ni perder datos. Se ejecuta automáticamente al iniciar la app.
+ * Este sistema permite migrar de una version a otra sin reinstalar
+ * ni perder datos. Se ejecuta automaticamente al iniciar la app
+ * via instrumentation.ts.
  * 
  * Flujo:
- * 1. Lee la versión actual de la BD (tabla _migration_history)
- * 2. Compara con la versión del package.json
+ * 1. Lee la version actual de la BD (tabla _migration_history)
+ * 2. Compara con la version del package.json
  * 3. Ejecuta migraciones pendientes en orden
- * 4. Marca cada migración como completada
+ * 4. Marca cada migracion como completada
  * 
- * Cada migración puede:
+ * Cada migracion puede:
  * - ALTER TABLE (agregar columnas con defaults)
  * - CREATE TABLE (tablas nuevas)
+ * - CREATE INDEX (indices nuevos)
  * - UPDATE (transformar datos existentes)
  * - INSERT (sembrar datos iniciales)
+ * 
+ * Seguridad:
+ * - Backup automatico de la BD antes de cada batch de migraciones
+ * - Errores de "columna ya existe" se ignoran (idempotente)
+ * - Cada migracion se registra individualmente
+ * - Si falla una, las migraciones posteriores no se ejecutan
  */
 
 import { db } from './db';
-import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, copyFileSync } from 'fs';
 import { join } from 'path';
+import { getAppVersion, compareVersions } from './version';
 
-// Versión actual del sistema (se lee de package.json)
-function getAppVersion(): string {
-  try {
-    const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'));
-    return pkg.version || '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
+// ─── Tipos ──────────────────────────────────────────────────────
+interface Migration {
+  version: string;
+  description: string;
+  up: string[]; // SQL statements
 }
 
-// Asegurar que la tabla de migraciones existe
+// ─── Utilidades ─────────────────────────────────────────────────
+
 async function ensureMigrationTable() {
   try {
     await db.$executeRawUnsafe(`
@@ -47,7 +54,6 @@ async function ensureMigrationTable() {
   }
 }
 
-// Obtener la última versión migrada
 async function getLastMigration(): Promise<string | null> {
   try {
     const result: any[] = await db.$queryRawUnsafe(
@@ -59,7 +65,17 @@ async function getLastMigration(): Promise<string | null> {
   }
 }
 
-// Registrar migración completada
+async function getAppliedVersions(): Promise<string[]> {
+  try {
+    const result: any[] = await db.$queryRawUnsafe(
+      `SELECT version FROM _migration_history ORDER BY applied_at ASC`
+    );
+    return result.map((r: any) => r.version);
+  } catch {
+    return [];
+  }
+}
+
 async function markMigrationApplied(version: string, description: string) {
   await db.$executeRawUnsafe(
     `INSERT OR IGNORE INTO _migration_history (version, description) VALUES (?, ?)`,
@@ -67,7 +83,6 @@ async function markMigrationApplied(version: string, description: string) {
   );
 }
 
-// Backup de la BD antes de migrar
 function backupDatabase(): string | null {
   const dbPath = join(process.cwd(), 'prisma', 'dev.db');
   if (!existsSync(dbPath)) return null;
@@ -80,7 +95,12 @@ function backupDatabase(): string | null {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupPath = join(backupDir, `pre-migration-${timestamp}.db`);
   try {
+    // Copiar tambien WAL y SHM si existen
     copyFileSync(dbPath, backupPath);
+    const walPath = dbPath + '-wal';
+    const shmPath = dbPath + '-shm';
+    if (existsSync(walPath)) copyFileSync(walPath, backupPath + '-wal');
+    if (existsSync(shmPath)) copyFileSync(shmPath, backupPath + '-shm');
     console.log(`[Migration] Backup creado: ${backupPath}`);
     return backupPath;
   } catch (e) {
@@ -89,26 +109,50 @@ function backupDatabase(): string | null {
   }
 }
 
-interface Migration {
-  version: string;
-  description: string;
-  up: string[]; // SQL statements to execute
-}
+// ─── Definicion de Migraciones ──────────────────────────────────
+// 
+// IMPORTANTE: Cada migracion debe ser idempotente (poder ejecutarse
+// multiples veces sin errores). Usar "ADD COLUMN" que falla si ya
+// existe (se captura el error), o "IF NOT EXISTS" para tablas.
+// 
+// Ordenar por version de menor a mayor. El sistema solo ejecuta
+// las migraciones con version > ultima migrada AND <= version actual.
 
-// Definición de migraciones por versión
 const MIGRATIONS: Migration[] = [
+  // ─── v2.9.56 ────────────────────────────────────────────────
   {
     version: '2.9.56',
-    description: 'Agregar campos costo y margen al precio mayorista + API de logos mejorada',
+    description: 'Campos costo/margen mayorista + mejoras de logo API',
     up: [
-      // Agregar campos de costo/margen mayorista si no existen
       `ALTER TABLE Product ADD COLUMN wholesaleCost REAL DEFAULT 0`,
       `ALTER TABLE Product ADD COLUMN wholesaleMarginPercent REAL DEFAULT 0`,
     ],
   },
+
+  // ─── v2.9.57 ────────────────────────────────────────────────
+  {
+    version: '2.9.57',
+    description: 'Campos ticket config (monto recibido, logo) + fix auth en impresion',
+    up: [
+      // Estos campos pueden ya existir si se creo BD con schema actual
+      `ALTER TABLE Settings ADD COLUMN ticketShowCashReceived BOOLEAN DEFAULT 1`,
+      `ALTER TABLE Settings ADD COLUMN ticketShowLogo BOOLEAN DEFAULT 1`,
+    ],
+  },
+
+  // ─── v2.9.58 ────────────────────────────────────────────────
+  // (Reservado para proximos cambios de schema)
+  // {
+  //   version: '2.9.58',
+  //   description: 'Descripcion del cambio',
+  //   up: [
+  //     `ALTER TABLE ...`,
+  //   ],
+  // },
 ];
 
-// Ejecutar una sola migración
+// ─── Ejecucion ─────────────────────────────────────────────────
+
 async function executeMigration(migration: Migration) {
   console.log(`[Migration] Aplicando v${migration.version}: ${migration.description}`);
 
@@ -116,53 +160,102 @@ async function executeMigration(migration: Migration) {
     try {
       await db.$executeRawUnsafe(sql);
     } catch (e: any) {
-      // Ignorar errores de "columna ya existe" (ya se migró antes)
       const msg = (e?.message || '').toLowerCase();
-      if (msg.includes('duplicate column name') || msg.includes('already exists')) {
-        console.log(`[Migration] Columna/tabla ya existe, saltando...`);
+      if (
+        msg.includes('duplicate column name') ||
+        msg.includes('already exists') ||
+        msg.includes('duplicate table name')
+      ) {
+        console.log(`  [Migration] Ya existe, saltando...`);
       } else {
-        console.error(`[Migration] Error en SQL: ${sql}`, e?.message);
+        console.error(`  [Migration] ERROR en SQL: ${sql}`);
+        console.error(`  [Migration] Detalle: ${e?.message}`);
         throw e;
       }
     }
   }
 
   await markMigrationApplied(migration.version, migration.description);
-  console.log(`[Migration] v${migration.version} completada exitosamente`);
+  console.log(`[Migration] v${migration.version} completada`);
 }
 
-// Función principal: ejecutar todas las migraciones pendientes
-export async function runMigrations(): Promise<{ applied: number; version: string }> {
+/**
+ * Funcion principal: ejecutar todas las migraciones pendientes.
+ * Se llama automaticamente desde instrumentation.ts al iniciar la app.
+ * 
+ * Retorna:
+ * - applied: cantidad de migraciones ejecutadas
+ * - version: version actual del sistema
+ * - details: lista de migraciones aplicadas (para UI)
+ */
+export async function runMigrations(): Promise<{
+  applied: number;
+  version: string;
+  details: { version: string; description: string; applied: boolean }[];
+}> {
   try {
     await ensureMigrationTable();
 
     const lastVersion = await getLastMigration();
     const appVersion = getAppVersion();
+    const appliedVersions = await getAppliedVersions();
+
+    // Filtrar migraciones pendientes
     const pending = MIGRATIONS.filter(m => {
-      if (!lastVersion) return true;
-      // Comparar versiones: solo ejecutar migraciones con versión > última migrada
-      return m.version > lastVersion && m.version <= appVersion;
+      if (appliedVersions.includes(m.version)) return false; // Ya aplicada
+      if (!lastVersion) return compareVersions(m.version, appVersion) <= 0;
+      return compareVersions(m.version, lastVersion) > 0 && compareVersions(m.version, appVersion) <= 0;
     });
 
     if (pending.length === 0) {
-      console.log(`[Migration] Base de datos actualizada (v${lastVersion || '0.0.0'})`);
-      return { applied: 0, version: lastVersion || appVersion };
+      console.log(`[Migration] BD actualizada (v${lastVersion || '0.0.0'} -> v${appVersion})`);
+      return {
+        applied: 0,
+        version: lastVersion || appVersion,
+        details: MIGRATIONS.map(m => ({
+          version: m.version,
+          description: m.description,
+          applied: appliedVersions.includes(m.version),
+        })),
+      };
     }
 
     console.log(`[Migration] ${pending.length} migracion(es) pendiente(s): ${pending.map(m => 'v' + m.version).join(', ')}`);
 
     // Backup antes de migrar
-    backupDatabase();
-
-    // Ejecutar migraciones en orden
-    for (const migration of pending) {
-      await executeMigration(migration);
+    const backupPath = backupDatabase();
+    if (!backupPath) {
+      console.warn('[Migration] No se pudo crear backup. Continuando...');
     }
 
-    console.log(`[Migration] Todas las migraciones completadas. Version actual: v${appVersion}`);
-    return { applied: pending.length, version: appVersion };
+    // Ejecutar migraciones en orden
+    const executed: { version: string; description: string; applied: boolean }[] = [];
+    for (const migration of pending) {
+      await executeMigration(migration);
+      executed.push({ version: migration.version, description: migration.description, applied: true });
+    }
+
+    console.log(`[Migration] Todas completadas. Version actual: v${appVersion}`);
+
+    return {
+      applied: pending.length,
+      version: appVersion,
+      details: MIGRATIONS.map(m => ({
+        version: m.version,
+        description: m.description,
+        applied: appliedVersions.includes(m.version) || executed.some(e => e.version === m.version),
+      })),
+    };
   } catch (e) {
-    console.error('[Migration] Error fatal en migraciones:', e);
-    return { applied: 0, version: getAppVersion() };
+    console.error('[Migration] ERROR FATAL:', e);
+    return {
+      applied: 0,
+      version: getAppVersion(),
+      details: MIGRATIONS.map(m => ({
+        version: m.version,
+        description: m.description,
+        applied: false,
+      })),
+    };
   }
 }

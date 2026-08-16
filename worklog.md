@@ -1,35 +1,35 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Implementar arreglos para primer cliente: Precio mayorista con costo+margen, landscape tablets, logos, migración BD
+Task: Fix all ticket config toggles, migration system, catalog logo, and product image upload
 
 Work Log:
-- Leído código completo del proyecto (schema, APIs, components, hooks)
-- Analizada imagen adjunta mostrando formulario de producto
-- Agregados campos wholesaleCost y wholesaleMarginPercent al schema de Product
-- Push schema a DB con prisma db push
-- Actualizado API de productos (POST y PUT) para incluir nuevos campos
-- Actualizado products-tab.tsx: interface, emptyForm, openEdit, calculos y formulario
-- Implementado formulario de precio al mayor con 4 campos: costo, % ganancia, precio sugerido, cant min
-- Cambiado POS layout de lg:grid-cols-5 a md:grid-cols-5 para tablets landscape
-- Cambiado CartPanel de lg:col-span-3 a md:col-span-3
-- Cambiado ProductPanel de lg:col-span-2 a md:col-span-2
-- Mejorado store-logo API: agregado GET method para servir logos desde filesystem
-- Cambiado URL de logo de /store/logo.ext a /api/store-logo para evitar cache
-- Config-tab: auto-guardar logo en Settings al subir
-- Creado sistema de migración de BD (src/lib/db-migration.ts)
-- Migraciones se ejecutan automáticamente en instrumentation.ts al iniciar
-- Tabla _migration_history para tracking
-- Backup automático de BD antes de cada migración
-- Primera migración v2.9.56: agregar wholesaleCost y wholesaleMarginPercent
-- Versión actualizada a v2.9.56 en package.json
-- Build exitoso
-- ZIP generado: MyeCommerce-v2.9.20-2.9.56.zip (41MB)
+- Analyzed image uploaded by user showing ticket configuration toggles
+- Traced full data flow: config-tab.tsx → API settings → page.tsx → pos-tab.tsx → ticket-printer.ts
+- Found critical bug: ticketShowCashReceived and ticketShowLogo were defined in DB schema and config UI but NOT saved in API PUT, NOT in Settings interface, NOT passed as props to PosTab
+- Found all boolean toggles used `!== false` pattern which defaults to true for undefined values
+- Fixed API route (settings/route.ts): Added ticketShowCashReceived and ticketShowLogo to updateData, changed all toggles to `=== true` pattern
+- Fixed page.tsx: Added fields to Settings interface, default state, and PosTab props
+- Fixed pos/types.ts: Added ticketShowCashReceived and ticketShowLogo to PosTabProps
+- Fixed pos-tab.tsx: Destructured new props, included in ticketSettings object and dependency array
+- Fixed ticket-printer.ts: Added destructuring, changed `!== false` to `=== true` checks
+- Fixed escpos-buffer.ts: Changed `!== false` to `=== true` checks
+- Created src/lib/version.ts: Centralized version management from package.json
+- Created src/instrumentation.ts: Next.js startup hook to auto-run migrations and auto-backup
+- Enhanced src/lib/db-migration.ts: Complete rewrite with better versioning, applied versions tracking, detailed return values
+- Updated src/lib/auto-backup.ts: Added all missing tables (brands, heldSales, quotes, deliveryNotes, inventoryMovements, comboItems, expenseCategories, expenses), uses centralized version
+- Updated src/app/api/backup/route.ts: Full backup/restore now covers ALL 21 tables
+- Updated src/app/api/backup/stats/route.ts: Uses centralized version
+- Updated scripts/build-clean-zip.sh: Reads version from package.json dynamically
+- Fixed catalog logo: Changed container from 100px to 120px, used max-width/max-height instead of width/height, removed overflow:hidden
+- Fixed product image upload: Added client-side compression for photos >500KB (resizes to 1200px, JPEG quality 0.8), improved server-side error handling
+- Updated next.config.js: Added experimental serverActions body size limit
+- Updated package.json version to 2.9.58
 
 Stage Summary:
-- Precio al Mayor ahora usa misma lógica que Detal: Costo + % Ganancia = Precio Sugerido
-- Tablets en landscape (768px+) ahora muestran carrito y productos lado a lado como PC
-- Logo se sirve via API route (/api/store-logo) para evitar problemas de caché
-- Logo se auto-guarda en Settings al subir
-- Sistema de migración automático para futuras versiones
-- ZIP de distribución generado en /download/MyeCommerce-v2.9.20-2.9.56.zip
+- All ticket toggles now properly save to DB and propagate to printer engine
+- Migration system runs automatically at startup via instrumentation.ts
+- Backup system covers all 21 database tables
+- Version centralized in src/lib/version.ts
+- Catalog logo adapts properly without being cut off
+- Product image upload compresses large phone photos before uploading

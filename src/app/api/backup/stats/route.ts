@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
+import { getAppVersion } from '@/lib/version';
 
 export async function GET() {
   try {
@@ -14,7 +15,7 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
-      version: '2.9.56',
+      version: getAppVersion(),
       products,
       categories,
       clients,

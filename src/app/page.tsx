@@ -47,6 +47,7 @@ interface Settings {
   theme: string;
   ticketFontSize: number; ticketFontFamily: string; ticketHeaderMsg: string; ticketFooterMsg: string;
   ticketShowPhone: boolean; ticketShowSeller: boolean; ticketShowExchange: boolean; ticketShowSlogan: boolean;
+  ticketShowCashReceived: boolean; ticketShowLogo: boolean;
   ticketBold: boolean;
   ticketPaperWidth: string;
   ticketMarginLeft: number;
@@ -90,6 +91,7 @@ export default function Home() {
     bcvRate: 36.5, taxRate: 0, currency: "USD", allowZeroStock: false, enableDiscount: false, maxDiscountPct: 20, theme: "blue",
     ticketFontSize: 8, ticketFontFamily: 'monospace', ticketHeaderMsg: "", ticketFooterMsg: "Gracias por su compra!",
     ticketShowPhone: true, ticketShowSeller: true, ticketShowExchange: true, ticketShowSlogan: false,
+    ticketShowCashReceived: true, ticketShowLogo: true,
     ticketBold: true, ticketPaperWidth: '58mm',
     ticketMarginLeft: 0, ticketMarginRight: 0,
     ticketUseAgent: true, ticketAgentUrl: 'http://localhost:9100',
@@ -561,15 +563,17 @@ export default function Home() {
               ticketFontFamily={settings.ticketFontFamily || 'monospace'}
               ticketHeaderMsg={settings.ticketHeaderMsg || ""}
               ticketFooterMsg={settings.ticketFooterMsg || "Gracias por su compra!"}
-              ticketShowPhone={settings.ticketShowPhone !== false}
-              ticketShowSeller={settings.ticketShowSeller !== false}
-              ticketShowExchange={settings.ticketShowExchange !== false}
+              ticketShowPhone={settings.ticketShowPhone === true}
+              ticketShowSeller={settings.ticketShowSeller === true}
+              ticketShowExchange={settings.ticketShowExchange === true}
               ticketShowSlogan={settings.ticketShowSlogan === true}
-              ticketBold={settings.ticketBold !== false}
+              ticketShowCashReceived={settings.ticketShowCashReceived === true}
+              ticketShowLogo={settings.ticketShowLogo === true}
+              ticketBold={settings.ticketBold === true}
               ticketPaperWidth={settings.ticketPaperWidth || '58mm'}
               ticketMarginLeft={settings.ticketMarginLeft ?? 0}
               ticketMarginRight={settings.ticketMarginRight ?? 0}
-              ticketUseAgent={settings.ticketUseAgent !== false}
+              ticketUseAgent={settings.ticketUseAgent === true}
               ticketAgentUrl={settings.ticketAgentUrl || 'http://localhost:9100'}
               ticketCurrencyMode={settings.ticketCurrencyMode || 'dual'}
               storeLogo={settings.storeLogo || ''}

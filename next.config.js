@@ -3,6 +3,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
   webpack: (config) => {
     // jspdf referencia canvas y fflate como deps opcionales internas.
     // canvas requiere compilacion nativa (no disponible en Windows facil).

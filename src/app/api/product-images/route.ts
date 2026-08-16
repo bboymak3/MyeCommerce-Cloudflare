@@ -53,7 +53,14 @@ const EXT_MAP: Record<string, string> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch (parseError: any) {
+      console.error('[product-images] Error parsing formData:', parseError?.message);
+      return NextResponse.json({ error: 'Error al procesar la imagen. Intente con una imagen mas pequena (menos de 5MB).' }, { status: 400 });
+    }
+
     const file = formData.get('image') as File | null;
 
     if (!file) {

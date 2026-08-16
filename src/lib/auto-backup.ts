@@ -1,6 +1,7 @@
 import { db } from './db';
 import { mkdir, writeFile, rm, readdir } from 'fs/promises';
 import { join } from 'path';
+import { getAppVersion } from './version';
 
 const BACKUP_DIR = join(process.cwd(), 'respaldos');
 const MAX_BACKUPS = 7;
@@ -32,9 +33,21 @@ export function stopAutoBackup() {
 export async function performBackup() {
   await mkdir(BACKUP_DIR, { recursive: true });
 
-  const [products, categories, sales, saleItems, settings, devolutions, devolutionItems, cashClosings, license, users, clients, suppliers, purchases, purchaseItems, creditPayments, roleConfigs] = await Promise.all([
+  const [
+    products, categories, brands, sales, saleItems,
+    settings, devolutions, devolutionItems, cashClosings,
+    license, users, clients, suppliers, purchases, purchaseItems,
+    creditPayments, roleConfigs,
+    heldSales, heldSaleItems,
+    quotes, quoteItems,
+    deliveryNotes, deliveryNoteItems,
+    inventoryMovements,
+    comboItems,
+    expenseCategories, expenses,
+  ] = await Promise.all([
     db.product.findMany(),
     db.category.findMany(),
+    db.brand.findMany(),
     db.sale.findMany({ orderBy: { date: 'desc' } }),
     db.saleItem.findMany(),
     db.settings.findFirst(),
@@ -49,13 +62,24 @@ export async function performBackup() {
     db.purchaseItem.findMany(),
     db.creditPayment.findMany({ orderBy: { date: 'desc' } }),
     db.roleConfig.findMany(),
+    db.heldSale.findMany(),
+    db.heldSaleItem.findMany(),
+    db.quote.findMany(),
+    db.quoteItem.findMany(),
+    db.deliveryNote.findMany(),
+    db.deliveryNoteItem.findMany(),
+    db.inventoryMovement.findMany({ orderBy: { date: 'desc' } }),
+    db.comboItem.findMany(),
+    db.expenseCategory.findMany(),
+    db.expense.findMany({ orderBy: { date: 'desc' } }),
   ]);
 
   const backup = {
-    version: '2.9.56',
+    version: getAppVersion(),
     timestamp: new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' }),
     products,
     categories,
+    brands,
     sales,
     saleItems,
     devolutions,
@@ -70,6 +94,16 @@ export async function performBackup() {
     purchaseItems,
     creditPayments,
     roleConfigs,
+    heldSales,
+    heldSaleItems,
+    quotes,
+    quoteItems,
+    deliveryNotes,
+    deliveryNoteItems,
+    inventoryMovements,
+    comboItems,
+    expenseCategories,
+    expenses,
   };
 
   const dateStr = new Date().toISOString().slice(0, 10);

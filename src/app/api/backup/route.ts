@@ -1,11 +1,19 @@
 import { db } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { getAppVersion } from '@/lib/version';
 
 export async function GET() {
   try {
-    const [products, categories, sales, settings, devolutions, cashClosings, license, users, clients] = await Promise.all([
+    const [
+      products, categories, brands, sales, settings,
+      devolutions, cashClosings, license, users, clients,
+      suppliers, purchases, creditPayments, roleConfigs,
+      heldSales, quotes, deliveryNotes, inventoryMovements,
+      expenseCategories, expenses,
+    ] = await Promise.all([
       db.product.findMany(),
       db.category.findMany(),
+      db.brand.findMany(),
       db.sale.findMany({ include: { items: true } }),
       db.settings.findFirst(),
       db.devolution.findMany({ include: { items: true } }),
@@ -13,13 +21,24 @@ export async function GET() {
       db.license.findFirst(),
       db.user.findMany({ select: { id: true, username: true, fullName: true, role: true, isActive: true, permissions: true, avatar: true, lastLogin: true, createdAt: true, updatedAt: true }, orderBy: { createdAt: 'asc' } }),
       db.client.findMany(),
+      db.supplier.findMany(),
+      db.purchase.findMany({ include: { items: true } }),
+      db.creditPayment.findMany(),
+      db.roleConfig.findMany(),
+      db.heldSale.findMany({ include: { items: true } }),
+      db.quote.findMany({ include: { items: true } }),
+      db.deliveryNote.findMany({ include: { items: true } }),
+      db.inventoryMovement.findMany(),
+      db.expenseCategory.findMany(),
+      db.expense.findMany(),
     ]);
 
     return NextResponse.json({
-      version: '2.9.56',
+      version: getAppVersion(),
       exportedAt: new Date().toLocaleString('es-VE', { timeZone: 'America/Caracas' }),
       products,
       categories,
+      brands,
       clients,
       users,
       sales,
@@ -27,6 +46,16 @@ export async function GET() {
       cashClosings,
       settings,
       license,
+      suppliers,
+      purchases,
+      creditPayments,
+      roleConfigs,
+      heldSales,
+      quotes,
+      deliveryNotes,
+      inventoryMovements,
+      expenseCategories,
+      expenses,
     });
   } catch (error) {
     console.error('Error al exportar datos:', error);
@@ -39,6 +68,20 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
 
     // Limpiar BD existente (orden: dependencias primero)
+    // Tablas con relaciones foreign key primero
+    await db.deliveryNoteItem.deleteMany();
+    await db.deliveryNote.deleteMany();
+    await db.quoteItem.deleteMany();
+    await db.quote.deleteMany();
+    await db.heldSaleItem.deleteMany();
+    await db.heldSale.deleteMany();
+    await db.creditPayment.deleteMany();
+    await db.inventoryMovement.deleteMany();
+    await db.comboItem.deleteMany();
+    await db.purchaseItem.deleteMany();
+    await db.purchase.deleteMany();
+    await db.expense.deleteMany();
+    await db.expenseCategory.deleteMany();
     await db.devolutionItem.deleteMany();
     await db.devolution.deleteMany();
     await db.cashClosing.deleteMany();
@@ -46,10 +89,26 @@ export async function POST(req: NextRequest) {
     await db.sale.deleteMany();
     await db.product.deleteMany();
     await db.category.deleteMany();
+    await db.brand.deleteMany();
+    await db.supplier.deleteMany();
+    await db.roleConfig.deleteMany();
     await db.settings.deleteMany();
     await db.license.deleteMany();
     await db.user.deleteMany();
     await db.client.deleteMany();
+
+    // Restaurar en orden correcto (sin dependencias primero)
+    if (data.roleConfigs?.length) {
+      await db.roleConfig.createMany({ data: data.roleConfigs });
+    }
+
+    if (data.suppliers?.length) {
+      await db.supplier.createMany({ data: data.suppliers });
+    }
+
+    if (data.expenseCategories?.length) {
+      await db.expenseCategory.createMany({ data: data.expenseCategories });
+    }
 
     // Restaurar usuarios (incluyendo admin)
     if (data.users?.length) {
@@ -61,9 +120,13 @@ export async function POST(req: NextRequest) {
       await db.client.createMany({ data: data.clients });
     }
 
-    // Restaurar categorías
+    // Restaurar categorias y marcas
     if (data.categories?.length) {
       await db.category.createMany({ data: data.categories });
+    }
+
+    if (data.brands?.length) {
+      await db.brand.createMany({ data: data.brands });
     }
 
     // Restaurar productos
@@ -71,7 +134,12 @@ export async function POST(req: NextRequest) {
       await db.product.createMany({ data: data.products });
     }
 
-    // Restaurar ventas
+    // Restaurar combo items
+    if (data.comboItems?.length) {
+      await db.comboItem.createMany({ data: data.comboItems });
+    }
+
+    // Restaurar ventas (con items)
     if (data.sales?.length) {
       for (const sale of data.sales) {
         const { items, ...saleData } = sale;
@@ -80,15 +148,13 @@ export async function POST(req: NextRequest) {
             ...saleData,
             date: new Date(saleData.date),
             createdAt: new Date(saleData.createdAt),
-            items: {
-              create: items,
-            },
+            items: { create: items },
           },
         });
       }
     }
 
-    // Restaurar devoluciones
+    // Restaurar devoluciones (con items)
     if (data.devolutions?.length) {
       for (const dev of data.devolutions) {
         const { items, ...devData } = dev;
@@ -97,9 +163,7 @@ export async function POST(req: NextRequest) {
             ...devData,
             date: new Date(devData.date),
             createdAt: new Date(devData.createdAt),
-            items: {
-              create: items,
-            },
+            items: { create: items },
           },
         });
       }
@@ -116,7 +180,102 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Restaurar configuración
+    // Restaurar compras (con items)
+    if (data.purchases?.length) {
+      for (const purchase of data.purchases) {
+        const { items, ...purchaseData } = purchase;
+        await db.purchase.create({
+          data: {
+            ...purchaseData,
+            date: new Date(purchaseData.date),
+            createdAt: new Date(purchaseData.createdAt),
+            updatedAt: new Date(purchaseData.updatedAt),
+            items: { create: items },
+          },
+        });
+      }
+    }
+
+    // Restaurar pagos de credito
+    if (data.creditPayments?.length) {
+      await db.creditPayment.createMany({
+        data: data.creditPayments.map((cp: any) => ({
+          ...cp,
+          date: new Date(cp.date),
+          createdAt: new Date(cp.createdAt),
+        })),
+      });
+    }
+
+    // Restaurar facturas en espera (con items)
+    if (data.heldSales?.length) {
+      for (const hs of data.heldSales) {
+        const { items, ...hsData } = hs;
+        await db.heldSale.create({
+          data: {
+            ...hsData,
+            createdAt: new Date(hsData.createdAt),
+            updatedAt: new Date(hsData.updatedAt),
+            items: { create: items },
+          },
+        });
+      }
+    }
+
+    // Restaurar cotizaciones (con items)
+    if (data.quotes?.length) {
+      for (const q of data.quotes) {
+        const { items, ...qData } = q;
+        await db.quote.create({
+          data: {
+            ...qData,
+            createdAt: new Date(qData.createdAt),
+            updatedAt: new Date(qData.updatedAt),
+            items: { create: items },
+          },
+        });
+      }
+    }
+
+    // Restaurar notas de entrega (con items)
+    if (data.deliveryNotes?.length) {
+      for (const dn of data.deliveryNotes) {
+        const { items, ...dnData } = dn;
+        await db.deliveryNote.create({
+          data: {
+            ...dnData,
+            createdAt: new Date(dnData.createdAt),
+            updatedAt: new Date(dnData.updatedAt),
+            items: { create: items },
+          },
+        });
+      }
+    }
+
+    // Restaurar movimientos de inventario
+    if (data.inventoryMovements?.length) {
+      await db.inventoryMovement.createMany({
+        data: data.inventoryMovements.map((im: any) => ({
+          ...im,
+          date: new Date(im.date),
+          createdAt: new Date(im.createdAt),
+        })),
+      });
+    }
+
+    // Restaurar gastos
+    if (data.expenses?.length) {
+      await db.expense.createMany({
+        data: data.expenses.map((e: any) => ({
+          ...e,
+          date: new Date(e.date),
+          createdAt: new Date(e.createdAt),
+          updatedAt: new Date(e.updatedAt),
+        })),
+      });
+    }
+
+    // Restaurar configuracion
     if (data.settings) {
       await db.settings.create({ data: data.settings });
     }

@@ -104,6 +104,8 @@ export interface PosTabProps {
   ticketShowSeller?: boolean;
   ticketShowExchange?: boolean;
   ticketShowSlogan?: boolean;
+  ticketShowCashReceived?: boolean;
+  ticketShowLogo?: boolean;
   ticketBold?: boolean;
   ticketPaperWidth?: string;
   ticketMarginLeft?: number;

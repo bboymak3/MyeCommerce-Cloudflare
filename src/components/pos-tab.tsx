@@ -42,7 +42,8 @@ export default function PosTab(props: PosTabProps) {
     ticketFontSize = 8, ticketFontFamily = "monospace",
     ticketHeaderMsg = "", ticketFooterMsg = "Gracias por su compra!",
     ticketShowPhone = true, ticketShowSeller = true, ticketShowExchange = true,
-    ticketShowSlogan = false, ticketBold = true, ticketPaperWidth = "58mm",
+    ticketShowSlogan = false, ticketShowCashReceived = true, ticketShowLogo = true,
+    ticketBold = true, ticketPaperWidth = "58mm",
     ticketMarginLeft = 0, ticketMarginRight = 0,
     ticketUseAgent = true, ticketAgentUrl = "http://localhost:9100",
     ticketCurrencyMode = "dual", storeLogo = "", businessType = "general",
@@ -344,6 +345,7 @@ export default function PosTab(props: PosTabProps) {
       storeName, storeRif, storeAddress, storePhone,
       ticketFontSize, ticketFontFamily, ticketBold,
       ticketShowPhone, ticketShowSeller, ticketShowExchange, ticketShowSlogan,
+      ticketShowCashReceived, ticketShowLogo,
       ticketPaperWidth, ticketMarginLeft, ticketMarginRight,
       ticketHeaderMsg, ticketFooterMsg,
       ticketUseAgent: ticketUseAgent ?? true,
@@ -357,7 +359,7 @@ export default function PosTab(props: PosTabProps) {
     } catch (e: any) { toast.error("Impresion: " + (e.message || "desconocido"), { duration: 8000 }); }
   }, [storeName, storeRif, storeAddress, storePhone, ticketFontSize, ticketFontFamily, ticketBold,
     ticketShowPhone, ticketShowSeller, ticketShowExchange, ticketShowSlogan,
-    ticketPaperWidth, ticketMarginLeft, ticketMarginRight, ticketHeaderMsg, ticketFooterMsg,
+    ticketShowCashReceived, ticketShowLogo, ticketPaperWidth, ticketMarginLeft, ticketMarginRight, ticketHeaderMsg, ticketFooterMsg,
     ticketUseAgent, ticketAgentUrl, ticketCurrencyMode, storeLogo, businessType, taxMode, taxRate,
     currency, sellerName]);
 

@@ -323,8 +323,38 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
   };
   const stopScanner = async () => { try { if (scannerRef.current) { if (scannerRef.current.getState() === 2) await scannerRef.current.stop(); scannerRef.current.clear(); scannerRef.current = null; } } catch {} setShowScanner(false); setScannerError(""); };
 
-  // Image
-  const uploadImage = async (file: File) => { setUploading(true); try { const fd = new FormData(); fd.append("image", file); const r = await authFetch("/api/product-images", { method: "POST", body: fd }); const d = await r.json(); if (!r.ok) { toast.error(d.error || "Error al subir"); return; } if (d.imageUrl) { setFormData(p => ({ ...p, image: d.imageUrl })); toast.success("Imagen subida"); } } catch { toast.error("Error al subir"); } finally { setUploading(false); } };
+  // Image — con compresion automatica para fotos grandes de celular
+  const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      if (file.size < 500 * 1024 || !file.type.startsWith('image/')) {
+        resolve(file); // No comprimir si es menor a 500KB
+        return;
+      }
+      const img = new window.Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height;
+          if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(file); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob((blob) => {
+            if (!blob) { resolve(file); return; }
+            const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+            resolve(compressed);
+          }, 'image/jpeg', quality);
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+  const uploadImage = async (file: File) => { setUploading(true); try { const compressed = await compressImage(file); const fd = new FormData(); fd.append("image", compressed); const r = await authFetch("/api/product-images", { method: "POST", body: fd }); const d = await r.json(); if (!r.ok) { toast.error(d.error || "Error al subir"); return; } if (d.imageUrl) { setFormData(p => ({ ...p, image: d.imageUrl })); toast.success("Imagen subida"); } } catch { toast.error("Error al subir"); } finally { setUploading(false); } };
 
   // Combo items
   const addComboItem = async () => {

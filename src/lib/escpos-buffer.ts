@@ -319,7 +319,7 @@ export function generateEscposBuffer(params: {
   // Las impresoras termicas ESC/POS no soportan emojis nativamente.
   // Si hay un logo subido, se indica con [LOGO] como placeholder.
   // El agente de impresion puede ser extendido para soportar bitmaps.
-  if (settings.ticketShowLogo !== false && storeLogo) {
+  if (settings.ticketShowLogo === true && storeLogo) {
     parts.push(cmdAlign(1));
     parts.push(textLine('[LOGO]'));
     parts.push(cmdAlign(0));
@@ -547,7 +547,7 @@ export function generateEscposBuffer(params: {
   }
 
   // ═══ EFECTIVO / VUELTO ═══
-  if (settings.ticketShowCashReceived !== false && !isCreditSale && (receipt.paymentMethod === 'efectivo' || receipt.paymentMethod === 'efectivo-usd') && (receipt.cashReceived ?? 0) > 0) {
+  if (settings.ticketShowCashReceived === true && !isCreditSale && (receipt.paymentMethod === 'efectivo' || receipt.paymentMethod === 'efectivo-usd') && (receipt.cashReceived ?? 0) > 0) {
     parts.push(separatorLine(maxChars));
     const currSymbol = receipt.paymentMethod === 'efectivo' ? 'Bs' : '$';
     parts.push(textLine(padR('Recibido:', 10) + padL(currSymbol + ' ' + fmtN(receipt.cashReceived!), maxChars - 10)));
