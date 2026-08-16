@@ -17,6 +17,7 @@
  */
 
 import { generateEscposBuffer, uint8ToBase64 } from './escpos-buffer';
+import { authFetch } from './auth-fetch';
 
 // ─── Etiquetas de metodos de pago ───────────────────────────────────
 export const TICKET_PAYMENT_LABELS: Record<string, string> = {
@@ -233,7 +234,7 @@ export async function checkAgentStatus(agentUrl: string): Promise<{online: boole
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
-    const res = await fetch(agentUrl, {
+    const res = await authFetch(agentUrl, {
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -275,7 +276,7 @@ export async function printViaEscposAgent(params: {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const res = await fetch(agentUrl, {
+    const res = await authFetch(agentUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'print', data: base64Data }),
