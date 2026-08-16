@@ -1,5 +1,5 @@
 ' ==========================================================
-' MyeCommerce POS v2.9.55 - Instalador con Progreso Visible
+' MyeCommerce POS v2.9.57 - Instalador con Progreso Visible
 '
 ' Ejecutar como Administrador.
 ' Ventana de progreso se mantiene abierta durante toda la instalacion.
@@ -72,7 +72,7 @@ End If
 On Error GoTo 0
 
 Dim bienvenida
-bienvenida = "MyeCommerce POS v2.9.55" & vbCrLf & vbCrLf & _
+bienvenida = "MyeCommerce POS v2.9.57" & vbCrLf & vbCrLf & _
   "Sistema Punto de Venta - Venezuela" & vbCrLf & _
   "Doble Moneda USD/Bs con tasa BCV" & vbCrLf & _
   "Impresion Termica ESC/POS (agente v3.1 winspool)" & vbCrLf & _
@@ -93,7 +93,7 @@ If resultado <> vbYes Then WScript.Quit
 On Error Resume Next
 objFSO.DeleteFile logFile
 On Error GoTo 0
-LogWrite "=== INSTALACION LIMPIA v2.9.55 ==="
+LogWrite "=== INSTALACION LIMPIA v2.9.57 ==="
 LogWrite "Carpeta: " & strDir
 
 WriteStatus 1, 8, "Verificando permisos...", "", 0, "", ""
@@ -170,23 +170,67 @@ If nodeVer = "" Then
 End If
 
 LogWrite "  OK: Node.js " & Trim(nodeVer)
-WriteStatus 4, 8, "Node.js encontrado", Trim(nodeVer), 50, "", ""
+
+' Verificar version minima (v18+)
+nodeMajor = 0
+nodeVerTrim = Trim(nodeVer)
+If Left(nodeVerTrim, 1) = "v" Then nodeVerTrim = Mid(nodeVerTrim, 2)
+dotPos = InStr(nodeVerTrim, ".")
+If dotPos > 0 Then
+    nodeMajor = CInt(Left(nodeVerTrim, dotPos - 1))
+End If
+If nodeMajor < 18 Then
+    LogWrite "  ERROR: Node.js " & Trim(nodeVer) & " es demasiado antiguo (minimo v18)"
+    WriteStatus 0, 8, "ERROR", "Node.js " & Trim(nodeVer) & " es muy antiguo. Se necesita v18+ (recomendado v20 LTS).", 0, "FAIL", "Node.js demasiado antiguo. Actualice a v20 LTS desde nodejs.org."
+    MsgBox "Node.js " & Trim(nodeVer) & " es demasiado antiguo." & vbCrLf & "Se requiere Node.js 18+ (recomendado: 20 LTS)." & vbCrLf & "Descargue de https://nodejs.org e instale.", vbCritical, "ERROR"
+    WScript.Quit
+End If
+LogWrite "  OK: Version compatible (mayor o igual a v18)"
+
+WriteStatus 4, 8, "Node.js encontrado", Trim(nodeVer) & " - OK", 50, "", ""
 
 WriteStatus 5, 8, "Instalando dependencias npm...", "Este paso tarda 1-3 minutos...", 50, "", ""
 LogWrite "PASO 5: npm install --legacy-peer-deps --ignore-scripts..."
 ret = RunHidden("npm install --legacy-peer-deps --ignore-scripts")
 
 If ret <> 0 Then
-    LogWrite "  WARN: Primer intento fallo (codigo " & ret & "), reintentando..."
-    WriteStatus 5, 8, "Reintentando npm install...", "Segundo intento...", 50, "", ""
+    LogWrite "  WARN: Intento 1 fallo (codigo " & ret & "), limpiando cache..."
+    WriteStatus 5, 8, "Limpiando cache npm...", "Reintentando...", 50, "", ""
+    Call RunHidden("npm cache clean --force")
+    Call RunHidden("if exist node_modules rmdir /s /q node_modules")
+    On Error Resume Next
+    objFSO.DeleteFile strDir & "\package-lock.json"
+    On Error GoTo 0
     WScript.Sleep 2000
-    ret = RunHidden("npm install --legacy-peer-deps --ignore-scripts")
+    
+    LogWrite "  Intento 2: npm install --legacy-peer-deps..."
+    ret = RunHidden("npm install --legacy-peer-deps")
 End If
 
 If ret <> 0 Then
-    LogWrite "  ERROR: npm install fallo (codigo " & ret & ")"
+    LogWrite "  WARN: Intento 2 fallo, intentando --force..."
+    WriteStatus 5, 8, "Ultimo intento npm install...", "npm install --force...", 50, "", ""
+    Call RunHidden("if exist node_modules rmdir /s /q node_modules")
+    WScript.Sleep 2000
+    
+    LogWrite "  Intento 3: npm install --force..."
+    ret = RunHidden("npm install --force")
+End If
+
+If ret <> 0 Then
+    LogWrite "  ERROR: npm install fallo en 3 intentos (codigo " & ret & ")"
     WriteStatus 0, 8, "ERROR en npm install", "Revise install-log.txt para detalles", 0, "FAIL", "npm install fallo con codigo " & ret & ". Revise install-log.txt en la carpeta del sistema."
-    MsgBox "npm install fallo (codigo " & ret & ")." & vbCrLf & "Posible solucion:" & vbCrLf & "1. Ejecute manualmente en la carpeta: npm install --legacy-peer-deps --ignore-scripts" & vbCrLf & "2. Si falla, actualice Node.js a la version 20 LTS desde nodejs.org" & vbCrLf & "3. Vuelva a ejecutar INSTALAR-LIMPIO.vbs" & vbCrLf & "Carpeta: " & strDir, vbCritical, "Error"
+    MsgBox "npm install fallo en 3 intentos (codigo " & ret & ")." & vbCrLf & vbCrLf & _
+      "Posibles soluciones:" & vbCrLf & _
+      "1. Ejecute manualmente en la carpeta:" & vbCrLf & _
+      "   npm cache clean --force" & vbCrLf & _
+      "   rmdir /s /q node_modules" & vbCrLf & _
+      "   del package-lock.json" & vbCrLf & _
+      "   npm install --legacy-peer-deps --ignore-scripts" & vbCrLf & vbCrLf & _
+      "2. Actualice Node.js a la version 20 LTS desde nodejs.org" & vbCrLf & _
+      "3. Verifique conexion a internet" & vbCrLf & vbCrLf & _
+      "4. Descomprima el ZIP en otra carpeta (no en Downloads)" & vbCrLf & vbCrLf & _
+      "Carpeta: " & strDir, vbCritical, "Error"
     WScript.Quit
 End If
 LogWrite "  OK: Dependencias instaladas"
@@ -328,7 +372,7 @@ strDesktop = WshShell.SpecialFolders("Desktop")
 Set oLink = WshShell.CreateShortcut(strDesktop & "\MyeCommerce POS.lnk")
 oLink.TargetPath = strDir & "\INICIAR-TODO-OCULTO.vbs"
 oLink.WorkingDirectory = strDir
-oLink.Description = "MyeCommerce POS v2.9.55"
+oLink.Description = "MyeCommerce POS v2.9.57"
 oLink.IconLocation = "shell32.dll,14"
 oLink.Save
 On Error GoTo 0
@@ -361,4 +405,4 @@ finale = "INSTALACION COMPLETADA" & vbCrLf & vbCrLf & _
   "  caddy\caddy-mobile.log     - Log de Caddy movil" & vbCrLf & _
   "  install-log.txt            - Log de esta instalacion"
 
-MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.55 - Listo"
+MsgBox finale, vbInformation + vbOKOnly, "MyeCommerce POS v2.9.57 - Listo"
