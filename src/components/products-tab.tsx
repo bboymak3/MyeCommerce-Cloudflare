@@ -131,6 +131,9 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  // Crop dialog
+  const [showCrop, setShowCrop] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState('');
 
   // Finance summary
   const [showFinance, setShowFinance] = useState(true);
