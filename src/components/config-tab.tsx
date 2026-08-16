@@ -67,6 +67,8 @@ interface ConfigTabProps {
 // ─── Version Checker ───────────────────────────────────────────
 function VersionChecker() {
   const [checking, setChecking] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<{ step: string; message: string; percent: number } | null>(null);
   const [versionInfo, setVersionInfo] = useState<{
     localVersion: string;
     latestVersion: string;
@@ -85,6 +87,65 @@ function VersionChecker() {
       toast.error('No se pudo verificar la version');
     } finally {
       setChecking(false);
+    }
+  };
+
+  // ── Actualizacion ONLINE (desde la app) ──
+  const updateOnline = async () => {
+    if (!versionInfo) return;
+    const confirmed = window.confirm(
+      `Actualizar de v${versionInfo.localVersion} a v${versionInfo.latestVersion}?\n\n` +
+      `Se creara un respaldo automatico antes de actualizar.\n` +
+      `Despues de la actualizacion debera reiniciar el sistema.`
+    );
+    if (!confirmed) return;
+
+    setUpdating(true);
+    setUpdateProgress({ step: 'start', message: 'Iniciando actualizacion...', percent: 0 });
+
+    try {
+      const res = await authFetch('/api/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: versionInfo.latestVersion }),
+      });
+
+      if (!res.ok) throw new Error('Error del servidor');
+
+      // Leer el stream SSE de progreso
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (reader) {
+        let done = false;
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          done = d;
+          if (value) {
+            const text = decoder.decode(value);
+            const lines = text.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6));
+                  setUpdateProgress(data);
+
+                  if (data.step === 'complete') {
+                    toast.success(`Actualizado a v${versionInfo.latestVersion}! Reinicie el sistema.`);
+                  } else if (data.step === 'error') {
+                    toast.error(data.message);
+                  }
+                } catch {}
+              }
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Error en la actualizacion');
+      setUpdateProgress({ step: 'error', message: err?.message || 'Error desconocido', percent: 0 });
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -113,30 +174,64 @@ function VersionChecker() {
           </div>
 
           {versionInfo.hasUpdate ? (
-            <>
-              <div className="pt-2 space-y-2">
-                <p className="font-semibold text-green-700">
-                  Hay una nueva version disponible!
-                </p>
-                <div className="text-xs space-y-1 text-muted-foreground">
-                  <p className="font-medium">Para actualizar:</p>
-                  <ol className="list-decimal list-inside space-y-0.5">
-                    <li>Descargue el ZIP del link de abajo</li>
-                    <li>Coloque el archivo en la carpeta del sistema</li>
-                    <li>Ejecute ACTUALIZAR.bat (doble clic)</li>
-                    <li>El sistema hara un respaldo automatico</li>
-                  </ol>
+            <div className="pt-2 space-y-2">
+              <p className="font-semibold text-green-700">
+                Hay una nueva version disponible!
+              </p>
+
+              {/* Barra de progreso si esta actualizando */}
+              {updating && updateProgress && (
+                <div className="space-y-1">
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-green-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${updateProgress.percent}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">{updateProgress.message}</p>
                 </div>
-                <a
-                  href={versionInfo.downloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full text-center bg-green-600 text-white rounded-lg px-3 py-2 text-xs font-semibold hover:bg-green-700 transition-colors"
-                >
-                  Descargar v{versionInfo.latestVersion}
-                </a>
-              </div>
-            </>
+              )}
+
+              {!updating && (
+                <div className="space-y-2">
+                  {/* Opcion 1: ONLINE */}
+                  <button
+                    onClick={updateOnline}
+                    className="block w-full text-center bg-green-600 text-white rounded-lg px-3 py-2.5 text-xs font-semibold hover:bg-green-700 transition-colors"
+                  >
+                    Actualizar en Linea (Automatico)
+                  </button>
+                  <p className="text-[9px] text-center text-muted-foreground">
+                    Descarga, instala y migra todo automaticamente. Solo reinicie al final.
+                  </p>
+
+                  {/* Separador */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 border-t border-gray-200" />
+                    <span className="text-[9px] text-muted-foreground">o</span>
+                    <div className="flex-1 border-t border-gray-200" />
+                  </div>
+
+                  {/* Opcion 2: LOCAL (manual) */}
+                  <div className="text-xs space-y-1 text-muted-foreground">
+                    <p className="font-medium">Actualizacion Local (manual):</p>
+                    <ol className="list-decimal list-inside space-y-0.5">
+                      <li>Descargue el ZIP del link de abajo</li>
+                      <li>Coloque el archivo en la carpeta del sistema</li>
+                      <li>Ejecute ACTUALIZAR.bat (doble clic)</li>
+                    </ol>
+                  </div>
+                  <a
+                    href={versionInfo.downloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center border border-green-600 text-green-700 rounded-lg px-3 py-2 text-xs font-semibold hover:bg-green-50 transition-colors"
+                  >
+                    Descargar v{versionInfo.latestVersion} (ZIP)
+                  </a>
+                </div>
+              )}
+            </div>
           ) : (
             <p className="text-center text-muted-foreground pt-1">
               Su sistema esta actualizado
