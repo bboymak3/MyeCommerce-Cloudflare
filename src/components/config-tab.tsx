@@ -40,6 +40,8 @@ interface Settings {
   ticketMarginRight: number;
   ticketUseAgent: boolean;
   ticketAgentUrl: string;
+  ticketShowCashReceived: boolean;
+  ticketShowLogo: boolean;
   storeLogo: string;
   businessType: string;
   taxMode: string;
@@ -100,6 +102,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [ticketMarginRight, setTicketMarginRight] = useState(settings.ticketMarginRight ?? 0);
   const [ticketUseAgent, setTicketUseAgent] = useState(settings.ticketUseAgent !== false);
   const [ticketAgentUrl, setTicketAgentUrl] = useState(settings.ticketAgentUrl || 'http://localhost:9100');
+  const [ticketShowCashReceived, setTicketShowCashReceived] = useState(settings.ticketShowCashReceived !== false);
+  const [ticketShowLogo, setTicketShowLogo] = useState(settings.ticketShowLogo !== false);
   const [agentStatus, setAgentStatus] = useState<'unknown' | 'online' | 'offline'>('unknown');
   const [agentInfo, setAgentInfo] = useState<any>(null);
   const [storeLogo, setStoreLogo] = useState(settings.storeLogo || '');
@@ -283,6 +287,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         ticketMarginRight: parseFloat(String(ticketMarginRight)),
         ticketUseAgent,
         ticketAgentUrl: ticketAgentUrl.replace(/\/+$/, ''),
+        ticketShowCashReceived,
+        ticketShowLogo,
         storeLogo,
         businessType,
         taxMode,
@@ -1027,6 +1033,26 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" checked={ticketBold} onChange={(e) => setTicketBold(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Mostrar Monto Recibido</Label>
+                  <p className="text-xs text-muted-foreground">Muestra cuanto pago el cliente y el vuelto</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={ticketShowCashReceived} onChange={(e) => setTicketShowCashReceived(e.target.checked)} className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex-1">
+                  <Label className="font-medium text-sm">Mostrar Logo</Label>
+                  <p className="text-xs text-muted-foreground">Muestra el logo del negocio en el ticket</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" checked={ticketShowLogo} onChange={(e) => setTicketShowLogo(e.target.checked)} className="sr-only peer" />
                   <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
                 </label>
               </div>

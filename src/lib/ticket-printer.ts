@@ -83,6 +83,8 @@ export interface TicketSettings {
   // Nuevos campos para agente ESC/POS
   ticketUseAgent?: boolean;
   ticketAgentUrl?: string;
+ ticketShowCashReceived?: boolean;
+  ticketShowLogo?: boolean;
   ticketCurrencyMode?: string;
   // Logo del negocio
   storeLogo?: string;
@@ -447,7 +449,7 @@ function printViaHtml(params: {
   }
 </style></head><body>
 ${(() => {
-  if (storeLogo) {
+  if (settings.ticketShowLogo !== false && storeLogo) {
     return `<div style="text-align:center;margin-bottom:2px"><img src="${storeLogo}" style="max-width:${Math.min(contentMm * 2.5, 120)}px;max-height:80px;object-fit:contain" /></div>`;
   }
   const bizEmoji = BUSINESS_EMOJIS[businessType || 'general'] || '\u{1F3EA}';
@@ -508,7 +510,7 @@ ${ticketShowExchange ? `
   <div class="s" style="margin-top:1px">$: ${fmtN(receipt.total)} | Tasa: 1$=${receipt.exchangeRate}Bs</div>
 ` : ''}
 
-${!isCreditSale && (receipt.paymentMethod === 'efectivo' || receipt.paymentMethod === 'efectivo-usd') && (receipt.cashReceived ?? 0) > 0 ? `
+${settings.ticketShowCashReceived !== false && !isCreditSale && (receipt.paymentMethod === 'efectivo' || receipt.paymentMethod === 'efectivo-usd') && (receipt.cashReceived ?? 0) > 0 ? `
   <div class="ln"></div>
   ${receipt.paymentMethod === 'efectivo' ? `
     <div class="r"><span class="k">Recibido:</span><span class="v">Bs ${fmtN(receipt.cashReceived!)}</span></div>

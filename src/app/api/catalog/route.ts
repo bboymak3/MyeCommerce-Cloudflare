@@ -233,8 +233,8 @@ export async function GET(req: NextRequest) {
     .cover { background:linear-gradient(135deg,${colors.primary},${colors.secondary}); color:white; padding:50px 40px; border-radius:0 0 30px 30px; text-align:center; position:relative; overflow:hidden; }
     .cover::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle at 30% 50%,${colors.accent}40,transparent 50%),radial-gradient(circle at 70% 80%,${colors.primary}30,transparent 40%); }
     .cover * { position:relative; z-index:1; }
-    .cover-logo { width:80px; height:80px; border-radius:20px; background:rgba(255,255,255,0.2); backdrop-filter:blur(10px); margin:0 auto 20px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.3); overflow:hidden; }
-    .cover-logo img { width:100%; height:100%; object-fit:cover; }
+    .cover-logo { width:100px; height:100px; border-radius:20px; background:rgba(255,255,255,0.2); backdrop-filter:blur(10px); margin:0 auto 20px; display:flex; align-items:center; justify-content:center; border:2px solid rgba(255,255,255,0.3); overflow:hidden; padding:8px; }
+    .cover-logo img { width:100%; height:100%; object-fit:contain; }
     .store-name { font-size:32px; font-weight:900; letter-spacing:-0.5px; margin-bottom:8px; text-shadow:0 2px 10px rgba(0,0,0,0.2); }
     .store-info { font-size:13px; opacity:0.9; line-height:1.8; }
     .store-info span { display:inline-flex; align-items:center; gap:4px; margin:0 8px; }

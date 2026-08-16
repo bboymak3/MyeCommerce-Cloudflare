@@ -324,7 +324,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
   const stopScanner = async () => { try { if (scannerRef.current) { if (scannerRef.current.getState() === 2) await scannerRef.current.stop(); scannerRef.current.clear(); scannerRef.current = null; } } catch {} setShowScanner(false); setScannerError(""); };
 
   // Image
-  const uploadImage = async (file: File) => { setUploading(true); try { const fd = new FormData(); fd.append("image", file); const r = await authFetch("/api/products/upload", { method: "POST", body: fd }); const d = await r.json(); if (d.imageUrl) { setFormData(p => ({ ...p, image: d.imageUrl })); toast.success("Imagen subida"); } } catch { toast.error("Error al subir"); } finally { setUploading(false); } };
+  const uploadImage = async (file: File) => { setUploading(true); try { const fd = new FormData(); fd.append("image", file); const r = await authFetch("/api/product-images", { method: "POST", body: fd }); const d = await r.json(); if (!r.ok) { toast.error(d.error || "Error al subir"); return; } if (d.imageUrl) { setFormData(p => ({ ...p, image: d.imageUrl })); toast.success("Imagen subida"); } } catch { toast.error("Error al subir"); } finally { setUploading(false); } };
 
   // Combo items
   const addComboItem = async () => {
