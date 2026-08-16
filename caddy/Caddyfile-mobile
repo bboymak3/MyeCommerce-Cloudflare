@@ -1,6 +1,7 @@
 # Caddyfile-mobile - MyeCommerce POS
 # ============================================================================
-# Acceso movil via HTTP :3000 (sin certificados, sin HTTPS)
+# Acceso movil via HTTPS :8443 (con certificado auto-firmado)
+# La camara del telefono REQUIERE HTTPS para funcionar
 #
 # Uso:  caddy.exe run --config Caddyfile-mobile
 # ============================================================================
@@ -10,9 +11,9 @@
 	admin off
 }
 
-# HTTP en puerto 8443 para TODAS las interfaces (0.0.0.0)
-# SIN certificados TLS - acceso directo via http://IP:8443
-:8443 {
+# HTTPS en puerto 8443 para TODAS las interfaces (0.0.0.0)
+# Con certificado auto-firmado — permite camara desde el telefono
+https://0.0.0.0:8443 {
 
 	# Proxy a Next.js
 	reverse_proxy localhost:3000

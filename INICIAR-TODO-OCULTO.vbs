@@ -3,7 +3,7 @@
 ' Inicia 4 servicios SIN abrir ventanas CMD:
 '   1. Printer-Agent (puerto 9100) - impresion termica
 '   2. Caddy Dominio (puerto 443) - HTTPS myecommerce.ve (PC)
-'   3. Caddy Movil (puerto 8443) - HTTP IP local (telefono)
+'   3. Caddy Movil (puerto 8443) - HTTPS IP local (telefono, camara)
 '   4. Next.js (puerto 3000) - aplicacion web
 '
 ' IMPORTANTE: Caddy Movil es INDEPENDIENTE del Caddy Dominio.
@@ -59,10 +59,10 @@ For i = 1 To 10
     On Error GoTo 0
 Next
 
-' -- PASO 5: Abrir puerto 8443 en firewall (acceso movil telefono HTTP) --
+' -- PASO 5: Abrir puerto 8443 en firewall (acceso movil telefono HTTPS/camara) --
 On Error Resume Next
 WshShell.Run "cmd /c netsh advfirewall firewall delete rule name=""MyeCommerce POS Mobile 8443"" >nul 2>&1", 0, True
-WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTP para telefono""", 0, True
+WshShell.Run "cmd /c netsh advfirewall firewall add rule name=""MyeCommerce POS Mobile 8443"" dir=in action=allow protocol=TCP localport=8443 profile=private,public description=""MyeCommerce POS - Acceso movil HTTPS para telefono y camara""", 0, True
 On Error GoTo 0
 
 ' -- PASO 6: Iniciar Caddy Dominio (oculto, HTTPS myecommerce.ve) --
@@ -77,8 +77,9 @@ If objFSO.FileExists(caddyDir & "\caddy.exe") Then
     caddyIniciado = True
 End If
 
-' -- PASO 7: Iniciar Caddy Movil (oculto, HTTP :8443) --
-' PROCESO INDEPENDIENTE - acceso movil via HTTP sin certificados
+' -- PASO 7: Iniciar Caddy Movil (oculto, HTTPS :8443) --
+' PROCESO INDEPENDIENTE - acceso movil via HTTPS (certificado auto-firmado)
+' HTTPS es REQUERIDO para que la camara del telefono funcione como escaner
 caddyMovilIniciado = False
 If objFSO.FileExists(caddyDir & "\caddy.exe") Then
     If objFSO.FileExists(caddyDir & "\Caddyfile-mobile") Then
@@ -94,8 +95,8 @@ If objFSO.FileExists(caddyDir & "\caddy.exe") Then
             WScript.Sleep 1000
             On Error Resume Next
             Set objHTTP2 = CreateObject("MSXML2.XMLHTTP")
-            ' Intentar conexion HTTP directa
-            objHTTP2.Open "GET", "http://localhost:8443", False
+            ' Intentar conexion HTTPS directa
+            objHTTP2.Open "GET", "https://localhost:8443", False
             On Error Resume Next
             objHTTP2.send ""
             ' Si responde 200 u otro status, Caddy esta escuchando

@@ -92,10 +92,13 @@ export function useScanner({ products, onProductFound, onCodeDetected }: UseScan
           errorMsg = "La camara esta siendo usada por otra aplicacion.";
         } else if (msg.includes("notsecure") || msg.includes("secure context")) {
           const host = typeof window !== "undefined" ? window.location.hostname : "";
-          if (host && host !== "myecommerce.ve" && host !== "localhost") {
-            errorMsg = "La camara requiere HTTPS. Use https://" + host + ":8443 en vez de http://" + host + ":3000";
+          const port = typeof window !== "undefined" ? window.location.port : "";
+          if (host === "localhost" || host === "127.0.0.1") {
+            errorMsg = "Permiso de camara denegado en localhost. Verifique que el navegador tenga permiso para acceder a la camara.";
+          } else if (port === "3000") {
+            errorMsg = "La camara requiere HTTPS. Desde el telefono use https://" + host + ":8443 (no http://" + host + ":3000)";
           } else {
-            errorMsg = "La camara requiere conexion segura (HTTPS). Use https://myecommerce.ve o https://IP_DEL_SERVER:8443";
+            errorMsg = "La camara requiere HTTPS. Use https://" + host + (port ? ":" + port : "") + " en vez de HTTP.";
           }
         } else {
           errorMsg = `Error al iniciar el escaner: ${err?.message || "Error desconocido"}.`;
