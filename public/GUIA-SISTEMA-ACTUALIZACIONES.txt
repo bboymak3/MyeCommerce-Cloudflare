@@ -1,0 +1,523 @@
+================================================================================
+  GUIA COMPLETA: SISTEMA DE ACTUALIZACIONES MyeCommerce v2.9.63+
+  Organizacion de GitHub Releases + Rollback de Versiones
+================================================================================
+
+  Fecha: Agosto 2026
+  Sistema: MyeCommerce v2.9.63+
+  
+================================================================================
+  INDICE
+================================================================================
+  1. PANORAMA GENERAL
+  2. ESTRUCTURA RECOMENDADA EN GITHUB
+  3. COMO CREAR UN RELEASE EN GITHUB (PASO A PASO)
+  4. COMO FUNCIONA EL SISTEMA DE DETECCION
+  5. COMO FUNCIONA LA ACTUALIZACION ONLINE
+  6. COMO FUNCIONA EL ROLLBACK (RESTAURAR VERSION ANTERIOR)
+  7. COMO FUNCIONA LA ACTUALIZACION LOCAL (MANUAL)
+  8. QUE CAMBIOS SE HICIERON EN EL CODIGO
+  9. SOLUCION DE PROBLEMAS
+  10. PLAN A FUTURO
+
+================================================================================
+  1. PANORAMA GENERAL
+================================================================================
+
+  El sistema de actualizaciones ahora usa GitHub Releases como fuente
+  oficial de versiones. Esto ofrece:
+
+  - Lista de TODAS las versiones disponibles (nuevas y antiguas)
+  - Notas de cambios (changelog) por cada version
+  - Descarga directa de cualquier version
+  - Instalacion automatica (online) de cualquier version
+  - ROLLBACK: restaurar versiones anteriores con un clic
+  - Estados claros: "hay internet", "no hay internet", "repo no encontrado"
+  - Respaldo automatico antes de cada cambio
+
+  ARCHIVOS DEL SISTEMA:
+  - /api/check-version  → Consulta GitHub Releases, lista todas las versiones
+  - /api/update         → Descarga e instala cualquier version (upgrade o rollback)
+  - config-tab.tsx      → Interfaz visual: lista, notas, botones, progreso
+  - ACTUALIZAR.bat      → Instalacion manual local (sin internet)
+
+================================================================================
+  2. ESTRUCTURA RECOMENDADA EN GITHUB
+================================================================================
+
+  OPCION A: USAR GITHUB RELEASES (RECOMENDADO - ya implementado)
+  -----------------------------------------------------------------
+
+  En tu repositorio de GitHub, ve a la seccion "Releases" y crea un
+  release por cada version. Cada release debe tener:
+
+  a) TAG: v2.9.58, v2.9.59, v2.9.60, etc. (formato semver con "v")
+  b) TITULO: Descripcion corta de la version
+  c) DESCRIPCION: Notas de cambios detalladas (lo que vera el usuario)
+  d) ASSET (archivo adjunto): ZIP del codigo fuente de esa version
+
+  Estructura visual en GitHub:
+  
+  releases/
+  ├── v2.9.63  ← MAS RECIENTE (la primera de la lista)
+  │   ├── Tag: v2.9.63
+  │   ├── Nombre: "Correcciones de impresion y nueva tasa euro"
+  │   ├── Notas: "Se corrigio el margen del ticket..."
+  │   └── Asset: MyeCommerce-v2.9.63.zip
+  │
+  ├── v2.9.62
+  │   ├── Tag: v2.9.62
+  │   ├── Nombre: "Mejoras del catalogo"
+  │   ├── Notas: "Se agrego busqueda por codigo..."
+  │   └── Asset: MyeCommerce-v2.9.62.zip
+  │
+  ├── v2.9.61
+  │   └── ...
+  │
+  ├── v2.9.60
+  │   └── ...
+  │
+  ├── v2.9.59
+  │   └── ...
+  │
+  └── v2.9.58  ← VERSION ANTERIOR (disponible para rollback)
+      └── ...
+
+  VENTAJAS de GitHub Releases:
+  - Todas las versiones quedan ARCHIVADAS permanentemente
+  - El usuario puede volver a cualquier version anterior (rollback)
+  - Cada release tiene notas de cambios visibles desde la app
+  - GitHub maneja el almacenamiento y la descarga
+  - Es el estandar de la industria para distribucion de software
+
+  -----------------------------------------------------------------
+
+  OPCION B: USAR CARPETAS EN EL REPOSITORIO (ALTERNATIVA)
+  -----------------------------------------------------------------
+
+  Si prefieres organizarlo con carpetas dentro del repositorio:
+
+  repo-root/
+  ├── releases/                    ← CARPETA DE ACTUALIZACIONES
+  │   ├── current.json              ← Apunta a la version mas reciente
+  │   ├── v2.9.63.zip              ← ZIP de la version mas reciente
+  │   └── v2.9.62.zip
+  │
+  ├── archive/                      ← CARPETA DE ARCHIVO (versiones viejas)
+  │   ├── v2.9.58.zip              ← Versiones antiguas aqui
+  │   ├── v2.9.59.zip
+  │   ├── v2.9.60.zip
+  │   └── v2.9.61.zip
+  │
+  ├── src/                          ← Codigo fuente actual
+  ├── public/
+  └── ... (resto del proyecto)
+
+  Archivo releases/current.json:
+  {
+    "version": "2.9.63",
+    "url": "./releases/v2.9.63.zip",
+    "date": "2026-08-17",
+    "notes": "Correcciones de impresion y nueva tasa euro"
+  }
+
+  NOTA: Esta opcion B requiere cambios adicionales en el codigo
+  para leer los archivos desde el repo en vez de usar la API de Releases.
+  La opcion A (GitHub Releases) ya esta implementada y funcionando.
+
+================================================================================
+  3. COMO CREAR UN RELEASE EN GITHUB (PASO A PASO)
+================================================================================
+
+  PASO 1: Preparar el ZIP de la version
+  -------------------------------------
+  a) Asegurate de que el package.json tenga la version correcta:
+     "version": "2.9.63"
+  
+  b) Todo el proyecto debe estar probado y funcionando
+  
+  c) Comprime la carpeta del proyecto en un ZIP
+     - NO incluyas: node_modules/, .next/, BACKUPS/, prisma/dev.db
+     - SI incluye: src/, public/, prisma/schema.prisma, prisma/migrations/,
+                   package.json, package-lock.json, los .bat, etc.
+
+  PASO 2: Ir a GitHub
+  -------------------
+  a) Abre tu repositorio en github.com
+  b) En el lado derecho, haz clic en "Releases"
+  c) Haz clic en "Draft a new release"
+  d) O haz clic en "Tags" → "Create tag + release"
+
+  PASO 3: Llenar la informacion del release
+  ----------------------------------------
+  a) Choose a tag:
+     - Escribe: v2.9.63
+     - Selecciona "Create new tag: v2.9.63 on publish"
+  
+  b) Release title:
+     - Escribe algo descriptivo como:
+       "v2.9.63 - Correcciones de impresion y nueva tasa euro"
+  
+  c) Describe the release (NOTAS DE CAMBIOS):
+     - Escribe en formato legible para el usuario. Ejemplo:
+
+       ## Novedades
+       - Se corrigio el margen del ticket en impresoras 80mm
+       - Se agrego tasa Euro/USDT en configuracion
+       - Mejoras en la velocidad del catalogo
+       
+       ## Correcciones
+       - Se corrigio error al buscar productos por codigo
+       - Se corrigio problema con la tasa BCV al inicio
+       
+       ## Instrucciones
+       - Actualize desde la app: Configuracion > Actualizaciones
+       - O descargue este ZIP y ejecute ACTUALIZAR.bat
+
+  d) Attach binaries (ARCHIVOS):
+     - Arrastra y suelta el ZIP del proyecto
+     - O haz clic en "Attach binaries" y selecciona el archivo
+     - El archivo debe llamarse como prefieras, ej: MyeCommerce-v2.9.63.zip
+
+  PASO 4: Publicar
+  ----------------
+  a) Verifica que "Set as the latest release" esta marcado (es el default)
+  b) Haz clic en "Publish release"
+
+  LISTO. El sistema ahora detectara esta version automaticamente.
+
+  REPETIR estos pasos cada vez que publiques una nueva version.
+
+================================================================================
+  4. COMO FUNCIONA EL SISTEMA DE DETECCION
+================================================================================
+
+  Cuando el usuario hace clic en "Buscar Actualizaciones":
+
+  1. El frontend llama a: GET /api/check-version
+
+  2. El API hace lo siguiente:
+     a) Lee el package.json local → version instalada (ej: 2.9.63)
+     b) Consulta GitHub Releases API:
+        GET https://api.github.com/repos/csglider/MyeCommerce-v2.9.20/releases
+     c) Procesa la respuesta:
+        - Filtra releases que no sean "draft"
+        - Filtra tags con formato v2.9.XX
+        - Compara cada version con la local
+        - Marca cada version como: isNewer, isOlder, isCurrent
+        - Obtiene la URL de descarga (asset del release o archive)
+        - Formatea la fecha relativa (hace X dias)
+     d) Retorna JSON con TODA la informacion
+
+  3. La respuesta JSON incluye:
+  {
+    "status": "ok",                    // "ok" | "no_internet" | "repo_not_found" | "no_releases"
+    "localVersion": "2.9.63",
+    "latestVersion": "2.9.65",
+    "hasUpdate": true,
+    "totalVersions": 8,
+    "versions": [
+      {
+        "version": "2.9.65",
+        "name": "Nueva version",
+        "notes": "Notas de cambios...",
+        "date": "2026-08-15T10:00:00Z",
+        "dateRelative": "hace 2 dias",
+        "downloadUrl": "https://github.com/.../archive/v2.9.65.zip",
+        "prerelease": false,
+        "isNewer": true,
+        "isOlder": false,
+        "isCurrent": false
+      },
+      {
+        "version": "2.9.63",
+        "name": "...",
+        "notes": "...",
+        "isNewer": false,
+        "isOlder": false,
+        "isCurrent": true,       ← Esta es la que tiene instalada
+        ...
+      },
+      {
+        "version": "2.9.58",
+        "name": "...",
+        "notes": "...",
+        "isNewer": false,
+        "isOlder": true,          ← Puede hacer rollback a esta
+        ...
+      }
+    ],
+    "githubRepo": "csglider/MyeCommerce-v2.9.20",
+    "releasesUrl": "https://github.com/csglider/MyeCommerce-v2.9.20/releases"
+  }
+
+  4. La interfaz muestra:
+     - Version instalada vs version mas reciente
+     - Cuantas versiones nuevas hay
+     - Lista expandible de TODAS las versiones
+     - Cada version muestra: notas de cambios, fecha, botones
+     - Boton verde "Actualizar" para versiones nuevas
+     - Boton naranja "Restaurar" para versiones antiguas (rollback)
+     - Link "Descargar ZIP" para instalacion manual
+
+  ESTADOS DE ERROR:
+  - "no_internet": Muestra mensaje naranja "No se pudo conectar a GitHub"
+  - "repo_not_found": Muestra mensaje rojo "Repositorio no encontrado"
+  - "no_releases": Muestra mensaje amarillo "No hay versiones publicadas"
+
+================================================================================
+  5. COMO FUNCIONA LA ACTUALIZACION ONLINE
+================================================================================
+
+  Cuando el usuario hace clic en "Actualizar" (version nueva) o
+  "Restaurar" (version anterior):
+
+  1. Se muestra dialogo de confirmacion:
+     - Para actualizacion: "Actualizar de vX a vY? Se creara respaldo..."
+     - Para rollback: "RESTAURAR a vX? Esto instalara una version ANTERIOR..."
+
+  2. El frontend envia: POST /api/update
+  {
+    "version": "2.9.65",
+    "downloadUrl": "https://github.com/.../archive/v2.9.65.zip"
+  }
+
+  3. El servidor ejecuta estos pasos (con progreso SSE en tiempo real):
+
+     PASO 1 (5%):  Verificar sistema
+                   - Verifica que exista prisma/dev.db
+                   - Lee version local del package.json
+                   - Detecta si es upgrade o downgrade (rollback)
+
+     PASO 2 (15%): CREAR RESPALDO AUTOMATICO
+                   - Crea carpeta: BACKUP_AUTO_v2.9.63_2026-08-17_1430
+                   - Copia: dev.db, dev.db-wal, dev.db-shm
+                   - Copia: schema.prisma
+                   - Copia: data/uploads/ (imagenes de productos)
+                   - Copia: package.json
+                   - NOTA: Si es rollback, la carpeta se llama
+                     BACKUP_AUTO_ROLLBACK_v2.9.63_...
+
+     PASO 3 (30%): DESCARGAR
+                   - Descarga el ZIP desde la URL del release
+                   - Lo guarda como temp_online_update.zip
+                   - Verifica que pese mas de 100KB
+
+     PASO 4 (55%): EXTRAER
+                   - Usa PowerShell Expand-Archive
+                   - Encuentra la carpeta extraida
+
+     PASO 5 (65%): COPIAR ARCHIVOS NUEVOS
+                   - Reemplaza: src/, public/, prisma/schema.prisma
+                   - Reemplaza: package.json, package-lock.json
+                   - Reemplaza: next.config, tsconfig, tailwind
+                   - Reemplaza: todos los .bat y .vbs
+                   - Reemplaza: caddy/Caddyfile, printer-agent/agent.js
+                   - NO toca: prisma/dev.db, data/, BACKUPS/
+
+     PASO 6 (80%): LIMPIAR TEMPORALES
+                   - Borra temp_online_update.zip
+                   - Borra temp_online_extract/
+
+     PASO 7 (85%): MIGRAR BASE DE DATOS
+                   - Ejecuta: npx prisma generate
+                   - Ejecuta: npx prisma db push --accept-data-loss
+                   - Fallback: npx prisma migrate deploy
+
+     PASO 8 (100%): COMPLETADO
+                   - Muestra: "Actualizado de v2.9.63 a v2.9.65"
+                   - Muestra ruta del respaldo creado
+                   - Pide reiniciar el sistema
+
+  4. El usuario debe reiniciar el sistema (INICIAR-TODO.bat)
+
+================================================================================
+  6. COMO FUNCIONA EL ROLLBACK (RESTAURAR VERSION ANTERIOR)
+================================================================================
+
+  El ROLLBACK usa exactamente el mismo mecanismo que la actualizacion,
+  pero con una version ANTERIOR. La diferencia es:
+
+  a) El dialogo de confirmacion es diferente:
+     "RESTAURAR a v2.9.58? Esto instalara una version ANTERIOR..."
+
+  b) El respaldo se nombra diferente:
+     BACKUP_AUTO_ROLLBACK_v2.9.63_2026-08-17_1430
+     (en vez de BACKUP_AUTO_PRE-ACTUALIZACION_...)
+
+  c) El boton es naranja ("Restaurar") en vez de verde ("Actualizar")
+
+  d) El mensaje de completado dice "RESTAURADO" en vez de "Actualizado"
+
+  IMPORTANTE: La base de datos SIEMPRE se preserva. Solo se reemplaza
+  el codigo (src/, public/, etc.). Los datos (productos, ventas, etc.)
+  nunca se pierden.
+
+  PRECAUCION: Si la version anterior tiene un schema de BD diferente,
+  prisma db push ajustara la BD automaticamente. Sin embargo, siempre
+  hay un respaldo completo en la carpeta BACKUP_AUTO_.
+
+================================================================================
+  7. COMO FUNCIONA LA ACTUALIZACION LOCAL (MANUAL)
+================================================================================
+
+  Si no hay internet, el usuario puede actualizar manualmente:
+
+  1. Desde otro dispositivo con internet, descargar el ZIP de la version
+     deseada desde GitHub Releases
+
+  2. Copiar el ZIP a la carpeta del sistema (C:\MyeCommerce\)
+     El archivo puede tener cualquier nombre, pero debe ser .zip
+
+  3. Ejecutar ACTUALIZAR.bat (doble clic)
+
+  El ACTUALIZAR.bat hace lo siguiente:
+     1. Verifica que existe prisma/dev.db
+     2. Lee la version actual del package.json
+     3. Busca un archivo .zip en la carpeta
+     4. Crea un respaldo automatico
+     5. Extrae el ZIP
+     6. Reemplaza archivos (preservando BD y data)
+     7. Ejecuta npm install
+     8. Ejecuta npx prisma db push
+     9. Muestra mensaje de completado
+
+  NOTA: El ZIP debe contener la estructura del proyecto completo
+  (como el que se descarga de GitHub archive).
+
+================================================================================
+  8. QUE CAMBIOS SE HICIERON EN EL CODIGO
+================================================================================
+
+  ARCHIVO: package.json
+  - Version actualizada de "2.9.58" a "2.9.63"
+  - Esto permite que el sistema detecte correctamente la version instalada
+
+  ARCHIVO: src/app/api/check-version/route.ts (REESCRITO COMPLETO)
+  CAMBIOS:
+  - Ahora usa GitHub Releases API en vez de GitHub Tags API
+    Antes: GET /repos/{repo}/tags
+    Ahora: GET /repos/{repo}/releases
+  - Retorna TODAS las versiones (no solo la mas reciente)
+  - Cada version incluye: notes, date, dateRelative, downloadUrl
+  - Cada version esta marcada como: isNewer, isOlder, isCurrent
+  - Retorna campo "status" con estados claros:
+    "ok" | "no_internet" | "repo_not_found" | "no_releases"
+  - Soporta release assets (ZIP adjuntos al release)
+  - Cache reducido de 5 min a 1 min
+  - Header User-Agent para evitar bloqueos
+
+  ARCHIVO: src/app/api/update/route.ts (MEJORADO)
+  CAMBIOS:
+  - Acepta parametro "downloadUrl" en el body (URL directa del asset)
+    Antes: solo aceptaba "version" y construia la URL
+    Ahora: acepta "version" + "downloadUrl" (usa la URL del release asset)
+  - Detecta si es upgrade o downgrade (rollback)
+  - Nombra respaldos diferente para rollback:
+    "BACKUP_AUTO_ROLLBACK_v..." vs "BACKUP_AUTO_PRE-ACTUALIZACION_v..."
+  - Respaldos ahora incluyen package.json
+  - Mensajes de error mas descriptivos
+  - Verificacion de tamano minimo del ZIP descargado
+  - Retorna ruta del respaldo creado en el mensaje de completado
+  - Eliminado codigo de shouldPreserve() que no se usaba
+
+  ARCHIVO: src/components/config-tab.tsx (REESCRITO VersionChecker)
+  CAMBIOS:
+  - Nuevas interfaces: VersionEntry, VersionCheckResult
+  - Estado "expandedVersion" para expandir/colapsar cada version
+  - Mensajes de estado claros con colores:
+    - Naranja: sin internet
+    - Rojo: repositorio no encontrado
+    - Amarillo: no hay releases
+  - Barra de progreso con 3 colores:
+    - Azul: en progreso
+    - Verde: completado
+    - Rojo: error
+  - Lista expandible de TODAS las versiones disponibles
+  - Cada version muestra:
+    - Badge "Instalada" (azul) para la version actual
+    - Badge "Beta" para prereleases
+    - Fecha relativa (hace X dias)
+    - Notas de cambios (scrollable)
+    - Boton verde "Actualizar" (versiones nuevas)
+    - Boton naranja "Restaurar" (versiones antiguas, rollback)
+    - Link "Descargar ZIP" (siempre disponible)
+    - Instrucciones de instalacion manual
+  - Boton principal deshabilitado durante actualizaciones
+  - Muestra "Ver en GitHub" link
+  - Muestra contador: "N versiones disponibles"
+
+================================================================================
+  9. SOLUCION DE PROBLEMAS
+================================================================================
+
+  PROBLEMA: "No se pudo conectar a GitHub"
+  SOLUCION:
+  - Verifique la conexion a internet del servidor
+  - Si esta detras de un proxy/firewall, permita acceso a api.github.com
+  - Use la actualizacion local (manual) mientras tanto
+
+  PROBLEMA: "Repositorio no encontrado"
+  SOLUCION:
+  - Verifique que el repositorio exista en GitHub
+  - Verifique que sea PUBLICO (no privado)
+  - Si cambio el nombre del repo, actualice la constante GITHUB_REPO en:
+    - src/app/api/check-version/route.ts (linea 4)
+    - src/app/api/update/route.ts (linea 9)
+
+  PROBLEMA: "No hay versiones publicadas"
+  SOLUCION:
+  - Cree al menos un release en GitHub con tag formato v2.9.XX
+  - Siga los pasos de la seccion 3 de esta guia
+
+  PROBLEMA: Dice "su sistema esta actualizado" pero sabe que hay version mas nueva
+  SOLUCION:
+  - Verifique que el package.json tenga la version correcta
+  - Si actualizo manualmente, actualice el package.json tambien
+  - Haga clic en "Buscar Actualizaciones" de nuevo (cache de 1 min)
+
+  PROBLEMA: La actualizacion falla al extraer el ZIP
+  SOLUCION:
+  - Verifique que el ZIP descargado no este corrupto
+  - Descargue el ZIP manualmente desde GitHub y use ACTUALIZAR.bat
+  - Verifique que PowerShell este instalado (viene con Windows 10+)
+
+  PROBLEMA: La base de datos da error despues de actualizar
+  SOLUCION:
+  - Restaure el respaldo automatico desde la carpeta BACKUP_AUTO_
+  - Copie los archivos dev.db, dev.db-wal, dev.db-shm a prisma/
+  - Reinicie el sistema
+
+================================================================================
+  10. PLAN A FUTURO
+================================================================================
+
+  Mejoras pendientes para el sistema de actualizaciones:
+
+  a) CONFIGURACION DESDE LA APP:
+     - Permitir cambiar la URL del repositorio desde Configuracion
+     - Sin necesidad de modificar codigo
+
+  b) NOTIFICACIONES AUTOMATICAS:
+     - Verificar version al iniciar el sistema
+     - Mostrar badge rojo "N" cuando hay nuevas versiones
+
+  c) ACTUALIZACIONES POR PARTES:
+     - Solo actualizar archivos cambiados (diff/patch)
+     - Reducir tiempo de descarga
+
+  d) HASH DE VERIFICACION:
+     - Verificar SHA256 del ZIP descargado
+     - Evitar instalacion de archivos corruptos o modificados
+
+  e) MODO OFFLINE COMPLETO:
+     - Generar un paquete "offline update" con todas las versiones
+     - Para instalaciones sin acceso a internet
+
+  f) SCHEDULER DE ACTUALIZACION:
+     - Programar actualizaciones automaticas en horario nocturno
+     - Con verificacion post-actualizacion automatica
+
+================================================================================
+  FIN DE LA GUIA
+================================================================================

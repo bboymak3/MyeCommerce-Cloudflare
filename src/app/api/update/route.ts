@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execSync } from 'child_process';
-import { writeFile, mkdir, cp, rm, readdir, stat } from 'fs/promises';
-import { existsSync, createReadStream, createWriteStream } from 'fs';
+import { mkdir, cp, rm, readdir, stat } from 'fs/promises';
+import { existsSync, createWriteStream } from 'fs';
 import { join } from 'path';
 import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
@@ -16,9 +16,9 @@ const PRESERVE_LIST = [
   'prisma/dev.db-journal',
   'data/',
   'BACKUPS/',
+  'BACKUP_AUTO_',
   'caddy/caddy.exe',
   'caddy/local-ip.txt',
-  'BACKUP_PRE-ACTUALIZACION_',
 ];
 
 // Archivos/carpetas a copiar de la nueva version
@@ -59,24 +59,14 @@ interface UpdateProgress {
   step: string;
   message: string;
   percent: number;
+  backupDir?: string;
 }
 
 function sendProgress(controller: ReadableStreamDefaultController, data: UpdateProgress) {
   controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(data)}\n\n`));
 }
 
-// Verificar si una ruta debe preservarse
-function shouldPreserve(relativePath: string): boolean {
-  return PRESERVE_LIST.some(item => {
-    if (item.endsWith('/')) {
-      return relativePath.startsWith(item) || relativePath === item.slice(0, -1);
-    }
-    return relativePath === item || relativePath.startsWith(item.replace(/[^/]+$/, ''));
-  });
-}
-
 export async function POST(req: NextRequest) {
-  const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
       const runUpdate = async () => {
@@ -86,6 +76,7 @@ export async function POST(req: NextRequest) {
           // Leer body
           const body = await req.json();
           const targetVersion = body.version;
+          const customUrl = body.downloadUrl; // URL directa del release asset (opcional)
 
           if (!targetVersion) {
             sendProgress(controller, { step: 'error', message: 'Version no especificada', percent: 0 });
@@ -105,47 +96,71 @@ export async function POST(req: NextRequest) {
           // Leer version local
           let localVersion = '0.0.0';
           try {
-            const fs = await import('fs');
-            const pkg = JSON.parse(fs.readFileSync(join(BASE, 'package.json'), 'utf-8'));
+            const fsSync = await import('fs');
+            const pkg = JSON.parse(fsSync.readFileSync(join(BASE, 'package.json'), 'utf-8'));
             localVersion = pkg.version || '0.0.0';
           } catch {}
 
-          sendProgress(controller, { step: 'check', message: `Version actual: v${localVersion} → v${targetVersion}`, percent: 10 });
+          // Verificar si es un rollback (version anterior)
+          const isRollback = customUrl ? true : false;
+          const localParts = localVersion.split('.').map(Number);
+          const targetParts = targetVersion.split('.').map(Number);
+          let isDowngrade = false;
+          for (let i = 0; i < 3; i++) {
+            if ((targetParts[i] || 0) < (localParts[i] || 0)) {
+              isDowngrade = true;
+              break;
+            } else if ((targetParts[i] || 0) > (localParts[i] || 0)) {
+              break;
+            }
+          }
+
+          const actionLabel = isDowngrade ? `RESTAURANDO a v${targetVersion} (version anterior)` : `Actualizando a v${targetVersion}`;
+          sendProgress(controller, { step: 'check', message: `Version actual: v${localVersion} → ${actionLabel}`, percent: 10 });
 
           // ── PASO 2: Respaldar ──
           sendProgress(controller, { step: 'backup', message: 'Creando respaldo de seguridad...', percent: 15 });
 
           const now = new Date();
           const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
-          const backupDir = join(BASE, `BACKUP_AUTO_v${localVersion}_${dateStr}`);
+          const backupLabel = isDowngrade ? `ROLLBACK` : `PRE-ACTUALIZACION`;
+          const backupDir = join(BASE, `BACKUP_AUTO_${backupLabel}_v${localVersion}_${dateStr}`);
 
           if (!existsSync(backupDir)) await mkdir(backupDir, { recursive: true });
-
-          const fs = await import('fs/promises');
-          const fsSync = await import('fs');
 
           // Respaldar BD
           const dbFiles = ['dev.db', 'dev.db-wal', 'dev.db-shm', 'dev.db-journal'];
           for (const f of dbFiles) {
             const src = join(BASE, 'prisma', f);
-            if (existsSync(src)) await cp(src, join(backupDir, f));
+            if (existsSync(src)) {
+              try { await cp(src, join(backupDir, f)); } catch {}
+            }
           }
 
           // Respaldar schema
           const schemaSrc = join(BASE, 'prisma', 'schema.prisma');
-          if (existsSync(schemaSrc)) await cp(schemaSrc, join(backupDir, 'schema.prisma'));
+          if (existsSync(schemaSrc)) {
+            try { await cp(schemaSrc, join(backupDir, 'schema.prisma')); } catch {}
+          }
 
           // Respaldar uploads
           const uploadsDir = join(BASE, 'data', 'uploads');
           if (existsSync(uploadsDir)) {
-            await cp(uploadsDir, join(backupDir, 'uploads'), { recursive: true });
+            try { await cp(uploadsDir, join(backupDir, 'uploads'), { recursive: true }); } catch {}
           }
 
-          sendProgress(controller, { step: 'backup', message: 'Respaldo completado', percent: 25 });
+          // Respaldar package.json
+          const pkgSrc = join(BASE, 'package.json');
+          if (existsSync(pkgSrc)) {
+            try { await cp(pkgSrc, join(backupDir, 'package.json')); } catch {}
+          }
 
-          // ── PASO 3: Descargar nueva version ──
+          sendProgress(controller, { step: 'backup', message: `Respaldo completado en ${backupDir}`, percent: 25, backupDir });
+
+          // ── PASO 3: Descargar version ──
           const tagName = targetVersion.startsWith('v') ? targetVersion : `v${targetVersion}`;
-          const downloadUrl = `https://github.com/${GITHUB_REPO}/archive/refs/tags/${tagName}.zip`;
+          // Si hay URL custom (del release asset), usarla; si no, usar archive de GitHub
+          const downloadUrl = customUrl || `https://github.com/${GITHUB_REPO}/archive/refs/tags/${tagName}.zip`;
           const tempZip = join(BASE, 'temp_online_update.zip');
 
           sendProgress(controller, { step: 'download', message: `Descargando v${targetVersion}...`, percent: 30 });
@@ -153,25 +168,34 @@ export async function POST(req: NextRequest) {
           // Descargar con fetch nativo
           const res = await fetch(downloadUrl, { redirect: 'follow' });
           if (!res.ok || !res.body) {
-            sendProgress(controller, { step: 'error', message: `Error al descargar: HTTP ${res.status}`, percent: 0 });
+            sendProgress(controller, {
+              step: 'error',
+              message: `Error al descargar v${targetVersion}: HTTP ${res.status}. Verifique que la version exista en GitHub.`,
+              percent: 0,
+            });
             controller.close();
             return;
           }
 
           // Stream a archivo
+          const fsSync = await import('fs');
           const fileStream = fsSync.createWriteStream(tempZip);
           await pipeline(Readable.fromWeb(res.body as any), fileStream);
 
-          // Verificar tamaño
+          // Verificar tamaño minimo (100KB)
           const zipStat = await stat(tempZip);
           if (zipStat.size < 100000) {
-            sendProgress(controller, { step: 'error', message: 'Archivo descargado demasiado pequeno. Error de descarga.', percent: 0 });
+            sendProgress(controller, {
+              step: 'error',
+              message: `Archivo descargado solo ${Math.round(zipStat.size / 1024)}KB (minimo 100KB). Posible error de version o URL incorrecta.`,
+              percent: 0,
+            });
             try { await rm(tempZip); } catch {}
             controller.close();
             return;
           }
 
-          sendProgress(controller, { step: 'download', message: `Descargado (${(zipStat.size / 1024 / 1024).toFixed(1)}MB)`, percent: 50 });
+          sendProgress(controller, { step: 'download', message: `Descargado (${(zipStat.size / 1024 / 1024).toFixed(1)} MB)`, percent: 50 });
 
           // ── PASO 4: Extraer ZIP ──
           sendProgress(controller, { step: 'extract', message: 'Extrayendo archivos...', percent: 55 });
@@ -180,15 +204,13 @@ export async function POST(req: NextRequest) {
           if (existsSync(tempExtract)) await rm(tempExtract, { recursive: true });
           await mkdir(tempExtract, { recursive: true });
 
-          // Usar PowerShell para extraer (disponible en Windows)
           try {
             execSync(
               `powershell -NoProfile -Command "Expand-Archive -Path '${tempZip.replace(/'/g, "''")}' -DestinationPath '${tempExtract.replace(/'/g, "''")}' -Force"`,
               { cwd: BASE, timeout: 120000, stdio: 'pipe' }
             );
           } catch (err: any) {
-            // Alternativa: usar unzip nativo de Node si hay
-            sendProgress(controller, { step: 'error', message: 'Error al extraer ZIP: ' + (err?.message || ''), percent: 0 });
+            sendProgress(controller, { step: 'error', message: 'Error al extraer ZIP. Verifique que el archivo no este corrupto.', percent: 0 });
             try { await rm(tempZip); } catch {}
             controller.close();
             return;
@@ -207,7 +229,6 @@ export async function POST(req: NextRequest) {
           }
 
           if (!extractedDir) {
-            // Usar la primera carpeta
             for (const entry of extractEntries) {
               const fullPath = join(tempExtract, entry);
               const s = await stat(fullPath);
@@ -216,7 +237,7 @@ export async function POST(req: NextRequest) {
           }
 
           if (!extractedDir) {
-            sendProgress(controller, { step: 'error', message: 'No se pudo encontrar la carpeta extraida', percent: 0 });
+            sendProgress(controller, { step: 'error', message: 'No se pudo encontrar la carpeta extraida del ZIP.', percent: 0 });
             try { await rm(tempZip); await rm(tempExtract, { recursive: true }); } catch {}
             controller.close();
             return;
@@ -228,6 +249,7 @@ export async function POST(req: NextRequest) {
           sendProgress(controller, { step: 'copy', message: 'Actualizando archivos del sistema...', percent: 65 });
 
           let copied = 0;
+          let errors = 0;
           for (const item of UPDATE_ITEMS) {
             const srcPath = join(extractedDir, item);
             if (!existsSync(srcPath)) continue;
@@ -237,11 +259,9 @@ export async function POST(req: NextRequest) {
             try {
               const s = await stat(srcPath);
               if (s.isDirectory()) {
-                // Eliminar destino y copiar completo
                 if (existsSync(destPath)) await rm(destPath, { recursive: true });
                 await cp(srcPath, destPath, { recursive: true });
               } else {
-                // Asegurar que el directorio padre existe
                 const parentDir = join(destPath, '..');
                 if (!existsSync(parentDir)) await mkdir(parentDir, { recursive: true });
                 await cp(srcPath, destPath);
@@ -249,6 +269,7 @@ export async function POST(req: NextRequest) {
               copied++;
             } catch (err: any) {
               console.warn(`[update] Error copiando ${item}:`, err?.message);
+              errors++;
             }
           }
 
@@ -259,7 +280,7 @@ export async function POST(req: NextRequest) {
             if (!existsSync(dp)) await mkdir(dp, { recursive: true });
           }
 
-          sendProgress(controller, { step: 'copy', message: `${copied} elementos actualizados`, percent: 75 });
+          sendProgress(controller, { step: 'copy', message: `${copied} elementos actualizados (${errors} errores)`, percent: 75 });
 
           // ── PASO 6: Limpiar temporales ──
           sendProgress(controller, { step: 'cleanup', message: 'Limpiando archivos temporales...', percent: 80 });
@@ -277,8 +298,7 @@ export async function POST(req: NextRequest) {
 
           try {
             execSync('npx prisma db push --accept-data-loss', { cwd: BASE, timeout: 60000, stdio: 'pipe' });
-          } catch (err: any) {
-            // Intentar migrate deploy como fallback
+          } catch {
             try {
               execSync('npx prisma migrate deploy', { cwd: BASE, timeout: 60000, stdio: 'pipe' });
             } catch (err2: any) {
@@ -289,10 +309,15 @@ export async function POST(req: NextRequest) {
           sendProgress(controller, { step: 'migrate', message: 'Base de datos migrada', percent: 90 });
 
           // ── PASO 8: Completado ──
+          const finalMsg = isDowngrade
+            ? `RESTAURADO a v${targetVersion} desde v${localVersion}. Respaldado en: ${backupDir}`
+            : `Actualizado de v${localVersion} a v${targetVersion}. Respaldado en: ${backupDir}`;
+
           sendProgress(controller, {
             step: 'complete',
-            message: `Actualizado de v${localVersion} a v${targetVersion}. Respaldado en: ${join(backupDir, '..')}`,
+            message: finalMsg,
             percent: 100,
+            backupDir,
           });
 
           controller.close();

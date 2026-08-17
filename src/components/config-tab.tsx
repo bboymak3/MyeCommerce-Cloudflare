@@ -64,25 +64,55 @@ interface ConfigTabProps {
   };
 }
 
-// ─── Version Checker ───────────────────────────────────────────
+// ─── Version Checker (mejorado con rollback + todas las versiones) ───
+interface VersionEntry {
+  version: string;
+  name: string;
+  notes: string;
+  date: string;
+  dateRelative: string;
+  downloadUrl: string;
+  prerelease: boolean;
+  isNewer: boolean;
+  isOlder: boolean;
+  isCurrent: boolean;
+}
+
+interface VersionCheckResult {
+  status: 'ok' | 'no_internet' | 'repo_not_found' | 'no_releases' | 'error';
+  localVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  totalVersions: number;
+  versions: VersionEntry[];
+  githubRepo: string;
+  releasesUrl: string;
+  error?: string;
+}
+
 function VersionChecker() {
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [updateProgress, setUpdateProgress] = useState<{ step: string; message: string; percent: number } | null>(null);
-  const [versionInfo, setVersionInfo] = useState<{
-    localVersion: string;
-    latestVersion: string;
-    hasUpdate: boolean;
-    downloadUrl: string;
-    releasesUrl: string;
-  } | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<{ step: string; message: string; percent: number; backupDir?: string } | null>(null);
+  const [versionInfo, setVersionInfo] = useState<VersionCheckResult | null>(null);
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
 
   const checkVersion = async () => {
     setChecking(true);
+    setUpdateProgress(null);
     try {
       const res = await authFetch('/api/check-version');
       const data = await res.json();
       setVersionInfo(data);
+      if (data.status !== 'ok') {
+        const msgs: Record<string, string> = {
+          no_internet: 'No se pudo conectar a GitHub. Verifique su conexion a internet.',
+          repo_not_found: 'Repositorio de GitHub no encontrado. Contacte soporte.',
+          no_releases: 'No hay releases publicados en GitHub todavia.',
+          error: data.error || 'Error desconocido al verificar version.',
+        };
+        toast.error(msgs[data.status] || 'Error al verificar version');
+      }
     } catch {
       toast.error('No se pudo verificar la version');
     } finally {
@@ -90,29 +120,33 @@ function VersionChecker() {
     }
   };
 
-  // ── Actualizacion ONLINE (desde la app) ──
-  const updateOnline = async () => {
-    if (!versionInfo) return;
+  // ── Instalar cualquier version (upgrade o rollback) ──
+  const installVersion = async (ver: VersionEntry) => {
+    const isRollback = ver.isOlder;
     const confirmed = window.confirm(
-      `Actualizar de v${versionInfo.localVersion} a v${versionInfo.latestVersion}?\n\n` +
-      `Se creara un respaldo automatico antes de actualizar.\n` +
-      `Despues de la actualizacion debera reiniciar el sistema.`
+      isRollback
+        ? `RESTAURAR a v${ver.version}?\n\n` +
+          `Esto instalara una version ANTERIOR a la actual.\n` +
+          `Se creara un respaldo automatico de su version actual antes de continuar.\n` +
+          `Despues de la restauracion debera reiniciar el sistema.`
+        : `Actualizar a v${ver.version}?\n\n` +
+          `Se creara un respaldo automatico antes de actualizar.\n` +
+          `Despues de la actualizacion debera reiniciar el sistema.`
     );
     if (!confirmed) return;
 
     setUpdating(true);
-    setUpdateProgress({ step: 'start', message: 'Iniciando actualizacion...', percent: 0 });
+    setUpdateProgress({ step: 'start', message: 'Iniciando...', percent: 0 });
 
     try {
       const res = await authFetch('/api/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version: versionInfo.latestVersion }),
+        body: JSON.stringify({ version: ver.version, downloadUrl: ver.downloadUrl }),
       });
 
       if (!res.ok) throw new Error('Error del servidor');
 
-      // Leer el stream SSE de progreso
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
 
@@ -129,9 +163,11 @@ function VersionChecker() {
                 try {
                   const data = JSON.parse(line.slice(6));
                   setUpdateProgress(data);
-
                   if (data.step === 'complete') {
-                    toast.success(`Actualizado a v${versionInfo.latestVersion}! Reinicie el sistema.`);
+                    toast.success(isRollback
+                      ? `Restaurado a v${ver.version}! Reinicie el sistema.`
+                      : `Actualizado a v${ver.version}! Reinicie el sistema.`
+                    );
                   } else if (data.step === 'error') {
                     toast.error(data.message);
                   }
@@ -149,96 +185,243 @@ function VersionChecker() {
     }
   };
 
+  // ── Renderizar mensaje de estado ──
+  const renderStatus = () => {
+    if (!versionInfo) return null;
+    if (versionInfo.status === 'ok') return null;
+
+    const statusConfig: Record<string, { icon: string; title: string; desc: string; color: string }> = {
+      no_internet: {
+        icon: 'No hay conexion a Internet',
+        title: 'No se pudo conectar a GitHub',
+        desc: 'Verifique su conexion a internet e intente de nuevo. Puede usar la actualizacion local (manual) mientras tanto.',
+        color: 'bg-orange-50 border-orange-200 text-orange-800',
+      },
+      repo_not_found: {
+        icon: 'Repositorio no encontrado',
+        title: 'Repositorio de GitHub no disponible',
+        desc: `El repositorio configurado (${versionInfo.githubRepo}) no fue encontrado. Puede que sea privado o la URL este incorrecta. Contacte soporte tecnico.`,
+        color: 'bg-red-50 border-red-200 text-red-800',
+      },
+      no_releases: {
+        icon: 'Sin releases',
+        title: 'No hay versiones publicadas',
+        desc: 'Aun no se han publicado releases de versiones en GitHub. Contacte soporte tecnico para obtener la actualizacion manualmente.',
+        color: 'bg-yellow-50 border-yellow-200 text-yellow-800',
+      },
+    };
+
+    const cfg = statusConfig[versionInfo.status];
+    if (!cfg) return null;
+
+    return (
+      <div className={`p-3 rounded-lg border text-sm ${cfg.color}`}>
+        <p className="font-semibold text-sm">{cfg.icon}</p>
+        <p className="font-semibold mt-1">{cfg.title}</p>
+        <p className="text-xs mt-1 opacity-80">{cfg.desc}</p>
+        <p className="text-xs mt-2 font-mono">Version local: v{versionInfo.localVersion}</p>
+      </div>
+    );
+  };
+
+  // ── Barra de progreso de actualizacion ──
+  const renderProgress = () => {
+    if (!updating || !updateProgress) return null;
+    const isError = updateProgress.step === 'error';
+    const isComplete = updateProgress.step === 'complete';
+    return (
+      <div className={`p-3 rounded-lg border text-sm space-y-2 ${
+        isError ? 'bg-red-50 border-red-200' : isComplete ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'
+      }`}>
+        <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              isError ? 'bg-red-500' : isComplete ? 'bg-green-500' : 'bg-blue-500'
+            }`}
+            style={{ width: `${updateProgress.percent}%` }}
+          />
+        </div>
+        <p className="text-xs font-medium">{updateProgress.message}</p>
+        {isComplete && updateProgress.backupDir && (
+          <p className="text-[10px] text-muted-foreground">Respaldo: {updateProgress.backupDir}</p>
+        )}
+        {(isComplete || isError) && (
+          <button
+            onClick={() => setUpdateProgress(null)}
+            className="text-xs text-primary underline"
+          >
+            Cerrar
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // ── Lista de versiones disponibles ──
+  const renderVersionList = () => {
+    if (!versionInfo || versionInfo.status !== 'ok' || versionInfo.versions.length === 0) return null;
+
+    return (
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-muted-foreground">
+            Todas las versiones disponibles ({versionInfo.totalVersions})
+          </p>
+          <a
+            href={versionInfo.releasesUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-primary hover:underline"
+          >
+            Ver en GitHub
+          </a>
+        </div>
+
+        <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+          {versionInfo.versions.map((ver) => {
+            const isExpanded = expandedVersion === ver.version;
+            return (
+              <div
+                key={ver.version}
+                className={`rounded-lg border text-xs ${
+                  ver.isCurrent
+                    ? 'bg-blue-50 border-blue-300'
+                    : ver.isNewer
+                      ? 'bg-green-50/50 border-green-200'
+                      : 'bg-muted/30 border-gray-200'
+                }`}
+              >
+                <div
+                  className="flex items-center justify-between p-2.5 cursor-pointer"
+                  onClick={() => setExpandedVersion(isExpanded ? null : ver.version)}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-sm">v{ver.version}</span>
+                    {ver.isCurrent && (
+                      <Badge variant="secondary" className="text-[9px] px-1.5 py-0 bg-blue-200 text-blue-800">Instalada</Badge>
+                    )}
+                    {ver.prerelease && (
+                      <Badge variant="outline" className="text-[9px] px-1.5 py-0">Beta</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-muted-foreground">{ver.dateRelative}</span>
+                    <span className={`text-[10px] ${isExpanded ? 'rotate-180' : ''} transition-transform`}>▼</span>
+                  </div>
+                </div>
+
+                {/* Detalle expandido */}
+                {isExpanded && (
+                  <div className="px-2.5 pb-2.5 space-y-2 border-t border-gray-200/50 pt-2">
+                    {/* Notas de la version */}
+                    {ver.notes && (
+                      <div className="text-xs text-muted-foreground whitespace-pre-wrap bg-white/50 rounded p-2 max-h-[120px] overflow-y-auto">
+                        {ver.notes}
+                      </div>
+                    )}
+
+                    {/* Botones de accion */}
+                    <div className="flex gap-1.5">
+                      {!ver.isCurrent && !updating && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); installVersion(ver); }}
+                          className={`flex-1 text-center rounded-lg px-3 py-2 text-[11px] font-semibold transition-colors ${
+                            ver.isNewer
+                              ? 'bg-green-600 text-white hover:bg-green-700'
+                              : 'bg-orange-500 text-white hover:bg-orange-600'
+                          }`}
+                        >
+                          {ver.isNewer ? 'Actualizar' : 'Restaurar'}
+                        </button>
+                      )}
+                      <a
+                        href={ver.downloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 text-center border border-gray-300 text-gray-700 rounded-lg px-3 py-2 text-[11px] font-semibold hover:bg-gray-50 transition-colors"
+                      >
+                        Descargar ZIP
+                      </a>
+                    </div>
+
+                    {/* Instrucciones local */}
+                    <div className="text-[10px] text-muted-foreground space-y-0.5">
+                      <p className="font-medium">Instalacion manual:</p>
+                      <p>1. Descargue el ZIP</p>
+                      <p>2. Coloquelo en la carpeta del sistema</p>
+                      <p>3. Ejecute ACTUALIZAR.bat (doble clic)</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-3">
+      {/* Boton principal */}
       <Button
         variant="outline"
         className="w-full text-sm"
         onClick={checkVersion}
-        disabled={checking}
+        disabled={checking || updating}
       >
-        {checking ? 'Verificando...' : 'Buscar Actualizaciones'}
+        {checking ? 'Verificando...' : updating ? 'Actualizando en progreso...' : 'Buscar Actualizaciones'}
       </Button>
 
-      {versionInfo && (
+      {/* Estado de error/no conexion */}
+      {renderStatus()}
+
+      {/* Barra de progreso */}
+      {renderProgress()}
+
+      {/* Info de versiones */}
+      {versionInfo && versionInfo.status === 'ok' && (
         <div className={`p-3 rounded-lg border text-sm space-y-2 ${
-          versionInfo.hasUpdate ? 'bg-green-50 border-green-200' : 'bg-muted/50'
+          versionInfo.hasUpdate
+            ? 'bg-green-50 border-green-200'
+            : 'bg-muted/50'
         }`}>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Version instalada:</span>
-            <span className="font-mono font-bold">{versionInfo.localVersion}</span>
+            <span className="font-mono font-bold">v{versionInfo.localVersion}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Version mas reciente:</span>
-            <span className="font-mono font-bold">{versionInfo.latestVersion}</span>
+            <span className="font-mono font-bold">v{versionInfo.latestVersion}</span>
           </div>
 
           {versionInfo.hasUpdate ? (
             <div className="pt-2 space-y-2">
               <p className="font-semibold text-green-700">
-                Hay una nueva version disponible!
+                Hay {versionInfo.versions.filter(v => v.isNewer).length} nueva(s) version(es) disponible(s)!
               </p>
-
-              {/* Barra de progreso si esta actualizando */}
-              {updating && updateProgress && (
-                <div className="space-y-1">
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className="bg-green-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${updateProgress.percent}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">{updateProgress.message}</p>
-                </div>
-              )}
-
-              {!updating && (
-                <div className="space-y-2">
-                  {/* Opcion 1: ONLINE */}
-                  <button
-                    onClick={updateOnline}
-                    className="block w-full text-center bg-green-600 text-white rounded-lg px-3 py-2.5 text-xs font-semibold hover:bg-green-700 transition-colors"
-                  >
-                    Actualizar en Linea (Automatico)
-                  </button>
-                  <p className="text-[9px] text-center text-muted-foreground">
-                    Descarga, instala y migra todo automaticamente. Solo reinicie al final.
-                  </p>
-
-                  {/* Separador */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 border-t border-gray-200" />
-                    <span className="text-[9px] text-muted-foreground">o</span>
-                    <div className="flex-1 border-t border-gray-200" />
-                  </div>
-
-                  {/* Opcion 2: LOCAL (manual) */}
-                  <div className="text-xs space-y-1 text-muted-foreground">
-                    <p className="font-medium">Actualizacion Local (manual):</p>
-                    <ol className="list-decimal list-inside space-y-0.5">
-                      <li>Descargue el ZIP del link de abajo</li>
-                      <li>Coloque el archivo en la carpeta del sistema</li>
-                      <li>Ejecute ACTUALIZAR.bat (doble clic)</li>
-                    </ol>
-                  </div>
-                  <a
-                    href={versionInfo.downloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full text-center border border-green-600 text-green-700 rounded-lg px-3 py-2 text-xs font-semibold hover:bg-green-50 transition-colors"
-                  >
-                    Descargar v{versionInfo.latestVersion} (ZIP)
-                  </a>
-                </div>
+              {!updating && updateProgress?.step !== 'complete' && (
+                <button
+                  onClick={() => {
+                    const latest = versionInfo.versions.find(v => v.isNewer);
+                    if (latest) installVersion(latest);
+                  }}
+                  className="block w-full text-center bg-green-600 text-white rounded-lg px-3 py-2.5 text-xs font-semibold hover:bg-green-700 transition-colors"
+                >
+                  Actualizar a la Ultima Version (Automatico)
+                </button>
               )}
             </div>
           ) : (
             <p className="text-center text-muted-foreground pt-1">
-              Su sistema esta actualizado
+              Su sistema esta en la version mas reciente
             </p>
           )}
         </div>
       )}
+
+      {/* Lista de todas las versiones */}
+      {renderVersionList()}
     </div>
   );
 }

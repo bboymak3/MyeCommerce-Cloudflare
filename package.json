@@ -1,6 +1,6 @@
 {
   "name": "my-ecommerce",
-  "version": "2.9.58",
+  "version": "2.9.63",
   "private": true,
   "scripts": {
     "dev": "next dev",
