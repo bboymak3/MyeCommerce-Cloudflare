@@ -79,7 +79,8 @@ interface VersionEntry {
 }
 
 interface VersionCheckResult {
-  status: 'ok' | 'no_internet' | 'repo_not_found' | 'no_releases' | 'error';
+  status: 'ok' | 'no_internet' | 'repo_not_found' | 'no_releases' | 'local_only' | 'error';
+  source: 'github' | 'local';
   localVersion: string;
   latestVersion: string;
   hasUpdate: boolean;
@@ -265,16 +266,21 @@ function VersionChecker() {
       <div className="mt-3 space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-muted-foreground">
-            Todas las versiones disponibles ({versionInfo.totalVersions})
+            Todas las versiones ({versionInfo.totalVersions})
+            {versionInfo.source === 'local' && (
+              <span className="ml-1 text-[9px] font-normal text-muted-foreground">(archivo local)</span>
+            )}
           </p>
-          <a
-            href={versionInfo.releasesUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] text-primary hover:underline"
-          >
-            Ver en GitHub
-          </a>
+          {versionInfo.source === 'github' && (
+            <a
+              href={versionInfo.releasesUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-primary hover:underline"
+            >
+              Ver en GitHub
+            </a>
+          )}
         </div>
 
         <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">

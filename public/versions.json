@@ -1,0 +1,293 @@
+{
+  "ultimaActualizacion": "2026-08-17",
+  "repositorio": "csglider/MyeCommerce-v2.9.20",
+  "versiones": [
+    {
+      "version": "2.9.63",
+      "nombre": "Sistema de actualizaciones mejorado + Rollback",
+      "notas": "- Sistema de actualizaciones COMPLETAMENTE MEJORADO\n- Ahora usa GitHub Releases API (antes Tags)\n- Lista de TODAS las versiones disponibles\n- Notas de cambios visibles para cada version\n- ROLLBACK: restaurar versiones anteriores con un clic\n- Estados claros: sin internet, repo no encontrado, sin releases\n- Respaldos automaticos con nombre descriptivo\n- Barra de progreso con colores (azul/verde/rojo)\n- Version local corregida a v2.9.63",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.62",
+      "nombre": "Tasa de cambio y UX",
+      "notas": "- Mejoras en el manejo de tasa de cambio BCV\n- Optimizacion de la experiencia de usuario\n- Interfaz mas rapida y fluida\n- Correcciones de bugs menores",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.61",
+      "nombre": "Reportes y gestion",
+      "notas": "- Mejoras en los reportes de ventas\n- Optimizacion del modulo de gestion\n- Mejoras en exportacion de datos\n- Fix en calculos de ganancias\n- Fix en filtros de busqueda",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.60",
+      "nombre": "Catalogo y estabilidad",
+      "notas": "- Mejoras en el catalogo de productos\n- Optimizacion de carga de imagenes\n- Mejoras en la estabilidad general\n- Fix en sincronizacion de datos\n- Correcciones menores de UI",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.59",
+      "nombre": "Mejoras del POS y tickets",
+      "notas": "- Mejoras en el punto de venta (POS)\n- Optimizacion de impresion de tickets\n- Correcciones de interfaz de usuario\n- Fix en calculos de cambio\n- Fix en busqueda de productos",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.58",
+      "nombre": "Sistema de actualizaciones",
+      "notas": "- Sistema de actualizaciones automaticas (online)\n- Sistema de actualizacion local (manual con ACTUALIZAR.bat)\n- Deteccion de version via GitHub API\n- Mejoras generales del sistema\n- Optimizacion de rendimiento",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.57",
+      "nombre": "Optimizaciones y mejoras",
+      "notas": "- Optimizacion del sistema de busqueda\n- Mejoras en la gestion de productos\n- Correcciones de interfaz",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.56",
+      "nombre": "Correcciones de estabilidad",
+      "notas": "- Mejoras generales de estabilidad\n- Optimizacion del rendimiento\n- Correcciones menores",
+      "fecha": "2026-08-17",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.55",
+      "nombre": "Buscador Avanzado + 3 Modos de Tema + Elegancia Visual",
+      "notas": "- Buscador avanzado de productos\n- 3 modos de tema visual\n- Mejoras esteticas generales",
+      "fecha": "2026-08-01",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.54",
+      "nombre": "FIX CRITICO: Presupuestos + Imagenes + Caddy Movil",
+      "notas": "- Fix critico en presupuestos\n- Fix en carga de imagenes\n- Fix en Caddy movil",
+      "fecha": "2026-07-28",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.53",
+      "nombre": "Fix Caddy Movil + Imagenes + Buscador Mejorado",
+      "notas": "- Fix en Caddy movil\n- Fix en subida de imagenes\n- Buscador mejorado",
+      "fecha": "2026-07-25",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.52",
+      "nombre": "Fix Etiquetas + Buscador + Scanner + UX POS",
+      "notas": "- Fix en etiquetas de productos\n- Fix en buscador\n- Fix en scanner de codigos\n- Mejoras UX en POS",
+      "fecha": "2026-07-20",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.51",
+      "nombre": "Fix Caddy Mobile + Upload Imagenes",
+      "notas": "- Fix en Caddy para movil\n- Fix en subida de imagenes",
+      "fecha": "2026-07-15",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.50",
+      "nombre": "Remodelacion Visual Moderna",
+      "notas": "- Nueva interfaz visual moderna\n- Mejoras de diseno en todo el sistema",
+      "fecha": "2026-07-10",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.49",
+      "nombre": "Caddy Movil Independiente (Fix Camera)",
+      "notas": "- Caddy movil independiente\n- Fix en acceso a camara",
+      "fecha": "2026-07-05",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.48.3",
+      "nombre": "Version de parche 48.3",
+      "notas": "- Correcciones menores",
+      "fecha": "2026-06-28",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.48.2",
+      "nombre": "Version de parche 48.2",
+      "notas": "- Correcciones menores",
+      "fecha": "2026-06-25",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.48.1",
+      "nombre": "Version de parche 48.1",
+      "notas": "- Correcciones menores",
+      "fecha": "2026-06-22",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.48",
+      "nombre": "Version 2.9.48",
+      "notas": "- Nuevas funcionalidades\n- Mejoras de rendimiento",
+      "fecha": "2026-06-20",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.47.7",
+      "nombre": "Version de parche 47.7",
+      "notas": "- Correcciones de bugs",
+      "fecha": "2026-06-15",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.47.6",
+      "nombre": "Version de parche 47.6",
+      "notas": "- Correcciones de bugs",
+      "fecha": "2026-06-12",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.47.5",
+      "nombre": "Version de parche 47.5",
+      "notas": "- Correcciones de bugs",
+      "fecha": "2026-06-10",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.47.4",
+      "nombre": "Version de parche 47.4",
+      "notas": "- Correcciones de bugs",
+      "fecha": "2026-06-08",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.47",
+      "nombre": "Version 2.9.47",
+      "notas": "- Mejoras generales del sistema",
+      "fecha": "2026-06-05",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.46",
+      "nombre": "Fix Categorias, Menu Duplicado, POS",
+      "notas": "- Fix en categorias\n- Fix en menu duplicado\n- Fix en POS",
+      "fecha": "2026-05-28",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.45",
+      "nombre": "Version 2.9.45",
+      "notas": "- Mejoras de estabilidad",
+      "fecha": "2026-05-20",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.44",
+      "nombre": "Version 2.9.44",
+      "notas": "- Correcciones menores",
+      "fecha": "2026-05-15",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.43",
+      "nombre": "Version 2.9.43",
+      "notas": "- Mejoras de rendimiento",
+      "fecha": "2026-05-10",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.42",
+      "nombre": "Version 2.9.42",
+      "notas": "- Correcciones de UI",
+      "fecha": "2026-05-05",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.41",
+      "nombre": "Version 2.9.41",
+      "notas": "- Mejoras generales",
+      "fecha": "2026-04-28",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.40",
+      "nombre": "Version 2.9.40",
+      "notas": "- Optimizaciones del sistema",
+      "fecha": "2026-04-20",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.39",
+      "nombre": "Version 2.9.39",
+      "notas": "- Correcciones de bugs",
+      "fecha": "2026-04-15",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.38",
+      "nombre": "Version 2.9.38",
+      "notas": "- Mejoras en el POS",
+      "fecha": "2026-04-10",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.37.1",
+      "nombre": "Version de parche 37.1",
+      "notas": "- Fix critico",
+      "fecha": "2026-04-05",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.37",
+      "nombre": "Version 2.9.37",
+      "notas": "- Nuevas funcionalidades",
+      "fecha": "2026-04-01",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.36",
+      "nombre": "Version 2.9.36",
+      "notas": "- Mejoras de estabilidad",
+      "fecha": "2026-03-25",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.35",
+      "nombre": "Version 2.9.35",
+      "notas": "- Correcciones menores",
+      "fecha": "2026-03-20",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.34",
+      "nombre": "MyeCommerce POS v2.9.34",
+      "notas": "- Mejoras generales del POS",
+      "fecha": "2026-03-15",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.33",
+      "nombre": "Version 2.9.33",
+      "notas": "- Mejoras del sistema",
+      "fecha": "2026-03-10",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.32",
+      "nombre": "Version 2.9.32",
+      "notas": "- Correcciones de bugs",
+      "fecha": "2026-03-05",
+      "tipo": "estable"
+    },
+    {
+      "version": "2.9.31",
+      "nombre": "Version 2.9.31",
+      "notas": "- Mejoras de rendimiento",
+      "fecha": "2026-02-28",
+      "tipo": "estable"
+    }
+  ]
+}
