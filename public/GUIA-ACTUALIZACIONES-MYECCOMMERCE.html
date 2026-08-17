@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=720">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<title>Guia de Actualizaciones - MyeCommerce POS</title>
+<style>
+@page {
+    size: 720px 1020px;
+    margin: 0;
+}
+:root {
+    --c-bg: #f8fafc;
+    --c-dark: #0f172a;
+    --c-accent: #2563eb;
+    --c-green: #16a34a;
+    --c-green-light: #dcfce7;
+    --c-red: #dc2626;
+    --c-red-light: #fee2e2;
+    --c-amber: #d97706;
+    --c-amber-light: #fef3c7;
+    --c-text: #1e293b;
+    --c-muted: #64748b;
+    --c-border: #e2e8f0;
+    --c-card: #ffffff;
+}
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 720px;
+    background: var(--c-bg);
+    color: var(--c-text);
+    font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+}
+@media screen {
+    html {
+        height: auto;
+        display: flex;
+        justify-content: center;
+        background: #e2e8f0;
+    }
+    body {
+        margin: 20px auto;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    }
+}
+.cover {
+    width: 720px;
+    height: 1020px;
+    box-sizing: border-box;
+    background: var(--c-dark);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 80px 70px;
+    break-after: page;
+}
+.cover .version-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+.cover .badge { margin-bottom: 0; }
+.cover .title { margin-bottom: 0; }
+.cover .subtitle { margin-bottom: 0; }
+.cover .version-badge { margin-top: 0; }
+.cover-badge {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--c-accent);
+    margin-bottom: 40px;
+    position: relative;
+    z-index: 1;
+}
+.cover-title {
+    font-size: 42px;
+    font-weight: 900;
+    color: #ffffff;
+    text-align: center;
+    line-height: 1.1;
+    margin-bottom: 28px;
+    position: relative;
+    z-index: 1;
+}
+.cover-subtitle {
+    font-size: 16px;
+    color: #94a3b8;
+    text-align: center;
+    font-weight: 300;
+    max-width: 480px;
+    line-height: 1.8;
+    position: relative;
+    z-index: 1;
+}
+.cover-version {
+    display: inline-block;
+    background: rgba(37, 99, 235, 0.2);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    color: #60a5fa;
+    margin-top: 32px;
+    position: relative;
+    z-index: 1;
+}
+.cover-footer {
+    position: absolute;
+    bottom: 50px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: #475569;
+    letter-spacing: 1px;
+    z-index: 1;
+}
+.main-content {
+    padding: 50px 60px 40px 60px;
+}
+.chapter-header {
+    break-after: avoid;
+    break-inside: avoid;
+    margin-top: 28px;
+    margin-bottom: 4px;
+}
+.section-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--c-accent);
+    margin-bottom: 6px;
+}
+.section-title {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--c-dark);
+    margin-bottom: 8px;
+    line-height: 1.2;
+}
+.divider {
+    width: 50px;
+    height: 3px;
+    background: var(--c-accent);
+    border-radius: 2px;
+    margin-bottom: 18px;
+}
+.body-text {
+    margin-bottom: 14px;
+    color: var(--c-text);
+    font-size: 13px;
+    line-height: 1.7;
+}
+.body-text strong {
+    font-weight: 700;
+    color: var(--c-dark);
+}
+.card {
+    background: var(--c-card);
+    border: 1px solid var(--c-border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    break-inside: avoid;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.card-green { border-left: 4px solid var(--c-green); background: var(--c-green-light); }
+.card-red { border-left: 4px solid var(--c-red); background: var(--c-red-light); }
+.card-amber { border-left: 4px solid var(--c-amber); background: var(--c-amber-light); }
+.card-blue { border-left: 4px solid var(--c-accent); background: #eff6ff; }
+.card-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; color: var(--c-dark); }
+.card-body { font-size: 12px; color: var(--c-text); line-height: 1.6; }
+.screenshot {
+    background: #ffffff;
+    border: 2px solid var(--c-border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    break-inside: avoid;
+}
+.screenshot-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--c-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+.mockup-window {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow: hidden;
+}
+.mockup-titlebar {
+    background: #e2e8f0;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mockup-dot { width: 8px; height: 8px; border-radius: 50%; }
+.mockup-dot-red { background: #ef4444; }
+.mockup-dot-yellow { background: #eab308; }
+.mockup-dot-green { background: #22c55e; }
+.mockup-titletext { flex: 1; text-align: center; font-size: 10px; color: var(--c-muted); font-weight: 500; }
+.mockup-content { padding: 14px; min-height: 80px; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+.compare-col { background: var(--c-card); border: 1px solid var(--c-border); border-radius: 8px; padding: 16px; break-inside: avoid; }
+.compare-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid var(--c-border); }
+.compare-col:first-child .compare-title { color: var(--c-green); border-bottom-color: var(--c-green); }
+.compare-col:last-child .compare-title { color: var(--c-accent); border-bottom-color: var(--c-accent); }
+.compare-item { font-size: 11px; color: var(--c-text); padding: 3px 0; display: flex; gap: 6px; align-items: flex-start; }
+.compare-icon { flex-shrink: 0; font-weight: 700; }
+.info-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 12px 0; break-inside: avoid; }
+.info-table th { background: var(--c-dark); color: #fff; padding: 8px 12px; text-align: left; font-weight: 600; font-size: 11px; }
+.info-table td { padding: 7px 12px; border-bottom: 1px solid var(--c-border); color: var(--c-text); }
+.info-table tr:nth-child(even) td { background: #f8fafc; }
+.highlight { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 16px; margin: 10px 0; break-inside: avoid; }
+.highlight-title { font-size: 12px; font-weight: 700; color: var(--c-accent); margin-bottom: 4px; }
+.highlight-body { font-size: 11px; color: var(--c-text); line-height: 1.5; }
+.path-box { background: #1e293b; color: #e2e8f0; font-family: 'Courier New', monospace; font-size: 12px; padding: 10px 16px; border-radius: 6px; margin: 8px 0; word-break: break-all; }
+.path-label { font-size: 10px; color: var(--c-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.progress-bar { width: 100%; height: 16px; background: #e2e8f0; border-radius: 8px; overflow: hidden; margin: 6px 0; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #16a34a, #22c55e); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; }
+.flow-box { background: var(--c-card); border: 2px solid var(--c-accent); border-radius: 8px; padding: 10px 16px; text-align: center; font-size: 11px; font-weight: 600; color: var(--c-accent); margin: 6px 0; }
+.flow-arrow { text-align: center; font-size: 18px; color: var(--c-muted); line-height: 1; padding: 2px 0; }
+.flow-row { display: flex; gap: 8px; align-items: center; justify-content: center; margin: 6px 0; }
+.flow-box-sm { background: var(--c-card); border: 1px solid var(--c-border); border-radius: 6px; padding: 8px 10px; text-align: center; font-size: 10px; font-weight: 500; color: var(--c-text); flex: 1; }
+.flow-arrow-h { font-size: 14px; color: var(--c-muted); flex-shrink: 0; }
+.ending {
+    width: 720px;
+    height: 1020px;
+    box-sizing: border-box;
+    background: var(--c-dark);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 80px;
+    text-align: center;
+    break-before: page;
+    overflow: hidden;
+}
+.ending-title { font-size: 32px; font-weight: 800; color: #fff; margin-bottom: 16px; }
+.ending-text { font-size: 14px; color: #94a3b8; max-width: 420px; line-height: 1.7; }
+.ending-badge { margin-top: 30px; display: inline-block; padding: 8px 24px; border: 1px solid rgba(37, 99, 235, 0.3); border-radius: 24px; font-size: 12px; color: #60a5fa; }
+</style>
+</head>
+<body>
+<div class="cover">
+    <div class="cover-badge">Guia de Usuario</div>
+    <div class="cover-title">Actualizaciones del Sistema</div>
+    <div class="cover-subtitle">Guia completa paso a paso para mantener su sistema MyeCommerce POS siempre actualizado, con metodos online automaticos y local manual.</div>
+    <div class="cover-version">Version 2.9.58+</div>
+</div>
+<div class="main-content">
+    <div class="chapter-header">
+        <div class="section-tag">Introduccion</div>
+        <div class="section-title">Como funcionan las actualizaciones</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">MyeCommerce POS tiene un sistema de actualizaciones integrado que le permite mantener su software siempre al dia con las ultimas mejoras, correcciones de errores y nuevas funciones. Existen <strong>dos metodos</strong> para actualizar: uno automatico (online) y uno manual (local). Ambos metodos son seguros y crean un respaldo de su base de datos antes de realizar cualquier cambio.</div>
+    <div class="card card-green">
+        <div class="card-title">Lo que se preserva siempre</div>
+        <div class="card-body">Independientemente del metodo que elija, la actualizacion NUNCA borra sus datos. Se preservan: la base de datos (prisma/dev.db), las imagenes de productos (data/uploads/), los respaldos anteriores (BACKUPS/), y el archivo caddy.exe si lo usa. Solo se reemplazan los archivos del programa (src/, public/, scripts .bat).</div>
+    </div>
+    <div class="compare-grid">
+        <div class="compare-col">
+            <div class="compare-title">Online (Automatico)</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Se hace desde la app, 2 clicks</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Descarga, instala y migra solo</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Requiere conexion a internet</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Barra de progreso visual</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Respaldo automatico</div>
+        </div>
+        <div class="compare-col">
+            <div class="compare-title">Local (Manual)</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> No necesita internet</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Descargar ZIP manualmente</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Colocar archivo en carpeta</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Ejecutar ACTUALIZAR.bat</div>
+            <div class="compare-item"><span class="compare-icon">&#10003;</span> Respaldo automatico</div>
+        </div>
+    </div>
+
+    <div class="chapter-header">
+        <div class="section-tag">Metodo 1</div>
+        <div class="section-title">Actualizacion Online (Automatica)</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">Este es el metodo <strong>recomendado</strong>. Todo se hace desde dentro de la aplicacion, sin necesidad de descargar archivos ni usar programas externos. La app se conecta a GitHub, descarga la nueva version, la instala y migra la base de datos automaticamente. Solo necesita hacer click en dos botones y esperar.</div>
+    <div class="card card-blue">
+        <div class="card-title">Requisitos previos</div>
+        <div class="card-body">La PC servidor debe tener conexion a internet activa. No necesita descargar nada manualmente. Asegurese de que no hay ventas en proceso antes de iniciar la actualizacion. La actualizacion tarda entre 2 y 5 minutos dependiendo de la velocidad de internet.</div>
+    </div>
+
+    <div class="screenshot">
+        <div class="screenshot-title">Paso 1: Abrir la seccion de Soporte</div>
+        <div class="mockup-window">
+            <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <div class="mockup-titletext">MyeCommerce POS - Configuracion</div>
+            </div>
+            <div class="mockup-content" style="font-size:11px;">
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:12px; margin-bottom:8px;">
+                    <div style="font-weight:700; margin-bottom:4px; color:#1e293b;">Paso a paso:</div>
+                    <div style="color:#64748b; font-size:11px;">1. Haga click en la pestana <strong>"Configuracion"</strong> en el menu lateral izquierdo.<br>2. Desplaze hacia abajo hasta encontrar la seccion <strong>"Soporte"</strong>.<br>3. Alli vera el boton <strong>"Buscar Actualizaciones"</strong>.</div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <div style="flex:1; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:10px; text-align:center; font-size:10px; color:#64748b;">Pestana Configuracion<br><strong style="color:#2563eb;">&lt;- Click aqui</strong></div>
+                    <div style="font-size:16px; color:#94a3b8;">-&gt;</div>
+                    <div style="flex:1; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:10px; text-align:center; font-size:10px; color:#64748b;">Seccion Soporte<br><strong style="color:#2563eb;">&lt;- Desplazar</strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="screenshot">
+        <div class="screenshot-title">Paso 2: Buscar y ver Actualizaciones</div>
+        <div class="mockup-window">
+            <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <div class="mockup-titletext">Buscar Actualizaciones</div>
+            </div>
+            <div class="mockup-content" style="font-size:11px;">
+                <div style="text-align:center; margin-bottom:10px;"><div style="display:inline-block; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:10px 40px; font-weight:600; color:#1e293b; font-size:13px;">[ Buscar Actualizaciones ]</div></div>
+                <div style="text-align:center; color:#64748b; font-size:10px; margin-bottom:12px;">&lt;- Click en este boton</div>
+                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:14px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span style="color:#64748b; font-size:11px;">Version instalada:</span><span style="font-weight:700; font-family:monospace;">2.9.58</span></div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:6px;"><span style="color:#64748b; font-size:11px;">Version mas reciente:</span><span style="font-weight:700; font-family:monospace;">2.9.90</span></div>
+                    <div style="border-top:1px solid #bbf7d0; padding-top:8px; margin-top:4px;">
+                        <div style="font-weight:700; color:#16a34a; font-size:12px; margin-bottom:8px;">Hay una nueva version disponible!</div>
+                        <div style="background:#16a34a; color:#fff; text-align:center; padding:10px; border-radius:6px; font-weight:600; font-size:12px; margin-bottom:6px;">Actualizar en Linea (Automatico)</div>
+                        <div style="text-align:center; font-size:10px; color:#64748b;">Descarga, instala y migra todo automaticamente</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="screenshot">
+        <div class="screenshot-title">Paso 3: Barra de Progreso</div>
+        <div class="mockup-window">
+            <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <div class="mockup-titletext">Actualizando...</div>
+            </div>
+            <div class="mockup-content" style="font-size:11px;">
+                <div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:10px; color:#64748b; margin-bottom:4px;"><span>Verificando sistema...</span><span>10%</span></div><div class="progress-bar"><div class="progress-fill" style="width:10%;">10%</div></div></div>
+                <div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:10px; color:#64748b; margin-bottom:4px;"><span>Descargando v2.9.90...</span><span>35%</span></div><div class="progress-bar"><div class="progress-fill" style="width:35%;">35%</div></div></div>
+                <div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:10px; color:#64748b; margin-bottom:4px;"><span>Extrayendo archivos...</span><span>60%</span></div><div class="progress-bar"><div class="progress-fill" style="width:60%;">60%</div></div></div>
+                <div style="margin-bottom:10px;"><div style="display:flex; justify-content:space-between; font-size:10px; color:#64748b; margin-bottom:4px;"><span>Migrando base de datos...</span><span>85%</span></div><div class="progress-bar"><div class="progress-fill" style="width:85%;">85%</div></div></div>
+                <div style="margin-bottom:8px;"><div style="display:flex; justify-content:space-between; font-size:10px; color:#64748b; margin-bottom:4px;"><span style="color:#16a34a; font-weight:700;">Completado!</span><span>100%</span></div><div class="progress-bar"><div class="progress-fill" style="width:100%;">100%</div></div></div>
+                <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:10px; text-align:center; color:#16a34a; font-weight:600; font-size:12px;">Actualizado a v2.9.90! Reinicie el sistema.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-amber">
+        <div class="card-title">Paso final: Reiniciar el sistema (IMPORTANTE)</div>
+        <div class="card-body">Despues de la actualizacion, debe reiniciar para que los cambios surtan efecto:<br><br><strong>1.</strong> Ejecute: <code>DETENER-TODO.bat</code><br><strong>2.</strong> Espere 5 segundos<br><strong>3.</strong> Ejecute: <code>INICIAR-TODO-OCULTO.vbs</code><br><strong>4.</strong> Espere 10-15 segundos<br><strong>5.</strong> Abra: <code>http://localhost:3000</code><br><strong>6.</strong> Verifique la version en Configuracion &gt; Soporte</div>
+    </div>
+
+    <div class="highlight">
+        <div class="highlight-title">Diagrama de flujo: Actualizacion Online</div>
+        <div class="highlight-body">
+            <div class="flow-box" style="font-size:12px;">Click en "Buscar Actualizaciones"</div>
+            <div class="flow-arrow">&#9660;</div>
+            <div class="flow-box">La app consulta GitHub</div>
+            <div class="flow-arrow">&#9660;</div>
+            <div class="flow-box">Muestra boton verde "Actualizar en Linea"</div>
+            <div class="flow-arrow">&#9660;</div>
+            <div class="flow-row">
+                <div class="flow-box-sm">Respaldar BD</div>
+                <div class="flow-arrow-h">&#8594;</div>
+                <div class="flow-box-sm">Descargar ZIP</div>
+                <div class="flow-arrow-h">&#8594;</div>
+                <div class="flow-box-sm">Extraer</div>
+                <div class="flow-arrow-h">&#8594;</div>
+                <div class="flow-box-sm">Migrar BD</div>
+            </div>
+            <div class="flow-arrow">&#9660;</div>
+            <div class="flow-box" style="background:var(--c-green-light); border-color:var(--c-green); color:var(--c-green);">Completado! Reinicie.</div>
+        </div>
+    </div>
+
+    <div class="chapter-header">
+        <div class="section-tag">Metodo 2</div>
+        <div class="section-title">Actualizacion Local (Manual)</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">Use este metodo si la PC servidor <strong>no tiene internet</strong> o si prefiere tener control manual sobre el proceso. Necesita descargar un archivo ZIP desde otra PC con internet, copiarlo a la PC servidor, y ejecutar un script de actualizacion.</div>
+
+    <div class="card card-blue">
+        <div class="card-title">Paso 1: Descargar el archivo ZIP</div>
+        <div class="card-body"><strong>Desde una PC con internet:</strong><br>1. Abra MyeCommerce en cualquier navegador<br>2. Vaya a Configuracion &gt; Soporte<br>3. Click en "Buscar Actualizaciones"<br>4. Click en el boton: <strong>"Descargar v2.9.90 (ZIP)"</strong><br><br><strong>Nombre del archivo que se descarga:</strong><br><div class="path-box" style="font-size:11px;">MyeCommerce-v2.9.20-v2.9.90.zip</div><strong>Formato:</strong> Archivo ZIP (carpeta comprimida)<br><strong>Tamano aproximado:</strong> 15 a 25 MB</div>
+    </div>
+
+    <div class="card card-blue">
+        <div class="card-title">Paso 2: Copiar el archivo a la PC servidor</div>
+        <div class="card-body">Copie el archivo ZIP a la carpeta de MyeCommerce:<br><br><div class="path-label">Carpeta del sistema:</div><div class="path-box">C:\MyeCommerce\</div><br><div class="path-label">Destino:</div><div class="path-box">C:\MyeCommerce\MyeCommerce-v2.9.20-v2.9.90.zip</div><br>Puede usar memoria USB, compartido de red, etc. Lo importante es que el ZIP quede <strong>dentro de la carpeta MyeCommerce</strong>, al mismo nivel que los demas archivos.</div>
+    </div>
+
+    <div class="screenshot">
+        <div class="screenshot-title">Como debe quedar la carpeta</div>
+        <div class="mockup-window">
+            <div class="mockup-titlebar">
+                <div class="mockup-dot mockup-dot-red"></div>
+                <div class="mockup-dot mockup-dot-yellow"></div>
+                <div class="mockup-dot mockup-dot-green"></div>
+                <div class="mockup-titletext">C:\MyeCommerce\</div>
+            </div>
+            <div class="mockup-content" style="font-size:11px; font-family:monospace;">
+                <div style="padding:8px; background:#f8fafc; border-radius:4px; border:1px solid #e2e8f0;">
+                    <div style="color:#2563eb;">ACTUALIZAR.bat &lt;- EJECUTAR ESTO</div>
+                    <div style="color:#64748b;">ACTUALIZAR.vbs</div>
+                    <div style="color:#64748b;">INICIAR-TODO.bat</div>
+                    <div style="color:#64748b;">INICIAR-TODO-OCULTO.vbs</div>
+                    <div style="color:#64748b;">INSTALAR.bat</div>
+                    <div style="color:#64748b;">package.json</div>
+                    <div style="color:#64748b;">src/ (carpeta)</div>
+                    <div style="color:#64748b;">prisma/ (carpeta)</div>
+                    <div style="color:#16a34a; font-weight:700; background:#f0fdf4; padding:2px 6px; border-radius:3px;">MyeCommerce-v2.9.20-v2.9.90.zip &lt;- EL ARCHIVO</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card card-blue">
+        <div class="card-title">Paso 3: Ejecutar ACTUALIZAR.bat</div>
+        <div class="card-body">Haga <strong>doble clic</strong> en <code>ACTUALIZAR.bat</code>. El script mostrara el progreso:<br><br><div class="path-box" style="font-size:10px;">PASO 1/8: Verificando sistema...<br>PASO 2/8: Version actual: 2.9.58<br>PASO 3/8: Creando respaldo...<br>PASO 4/8: Buscando archivo ZIP...<br>PASO 5/8: Extrayendo archivos...<br>PASO 6/8: Copiando archivos nuevos...<br>PASO 7/8: Ejecutando npm install...<br>PASO 8/8: Migrando base de datos...<br>ACTUALIZACION COMPLETADA exitosamente!</div><br>Espere a que termine (3-8 minutos). Al finalizar, presione cualquier tecla para cerrar.</div>
+    </div>
+
+    <div class="card card-amber">
+        <div class="card-title">Paso 4: Reiniciar</div>
+        <div class="card-body">Igual que el metodo online:<br><strong>1.</strong> <code>DETENER-TODO.bat</code> &rarr; espere 5s<br><strong>2.</strong> <code>INICIAR-TODO-OCULTO.vbs</code> &rarr; espere 15s<br><strong>3.</strong> Abrir <code>http://localhost:3000</code><br><strong>4.</strong> Verificar version en Configuracion &gt; Soporte</div>
+    </div>
+
+    <div class="chapter-header">
+        <div class="section-tag">Informacion Importante</div>
+        <div class="section-title">Que se hace con sus datos</div>
+        <div class="divider"></div>
+    </div>
+    <div class="body-text">Ambos metodos crean un <strong>respaldo automatico</strong> antes de hacer cualquier cambio. Este respaldo se guarda en una carpeta con la fecha y version.</div>
+    <table class="info-table">
+        <thead><tr><th>Elemento</th><th>Accion</th><th>Por que</th></tr></thead>
+        <tbody>
+            <tr><td>Base de datos (dev.db)</td><td style="color:var(--c-green); font-weight:700;">SE PRESERVA</td><td>Tiene sus productos, ventas, clientes</td></tr>
+            <tr><td>Imagenes (data/uploads/)</td><td style="color:var(--c-green); font-weight:700;">SE PRESERVA</td><td>Archivos unicos que no vienen en el ZIP</td></tr>
+            <tr><td>Respaldos (BACKUPS/)</td><td style="color:var(--c-green); font-weight:700;">SE PRESERVA</td><td>Sus respaldos quedan intactos</td></tr>
+            <tr><td>Codigo fuente (src/)</td><td style="color:var(--c-accent); font-weight:700;">SE REEMPLAZA</td><td>Es el codigo actualizado</td></tr>
+            <tr><td>Scripts (.bat, .vbs)</td><td style="color:var(--c-accent); font-weight:700;">SE REEMPLAZA</td><td>Pueden tener mejoras</td></tr>
+            <tr><td>package.json</td><td style="color:var(--c-accent); font-weight:700;">SE REEMPLAZA</td><td>Nueva version y dependencias</td></tr>
+            <tr><td>Schema BD (schema.prisma)</td><td style="color:var(--c-accent); font-weight:700;">SE REEMPLAZA</td><td>Nuevas tablas o campos</td></tr>
+            <tr><td>caddy.exe</td><td style="color:var(--c-green); font-weight:700;">SE PRESERVA</td><td>Archivo binario externo</td></tr>
+        </tbody>
+    </table>
+    <div class="highlight">
+        <div class="highlight-title">Donde queda el respaldo?</div>
+        <div class="highlight-body">
+            <div class="path-label">Carpeta de respaldo (ejemplo):</div>
+            <div class="path-box" style="font-size:11px;">C:\MyeCommerce\BACKUP_AUTO_v2.9.58_2026-08-17_1430\</div><br>
+            Dentro encontrara copias de: <strong>dev.db</strong>, <strong>schema.prisma</strong> y <strong>uploads/</strong>.<br>
+            Si algo sale mal, restaure copiando estos archivos a sus posiciones originales.
+        </div>
+    </div>
+
+    <div class="chapter-header">
+        <div class="section-tag">Solucion de Problemas</div>
+        <div class="section-title">Que hacer si algo falla</div>
+        <div class="divider"></div>
+    </div>
+    <div class="card card-red">
+        <div class="card-title">"Error al descargar: HTTP 404"</div>
+        <div class="card-body">La version no existe en GitHub. Verifique el numero de version. Puede que la etiqueta tenga formato diferente. Vuelva a buscar actualizaciones.</div>
+    </div>
+    <div class="card card-red">
+        <div class="card-title">"database is locked"</div>
+        <div class="card-body">Hay otro proceso usando la base de datos. Cierre la app completamente (DETENER-TODO.bat) antes de actualizar. Asegurese de que no quedan ventanas del navegador abiertas.</div>
+    </div>
+    <div class="card card-amber">
+        <div class="card-title">La actualizacion quedo a la mitad</div>
+        <div class="card-body">No se preocupe. El respaldo automatico esta seguro. Los archivos viejos estan en BACKUP_AUTO. Puede restaurar copiando los archivos del respaldo, o intentar la actualizacion de nuevo.</div>
+    </div>
+    <div class="card card-amber">
+        <div class="card-title">Despues de actualizar, la app no carga</div>
+        <div class="card-body">Ejecute <code>INSTALAR.bat</code> para reinstalar dependencias. Luego <code>INICIAR-TODO-OCULTO.vbs</code>. Si persiste, restaure dev.db desde el respaldo.</div>
+    </div>
+</div>
+<div class="ending">
+    <div class="ending-title">Listo para actualizar</div>
+    <div class="ending-text">Con esta guia tiene todo lo necesario para mantener su sistema MyeCommerce POS siempre actualizado. El metodo online es mas rapido, el metodo local funciona sin internet. Ambos son seguros.</div>
+    <div class="ending-badge">Soporte: valenciamundonet@gmail.com</div>
+</div>
+</body>
+</html>
