@@ -1,0 +1,633 @@
+================================================================================
+  PLAN DE IMPLEMENTACION: SISTEMA DE IMPRESION MULTICAJA POR LAN
+  MyeCommerce POS — Inversiones Valencia Mundonet FP
+================================================================================
+  Fecha de planificacion: 2026-08-17
+  Estado: PENDIENTE DE IMPLEMENTACION
+  Prioridad: ALTA (solicitud del cliente para部署 multi-caja)
+
+================================================================================
+  1. CONTEXTO Y OBJETIVO
+================================================================================
+
+El cliente tiene 4 cajas de punto de venta, cada una con su propia impresora
+termica conectada por USB. Todas las PCs estan conectadas por LAN a un router
+con DHCP (IPs dinamicas). Necesita que:
+
+  - La app y base de datos esten en un servidor central
+  - Cada caja acceda por navegador (Chrome) al servidor
+  - Cada caja imprima en SU PROPIA impresora conectada localmente
+  - Todo sea LO MAS AUTOMATICO POSIBLE (cero configuracion manual)
+  - Se vea profesional ante el cliente (configuracion visual, intuitiva)
+
+================================================================================
+  2. ARQUITECTURA FINAL ELEGIDA: SOLUCION 3 HIBRIDA + AUTO-DETECCION
+================================================================================
+
+  SERVIDOR CENTRAL
+  ┌─────────────────────────────────────────────────┐
+  │  MyeCommerce (Next.js) puerto 3000               │
+  │  Base de datos SQLite (prisma/dev.db)            │
+  │  SIN agente de impresion                          │
+  │  SIN impresora conectada                         │
+  │  IP: asignada por DHCP (ej: 192.168.1.100)       │
+  └──────────────────┬──────────────────────────────┘
+                     │
+                     │ LAN (navegadores Chrome)
+                     │
+      ┌──────────────┼──────────────┬──────────────┐
+      │              │              │              │
+┌─────┴──────┐ ┌────┴─────┐ ┌─────┴─────┐ ┌─────┴─────┐
+│  CAJA 1    │ │  CAJA 2   │ │  CAJA 3   │ │  CAJA 4   │
+│            │ │           │ │           │ │           │
+│ Chrome     │ │ Chrome    │ │ Chrome    │ │ Chrome    │
+│ → servidor │ │ → servidor│ │ → servidor│ │ → servidor│
+│            │ │           │ │           │ │           │
+│ Agente     │ │ Agente    │ │ Agente    │ │ Agente    │
+│ :9100      │ │ :9100     │ │ :9100     │ │ :9100     │
+│            │ │           │ │           │ │           │
+│ Impresora  │ │ Impresora │ │ Impresora │ │ Impresora │
+│ USB local  │ │ USB local │ │ USB local │ │ USB local │
+└────────────┘ └───────────┘ └───────────┘ └───────────┘
+
+================================================================================
+  3. FLUJO DE IMPRESION DETALLADO
+================================================================================
+
+  PASO 1: Caja arranca y abre navegador
+    ↓
+  PASO 2: App detecta IP automaticamente
+    GET /api/local-ip → devuelve la IP del navegador (ej: 192.168.1.11)
+    ↓
+  PASO 3: App prueba si hay agente local
+    fetch("http://192.168.1.11:9100/status") → si responde, agente local OK
+    ↓
+  PASO 4: Si agente detectado → se guarda automaticamente
+    localStorage: { agentUrl: "http://192.168.1.11:9100", autoDetected: true }
+    ↓
+  PASO 5: Vendedor hace venta y pulsa "Imprimir"
+    ↓
+  PASO 6: ticket-printer.ts genera buffer ESC/POS (base64)
+    ↓
+  PASO 7: POST /api/print-agent
+    body: {
+      action: "print",
+      data: "base64...",
+      agentUrl: "http://192.168.1.11:9100"  ← IP auto-detectada
+    }
+    ↓
+  PASO 8: Proxy del servidor redirige al agente de ESA caja
+    fetch("http://192.168.1.11:9100/print", { data: base64... })
+    ↓
+  PASO 9: Agente local recibe bytes → winspool.drv → impresora USB
+    ↓
+  PASO 10: Ticket sale por la impresora de la Caja 1
+
+================================================================================
+  4. SISTEMA DE DETECCION AUTOMATICA (3 MODOS)
+================================================================================
+
+  MODO 1: AUTOMATICO (principal — cero configuracion)
+  ─────────────────────────────────────────────────
+  - Al cargar la app, se llama a /api/local-ip
+  - Se obtiene la IP del navegador cliente
+  - Se intenta conectar a http://{IP}:9100/status
+  - Si responde → agente detectado automaticamente
+  - Se guarda en localStorage con flag autoDetected: true
+  - Cada vez que se imprime, se verifica que el agente siga activo
+  - Si la IP cambia por DHCP, al recargar se detecta la nueva IP
+  - SIEMPRE funciona sin importar cuantas veces cambie la IP
+
+  MODO 2: POR NOMBRE DE EQUIPO (fallback 1)
+  ─────────────────────────────────────────────────
+  - Si la auto-deteccion por IP falla
+  - Se intenta resolver el nombre de la PC via NetBIOS/mDNS
+  - Se usa: http://{NOMBRE-PC}:9100
+  - El nombre de PC viene del sistema operativo Windows
+  - No cambia con DHCP
+  - Se configura con un campo visual: nombre de la PC
+
+  MODO 3: IP MANUAL (fallback 2 — ultimo recurso)
+  ─────────────────────────────────────────────────
+  - Campo donde el usuario escribe la IP a mano
+  - Solo si los 2 modos anteriores fallan
+  - Se muestra un aviso de que es modo manual
+
+  LOGICA DE PRIORIDAD:
+  1. Intenta auto-detect (IP local) → si funciona, usa este
+  2. Si falla, intenta por nombre de equipo → si funciona, usa este
+  3. Si falla, muestra configuracion manual
+  4. Siempre muestra estado visual del agente (verde/rojo)
+
+================================================================================
+  5. ARCHIVOS QUE SE MODIFICAN
+================================================================================
+
+  5.1. src/app/api/print-agent/route.ts
+  ─────────────────────────────────────────
+  ACTUALMENTE:
+    - GET: redirige a http://localhost:9100/status o /printers
+    - POST: redirige a http://localhost:9100/print o /detect
+    - AGENTE_BASE = 'http://localhost:9100' (hardcodeado)
+
+  CAMBIOS NECESARIOS:
+    - POST: leer "agentUrl" del body
+    - Si agentUrl viene en el body → usar esa URL en lugar de localhost
+    - Si no viene → fallback a localhost (compatibilidad mono-pc)
+    - Agregar validacion: la agentUrl debe estar en rango LAN privado
+      (192.168.x.x, 10.x.x.x, 172.16-31.x.x) para evitar SSRF
+    - Agregar headers CORS para que el navegador pueda llamar directamente
+      al agente local (modo directo opcional)
+
+  5.2. src/app/api/local-ip/route.ts
+  ─────────────────────────────────────────
+  ACTUALMENTE: ya existe, devuelve la IP del cliente
+  Verificar que funciona correctamente y devuelve IPv4 LAN
+
+  POSIBLE MEJORA:
+    - Ademas de la IP, devolver el hostname del cliente
+    - Usar req.headers['x-forwarded-for'] como fallback
+    - Devolver tambien un "agentTestUrl" sugerido:
+      { ip: "192.168.1.11", hostname: "CAJA-1", suggestedAgentUrl: "http://192.168.1.11:9100" }
+
+  5.3. src/lib/ticket-printer.ts
+  ─────────────────────────────────────────
+  ACTUALMENTE:
+    - agentUrl siempre es "/api/print-agent" (proxy local)
+    - printViaEscposAgent() envia al proxy del servidor
+
+  CAMBIOS NECESARIOS:
+    - printViaEscposAgent() debe enviar la agentUrl detectada en el body
+    - Leer la agentUrl desde localStorage o estado de la app
+    - Si no hay agentUrl → fallback a "/api/print-agent" (modo actual)
+
+  5.4. src/components/config-tab.tsx
+  ─────────────────────────────────────────
+  ACTUALMENTE:
+    - Tiene toggle "Usar agente de impresion local"
+    - Tiene campo de URL del agente (localhost:9100)
+    - Tiene boton "Probar conexion"
+
+  CAMBIOS NECESARIOS:
+    - Reemplazar campo de URL con sistema de deteccion automatica
+    - Agregar componente visual de estado del agente:
+      - Indicador verde/rojo grande
+      - Nombre de la impresora detectada
+      - IP detectada (o "No detectado")
+      - Boton "Auto-detectar" prominent
+      - Opcion "Configurar manualmente" como link secundario
+    - El auto-detect se ejecuta al cargar la pagina de configuracion
+    - Guardar en localStorage: { agentUrl, mode: 'auto'|'hostname'|'manual' }
+
+  NUEVO COMPONENTE: AgentDetector (o integrado en config-tab)
+  ┌────────────────────────────────────────────────────────┐
+  │  IMPRESORA TERMICA                                       │
+  │                                                          │
+  │  ┌──────────────────────────────────────────────────┐   │
+  │  │  🟢 AGENTE DETECTADO                             │   │
+  │  │                                                    │   │
+  │  │  Impresora: POS-80 USB                           │   │
+  │  │  Direccion: 192.168.1.11:9100                    │   │
+  │  │  Modo: Automatico                                │   │
+  │  │  Ultima impresion: hace 3 minutos               │   │
+  │  └──────────────────────────────────────────────────┘   │
+  │                                                          │
+  │  [Re-detectar]                                          │
+  │                                                          │
+  │  ─ ─ ─ ─ ─ ─ ─ ─ o opciones avanzadas ─ ─ ─ ─ ─ ─    │
+  │                                                          │
+  │  Nombre del equipo: [CAJA-1                    ]         │
+  │  IP manual: [                                     ]     │
+  │                                                          │
+  └────────────────────────────────────────────────────────┘
+
+  5.5. printer-agent/agent.js
+  ─────────────────────────────────────────
+  ACTUALMENTE:
+    - Escucha en 0.0.0.0:9100 (ya acepta conexiones de la LAN)
+    - Tiene CORS: Access-Control-Allow-Origin: *
+    - Detecta impresoras via Win32_Printer
+
+  CAMBIOS NECESARIOS (minimos):
+    - Ya funciona para la Solucion 3 tal como esta
+    - Opcional: agregar endpoint GET /info que devuelva:
+      { name: "Caja 1", ip: "192.168.1.11", printer: "POS-80 USB", hostname: "CAJA-1" }
+    - Esto permite que el navegador descubra info del agente
+
+  5.6. Archivo nuevo: src/lib/agent-detector.ts
+  ─────────────────────────────────────────
+  LOGICA DE DETECCION:
+  
+  export interface AgentInfo {
+    url: string;           // "http://192.168.1.11:9100"
+    mode: 'auto' | 'hostname' | 'manual';
+    printer: string;       // "POS-80 USB"
+    hostname: string;      // "CAJA-1"
+    ip: string;            // "192.168.1.11"
+    online: boolean;
+    lastCheck: Date;
+  }
+
+  // Deteccion automatica
+  export async function detectAgent(): Promise<AgentInfo | null> {
+    // 1. Obtener IP del navegador
+    const localIp = await fetch('/api/local-ip').then(r => r.json());
+    
+    // 2. Probar agente local en esa IP
+    const testUrl = `http://${localIp.ip}:9100/status`;
+    try {
+      const res = await fetch(testUrl, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          url: `http://${localIp.ip}:9100`,
+          mode: 'auto',
+          printer: data.autoPrinter || 'Desconocida',
+          hostname: localIp.hostname || '',
+          ip: localIp.ip,
+          online: true,
+          lastCheck: new Date(),
+        };
+      }
+    } catch {}
+    
+    // 3. Probar por nombre de host
+    if (localIp.hostname) {
+      const hostnameUrl = `http://${localIp.hostname}:9100/status`;
+      try {
+        const res = await fetch(hostnameUrl, { signal: AbortSignal.timeout(2000) });
+        if (res.ok) {
+          const data = await res.json();
+          return {
+            url: `http://${localIp.hostname}:9100`,
+            mode: 'hostname',
+            printer: data.autoPrinter || 'Desconocida',
+            hostname: localIp.hostname,
+            ip: localIp.ip,
+            online: true,
+            lastCheck: new Date(),
+          };
+        }
+      } catch {}
+    }
+    
+    return null; // No se detecto automaticamente
+  }
+
+  // Verificacion periodica (cada 30 segundos)
+  export function startAgentMonitor(callback: (info: AgentInfo | null) => void) {
+    const interval = setInterval(async () => {
+      const savedUrl = localStorage.getItem('agentUrl');
+      if (savedUrl) {
+        try {
+          const res = await fetch(savedUrl + '/status', { signal: AbortSignal.timeout(2000) });
+          if (res.ok) {
+            const data = await res.json();
+            callback({ ...data, url: savedUrl, online: true, lastCheck: new Date() });
+          } else {
+            callback(null);
+          }
+        } catch {
+          callback(null);
+        }
+      } else {
+        // Intentar auto-detectar
+        const detected = await detectAgent();
+        callback(detected);
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }
+
+  5.7. Archivo nuevo: printer-agent/INSTALL-CAJA.bat
+  ─────────────────────────────────────────
+  Script de instalacion para cada caja (solo agente):
+  
+  @echo off
+  title MyeCommerce - Instalar Agente de Impresion
+  echo ========================================
+  echo   Instalacion del Agente de Impresion
+  echo   MyeCommerce POS
+  echo ========================================
+  echo.
+  echo Este script copia el agente de impresion
+  echo a esta PC para que pueda imprimir tickets
+  echo en la impresora conectada localmente.
+  echo.
+  echo Se creara la carpeta: C:\MyeCommerce-Agente\
+  echo.
+  pause
+  
+  mkdir C:\MyeCommerce-Agente\printer-agent\ 2>nul
+  copy /Y agent.js C:\MyeCommerce-Agente\printer-agent\agent.js
+  copy /Y INICIAR-AGENTE-OCULTO.vbs C:\MyeCommerce-Agente\INICIAR-AGENTE-OCULTO.vbs
+  
+  echo.
+  echo ========================================
+  echo   Instalacion completada
+  echo ========================================
+  echo.
+  echo Para iniciar el agente:
+  echo   1. Conecte la impresora por USB
+  echo   2. Haga doble clic en INICIAR-AGENTE-OCULTO.vbs
+  echo   3. Abra Chrome y vaya a la direccion del servidor
+  echo.
+  echo ¿Desea iniciar el agente ahora? (S/N)
+  set /p START=
+  if /i "%START%"=="S" (
+    start "" "C:\MyeCommerce-Agente\INICIAR-AGENTE-OCULTO.vbs"
+    echo Agente iniciado.
+  )
+  echo.
+  echo ¿Desea agregar el agente al inicio de Windows? (S/N)
+  set /p AUTO=
+  if /i "%AUTO%"=="S" (
+    copy /Y "C:\MyeCommerce-Agente\INICIAR-AGENTE-OCULTO.vbs" "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\"
+    echo Se agregara al inicio automatico.
+  )
+  echo.
+  pause
+
+================================================================================
+  6. ARCHIVOS QUE SE CREAN (NUEVOS)
+================================================================================
+
+  C:\MyeCommerce\src\lib\agent-detector.ts     ← Logica de deteccion automatica
+  C:\MyeCommerce\printer-agent\INSTALL-CAJA.bat ← Script instalacion para cajas
+  C:\MyeCommerce\printer-agent\SETUP-LAN.bat    ← Script configuracion rapida LAN
+
+  SETUP-LAN.bat (en el servidor):
+  @echo off
+  title MyeCommerce - Configuracion Multi-Caja LAN
+  echo ========================================
+  echo   Configuracion Multi-Caja LAN
+  echo   MyeCommerce POS
+  echo ========================================
+  echo.
+  echo Este asistente le ayudara a preparar las
+  echo cajas para que impriman en su impresora local.
+  echo.
+  echo PASO 1: Copiar archivos a las cajas
+  echo ──────────────────────────────────────
+  echo.
+  echo Inserte una memoria USB y presione cualquier tecla
+  echo para copiar los archivos del agente...
+  pause
+  echo.
+  set USB=%USERPROFILE%\Desktop\Agente-MultiCaja
+  mkdir "%USB%" 2>nul
+  mkdir "%USB%\printer-agent" 2>nul
+  copy /Y printer-agent\agent.js "%USB%\printer-agent\agent.js"
+  copy /Y printer-agent\INICIAR-AGENTE-OCULTO.vbs "%USB%\INICIAR-AGENTE-OCULTO.vbs"
+  copy /Y printer-agent\INSTALL-CAJA.bat "%USB%\INSTALL-CAJA.bat"
+  echo.
+  echo Archivos copiados a: %USB%\
+  echo.
+  echo EN CADA CAJA:
+  echo   1. Conecte la memoria USB
+  echo   2. Copie la carpeta "Agente-MultiCaja" al escritorio
+  echo   3. Ejecute INSTALL-CAJA.bat
+  echo   4. Siga las instrucciones
+  echo.
+  echo PASO 2: Verificar conexion LAN
+  echo ──────────────────────────────────────
+  echo.
+  echo IP de este servidor:
+  for /f "tokens=*" %%a in ('powershell -NoProfile -Command "(Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias Ethernet).IPAddress"') do echo   %%a
+  echo.
+  echo Abra Chrome en cada caja y vaya a:
+  echo   http://[IP-DEL-SERVIDOR]:3000
+  echo.
+  echo La impresora de cada caja se detectara automaticamente.
+  echo No es necesario configurar nada manualmente.
+  echo.
+  pause
+
+================================================================================
+  7. GUARDADO DE CONFIGURACION
+================================================================================
+
+  La configuracion del agente se guarda en el NAVEGADOR (localStorage):
+  
+  localStorage.setItem('myecommerce-agent', JSON.stringify({
+    url: 'http://192.168.1.11:9100',    // URL del agente
+    mode: 'auto',                        // 'auto' | 'hostname' | 'manual'
+    printer: 'POS-80 USB',              // Nombre de la impresora
+    hostname: 'CAJA-1',                  // Nombre del PC
+    ip: '192.168.1.11',                  // IP detectada
+    lastDetected: '2026-08-17T10:30:00Z' // Ultima deteccion exitosa
+  }));
+
+  TAMBIEN se puede guardar en la base de datos (tabla settings o nueva tabla terminals):
+  
+  // Si se implementa sistema de "terminales"
+  tabla "terminals":
+    id          INTEGER PRIMARY KEY
+    name        TEXT    // "Caja 1", "Caja 2"
+    hostname    TEXT    // "CAJA-1"
+    agentUrl    TEXT    // "http://192.168.1.11:9100"
+    printer     TEXT    // "POS-80 USB"
+    lastSeen    TEXT    // ultima vez que el agente respondio
+    status      TEXT    // "online" | "offline"
+    userId      TEXT    // vendedor asignado a esta terminal
+
+================================================================================
+  8. MANEJO DE DHCP DINAMICO (SITUACIONES ESPECIALES)
+================================================================================
+
+  SITUACION A: IP cambia mientras la app esta abierta
+  ──────────────────────────────────────────────────
+  Problema: DHCP renueva y cambia la IP de 192.168.1.11 a 192.168.1.82
+  Solucion: Monitor periodico cada 30 segundos
+    - Cada 30s: fetch("/api/local-ip") para obtener IP actual
+    - Comparar con la IP guardada en localStorage
+    - Si cambiaron → re-detectar agente → actualizar
+    - Mostrar notificacion: "Se detecto nuevo agente en 192.168.1.82"
+
+  SITUACION B: El agente se reinicia
+  ────────────────────────────────────────
+  Problema: El agente se cayó y volvió a arrancar
+  Solucion: Monitor periodico
+    - Cada 30s: probar conexion al agente guardado
+    - Si no responde → marcar como offline
+    - Si vuelve a responder → marcar como online
+    - Notificar al usuario visualmente
+
+  SITUACION C: El servidor se reinicia
+  ────────────────────────────────────────
+  Problema: El servidor de Next.js se reinició
+  Solucion: Cada caja tiene que refrescar la pagina
+    - Mostrar indicador de conexion en la app
+    - Si se pierde conexion → mostrar "Reconectando..."
+    - Auto-reconnect con retry
+
+  SITUACION D: Se agrega una caja nueva
+  ────────────────────────────────────────
+  Problema: Instalar una 5ta caja
+  Solucion: 
+    1. Copiar los 2 archivos del agente a la nueva PC
+    2. Ejecutar INSTALL-CAJA.bat
+    3. Abrir Chrome apuntando al servidor
+    4. El sistema detecta automaticamente la nueva impresora
+    5. Cero configuracion adicional
+
+  SITUACION E: Se quita una caja temporalmente
+  ─────────────────────────────────────────────
+  Problema: Una caja se apaga o se lleva de mantenimiento
+  Solucion:
+    - El monitor marca esa terminal como offline
+    - Las ventas siguen funcionando en las otras cajas
+    - Cuando vuelve, se reconecta automaticamente
+
+================================================================================
+  9. SEGURIDAD
+================================================================================
+
+  9.1 Validacion de agentUrl (anti-SSRF)
+  ────────────────────────────────────────
+  El proxy del servidor SOLO debe redirigir a IPs de red local privada:
+    - 192.168.0.0/16
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 127.0.0.0/8 (localhost)
+  
+  Rechazar cualquier agenteUrl que apunte a:
+    - IPs publicas (evitar SSRF)
+    - URLs con protocolo diferente a http
+    - Puertos diferentes a 9100
+
+  9.2 Autenticacion del agente
+  ──────────────────────────────
+  Actualmente el agente NO tiene autenticacion (escucha en 0.0.0.0)
+  Esto es aceptable porque:
+    - Solo funciona en red local (no accesible desde internet)
+    - Solo acepta conexiones HTTP en puerto 9100
+    - El router NAT bloquea acceso externo
+  
+  Si se quiere mayor seguridad:
+    - Agregar token secreto que el servidor envia al navegador
+    - El navegador incluye el token al imprimir
+    - El agente verifica el token antes de imprimir
+    - Opcional, no prioritario para fase 1
+
+================================================================================
+  10. HOJA DE RUTA DE IMPLEMENTACION
+================================================================================
+
+  FASE 1: Infraestructura minima (1-2 horas)
+  ──────────────────────────────────────────
+  [ ] 1. Crear src/lib/agent-detector.ts (logica de deteccion)
+  [ ] 2. Modificar src/app/api/local-ip/route.ts (devolver hostname tambien)
+  [ ] 3. Modificar src/app/api/print-agent/route.ts (aceptar agentUrl del body)
+  [ ] 4. Modificar src/lib/ticket-printer.ts (enviar agentUrl al proxy)
+  [ ] 5. Modificar src/components/config-tab.tsx (UI visual de deteccion)
+
+  FASE 2: Instalacion simplificada (30 min)
+  ─────────────────────────────────────────
+  [ ] 6. Crear printer-agent/INSTALL-CAJA.bat
+  [ ] 7. Crear printer-agent/SETUP-LAN.bat (en el servidor)
+  [ ] 8. Verificar que el agente funciona sin cambios (ya deberia)
+  [ ] 9. Agregar endpoint GET /info al agente (opcional)
+
+  FASE 3: Monitoreo y robustez (1 hora)
+  ────────────────────────────────────────
+  [ ] 10. Implementar monitor periodico (cada 30s)
+  [ ] 11. Notificacion visual cuando cambia la IP
+  [ ] 12. Indicador de estado del agente en el POS (barra superior)
+  [ ] 13. Auto-reconnect si se pierde conexion
+
+  FASE 4: Pulido profesional (opcional)
+  ────────────────────────────────────────
+  [ ] 14. Sistema de "terminales" en la base de datos
+  [ ] 15. Vista de "estado de cajas" para el administrador
+  [ ] 16. Asignar vendedor a terminal especifica
+  [ ] 17. Historial de impresiones por terminal
+  [ ] 18. Token de seguridad para el agente
+
+================================================================================
+  11. PRUEBAS NECESARIAS
+================================================================================
+
+  PRUEBA 1: Mono-PC (sin cambios visibles)
+  ────────────────────────────────────────
+  - Instalar en 1 sola PC
+  - Verificar que la impresion funciona igual que antes
+  - El agente local se detecta automaticamente
+  - No hay configuracion manual necesaria
+
+  PRUEBA 2: Multi-PC (LAN con DHCP)
+  ────────────────────────────────────────
+  - Servidor + 2 cajas minimas
+  - Cada caja con impresora conectada
+  - Hacer venta en Caja 1 → imprimir → sale en Impresora 1
+  - Hacer venta en Caja 2 → imprimir → sale en Impresora 2
+  - Verificar que las ventas se comparten en la base de datos
+
+  PRUEBA 3: DHCP cambia la IP
+  ────────────────────────────────────────
+  - Desconectar y reconectar la red de Caja 1
+  - Verificar que la IP cambia
+  - Abrir Chrome en Caja 1
+  - Verificar que el agente se re-detecta automaticamente
+  - Imprimir → sale correctamente en la impresora de Caja 1
+
+  PRUEBA 4: Agente se cae y vuelve
+  ────────────────────────────────────────
+  - Matar el proceso del agente en Caja 1
+  - Verificar que la app muestra "Agente desconectado"
+  - Reiniciar el agente
+  - Verificar que la app detecta que volvió
+
+  PRUEBA 5: Caja nueva se agrega
+  ────────────────────────────────────────
+  - Copiar archivos del agente a una nueva PC
+  - Ejecutar INSTALL-CAJA.bat
+  - Abrir Chrome apuntando al servidor
+  - Verificar deteccion automatica
+  - Imprimir correctamente
+
+================================================================================
+  12. NOTAS ADICIONALES
+================================================================================
+
+  - El agente NO necesita Node.js completo instalado en las cajas.
+    Usa solo modulos built-in (http, fs, path, child_process).
+    Solo necesita que Node.js esté disponible como comando.
+
+  - Si una caja NO tiene impresora conectada, simplemente no se detecta
+    agente local. La app funciona normal pero sin impresion directa.
+    Se puede mostrar: "No hay impresora conectada en esta PC"
+
+  - El proxy del servidor (/api/print-agent) MANTIENE compatibilidad
+    con el modo actual (localhost:9100) para instalaciones mono-PC.
+    Si no se envia agentUrl, usa localhost como antes.
+
+  - Las imagenes de productos se sirven desde el servidor central.
+    Las cajas no necesitan copia local de data/uploads/.
+
+  - El archivo prisma/dev.db se puede mantener en el servidor.
+    Si se quiere mayor robustez, migrar a PostgreSQL (futura mejora).
+    SQLite funciona para 4-5 cajas simultaneas sin problemas
+    siempre y cuando no haya escritura masiva.
+
+  - El sistema de impresion ya soporta: 55mm, 57mm, 58mm, 80mm.
+    Cada caja puede tener una impresora de diferente ancho.
+    El papel se configura individualmente en cada navegador
+    (Configuracion > Ancho del papel).
+
+================================================================================
+  13. ARCHIVOS ORIGINALES REFERENCIADOS
+================================================================================
+
+  - printer-agent/agent.js              ← Agente de impresion (no cambia)
+  - src/lib/ticket-printer.ts           ← Motor de tickets (modificar)
+  - src/lib/escpos-buffer.ts            ← Generador ESC/POS (no cambia)
+  - src/app/api/print-agent/route.ts    ← Proxy (modificar)
+  - src/app/api/local-ip/route.ts       ← Deteccion IP (mejorar)
+  - src/components/config-tab.tsx       ← UI configuracion (modificar)
+  - INICIAR-TODO-OCULTO.vbs             ← Arranca todo (servidor: solo Next.js)
+  - INICIAR-AGENTE-OCULTO.vbs           ← Arranca solo agente (cajas)
+
+================================================================================
+  FIN DEL PLAN
+================================================================================
