@@ -33,3 +33,26 @@ Stage Summary:
 - Version centralized in src/lib/version.ts
 - Catalog logo adapts properly without being cut off
 - Product image upload compresses large phone photos before uploading
+---
+Task ID: 1
+Agent: Main Agent
+Task: Evaluar código del usuario y aplicar sistema de actualizaciones mejorado
+
+Work Log:
+- Extrajo archivo RAR del usuario (240 archivos, proyecto Next.js completo)
+- Comparó check-version: usaba Tags API sin token → ahora usa Releases API con token + fallback local
+- Comparó update: solo aceptaba version → ahora acepta version + downloadUrl, detecta rollback
+- Comparó VersionChecker: simple → ahora con lista de versiones, changelogs, accordion, rollback, estados de error
+- Corrigió package.json: versión 2.9.58 → 2.9.63
+- Creó public/versions.json con 41 versiones (v2.9.31 a v2.9.63)
+- Creó src/app/api/download-version/route.ts (proxy para repos privados)
+- Creó .env con GITHUB_TOKEN
+- Creó carpeta releases/ con .gitkeep
+- Generó ZIP de instalación limpia (985KB) basado en código del usuario
+- Subió a GitHub Release v2.9.63 como asset
+
+Stage Summary:
+- Archivos modificados: package.json, check-version/route.ts, update/route.ts, config-tab.tsx
+- Archivos nuevos: versions.json, download-version/route.ts, .env, releases/.gitkeep
+- ZIP subido: https://github.com/csglider/MyeCommerce-v2.9.20/releases/download/v2.9.63/MyeCommerce-v2.9.63-INSTALACION-LIMPIA.zip
+
