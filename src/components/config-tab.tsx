@@ -335,9 +335,7 @@ function VersionChecker() {
                         </button>
                       )}
                       <a
-                        href={ver.downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={`/api/download-version?version=${ver.version}`}
                         className="flex-1 text-center border border-gray-300 text-gray-700 rounded-lg px-3 py-2 text-[11px] font-semibold hover:bg-gray-50 transition-colors"
                       >
                         Descargar ZIP

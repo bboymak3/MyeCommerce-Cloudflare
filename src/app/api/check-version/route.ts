@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server';
 // Cambia esta constante para apuntar a tu repositorio real de GitHub.
 // El sistema usara GitHub Releases para listar versiones disponibles.
 const GITHUB_REPO = 'csglider/MyeCommerce-v2.9.20';
+// Token de acceso para repositorios privados (GitHub Personal Access Token)
+// Si el repo es publico, puede dejarse vacio. Si es privado, se necesita el token.
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 
 // Comparador semver: retorna >0 si a > b, <0 si a < b, 0 si igual
 function compareSemver(a: string, b: string): number {
@@ -76,6 +79,7 @@ export async function GET() {
           headers: {
             'Accept': 'application/vnd.github.v3+json',
             'User-Agent': 'MyeCommerce-UpdateCheck',
+            ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {}),
           },
         }
       );
@@ -111,17 +115,17 @@ export async function GET() {
           versions = validReleases.map((r) => {
             const ver = r.tag_name.replace('v', '');
             const cmp = compareSemver(ver, localVersion);
+            // Para repos privados, usar la URL del tag archive (el servidor le agrega el token al descargar)
+            const archiveUrl = `https://github.com/${GITHUB_REPO}/archive/refs/tags/${r.tag_name}.zip`;
             return {
               version: ver,
               name: r.name || r.tag_name,
               notes: r.body || '',
               date: r.published_at,
               dateRelative: relativeDate(r.published_at),
-              // Priorizar asset ZIP del release, si no existe usar archive
-              downloadUrl:
-                r.assets.length > 0 && r.assets[0].browser_download_url
-                  ? r.assets[0].browser_download_url
-                  : `https://github.com/${GITHUB_REPO}/archive/refs/tags/${r.tag_name}.zip`,
+              // Siempre usar archive URL (funciona con token en el servidor)
+              downloadUrl: archiveUrl,
+              tag: r.tag_name,
               prerelease: r.prerelease,
               isNewer: cmp > 0,
               isOlder: cmp < 0,

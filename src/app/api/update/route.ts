@@ -7,6 +7,7 @@ import { pipeline } from 'stream/promises';
 import { Readable } from 'stream';
 
 const GITHUB_REPO = 'csglider/MyeCommerce-v2.9.20';
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 
 // Carpetas y archivos que se PRESERVAN al actualizar
 const PRESERVE_LIST = [
@@ -166,7 +167,7 @@ export async function POST(req: NextRequest) {
           sendProgress(controller, { step: 'download', message: `Descargando v${targetVersion}...`, percent: 30 });
 
           // Descargar con fetch nativo
-          const res = await fetch(downloadUrl, { redirect: 'follow' });
+          const res = await fetch(downloadUrl, { redirect: 'follow', headers: { ...(GITHUB_TOKEN ? { 'Authorization': `token ${GITHUB_TOKEN}` } : {}) } });
           if (!res.ok || !res.body) {
             sendProgress(controller, {
               step: 'error',
