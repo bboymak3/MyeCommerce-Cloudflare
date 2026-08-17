@@ -616,7 +616,236 @@ con DHCP (IPs dinamicas). Necesita que:
     (Configuracion > Ancho del papel).
 
 ================================================================================
-  13. ARCHIVOS ORIGINALES REFERENCIADOS
+  13. IMPRESION POR BLUETOOTH (DESDE TELEFONO)
+================================================================================
+
+  13.1. CONTEXTO
+  ────────────────
+  El cliente pregunta si puede imprimir desde un telefono movil
+  a una impresora termica conectada por Bluetooth.
+
+  PROBLEMA PRINCIPAL: Web Bluetooth API requiere HTTPS.
+  Es el MISMO problema que tuvimos con la camara (getUserMedia).
+  Ya se intento configurar HTTPS antes y no funciono, se decidio
+  mantener HTTP unicamente.
+
+  13.2. OPCIONES EVALUADAS
+  ──────────────────────────
+
+  OPCION A: Web Bluetooth API (navegador → impresora directa)
+  ──────────────────────────────────────────────────────────────
+  Como funciona:
+    Telefono (Chrome) → Web Bluetooth API → Impresora BLE thermal
+
+  Los navegadores modernos tienen una API que permite conectarse a
+  dispositivos Bluetooth directamente desde una pagina web.
+  Las impresoras termicas pequeñas usan BLE (Bluetooth Low Energy)
+  con protocolo ESC/POS, que es exactamente el mismo que ya genera
+  el sistema.
+
+  Ventajas:
+    ✅ No necesita agente ni programa extra
+    ✅ El navegador habla directamente con la impresora
+    ✅ Usa los mismos comandos ESC/POS que ya genera el sistema
+    ✅ Funciona con impresoras comunes (POS-58, Goojprt, NIIMBOT, etc.)
+
+  Desventajas:
+    ❌ Web Bluetooth API REQUIERE HTTPS
+    ❌ Chrome en iPhone NO soporta Web Bluetooth (solo Android/ChromeOS/Desktop)
+    ❌ Funciona solo en ciertos navegadores de Android
+
+  Viabilidad actual: NO FUNCIONA (por HTTP)
+  Viabilidad futura: Si se soluciona HTTPS, seria la mejor opcion
+
+  Si alguna vez se soluciona HTTPS, el flujo seria:
+    1. En la app, agregar boton "Imprimir por Bluetooth"
+    2. Al pulsar, Chrome pide permiso para usar Bluetooth
+    3. Chrome muestra lista de impresoras BLE cercanas
+    4. Seleccionar impresora → se conecta
+    5. Enviar bytes ESC/POS por Bluetooth
+    6. Sale el ticket
+
+  Codigo de ejemplo (para cuando haya HTTPS):
+    // Buscar impresoras BLE cercanas
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: ['0000ff00-0000-1000-8000-00805f9b34fb'] }],
+      optionalServices: ['0000ff10-0000-1000-8000-00805f9b34fb']
+    });
+
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService('0000ff10-0000-1000-8000-00805f9b34fb');
+    const characteristic = await service.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+
+    // Enviar bytes ESC/POS
+    await characteristic.writeValue(escposBuffer);
+
+  OPCION B: Impresora WiFi + Bluetooth (⭐ LA MAS VIABLE HOY)
+  ────────────────────────────────────────────────────────────────
+  Muchas impresoras termicas modernas traen AMBAS conexiones (WiFi + BT).
+
+  Impresoras que tienen WiFi + Bluetooth:
+    - Xprinter XP-350B (WiFi + USB + Bluetooth)
+    - MUNBYN ITP02 (WiFi + USB)
+    - Goojprt PT-210
+    - Phomemo M110 (Bluetooth + WiFi)
+    - NIIMBOT D11 (Bluetooth + WiFi)
+
+  Cómo funciona con WiFi:
+    1. La impresora se conecta al WiFi del negocio
+    2. El router le asigna una IP (ej: 192.168.1.50)
+    3. El agente (o el servidor) manda los bytes ESC/POS a esa IP
+    4. La impresora WiFi recibe los datos e imprime
+    5. Funciona con HTTP, sin problemas
+
+  Ventajas:
+    ✅ No necesita HTTPS
+    ✅ Funciona desde cualquier dispositivo (telefono, PC, tablet)
+    ✅ Se integra con la Solucion 3 multi-caja
+    ✅ Mismo protocolo ESC/POS que ya se usa
+
+  Para integrar en el sistema:
+    - Modificar el agente para soportar impresion por IP de red
+    - El agente ya usa winspool.drv que soporta impresoras de red
+    - Solo hay que asegurarse que la impresora WiFi este en la misma LAN
+    - Windows la detecta como impresora de red automaticamente
+
+  OPCION C: Intent de Android (bridge por app intermedia)
+  ────────────────────────────────────────────────────────────────
+  Como funciona:
+    Servidor → Navegador del telefono → Intent Android → App → Bluetooth → Impresora
+
+  El navegador abre un "intent" (link especial tipo miimprimir://base64...)
+  Android pregunta: "¿Con que app abrir?"
+  Se abre una app que envia por Bluetooth.
+
+  Ventajas:
+    ✅ Funciona en HTTP
+    ✅ Sin cambios al servidor
+
+  Desventajas:
+    ⚠️ No es transparente para el usuario (abre otra app)
+    ⚠️ Hay que crear una app Android simple
+    ⚠️ No funciona en iPhone
+
+  Viabilidad: MEDIA (funciona pero no es elegante)
+
+  OPCION D: App nativa Android como puente
+  ────────────────────────────────────────────────────────────────
+  Crear una app Android minima que:
+    1. Escucha en un puerto local del telefono (ej: localhost:9100)
+    2. Recibe bytes ESC/POS via HTTP
+    3. Los manda por Bluetooth a la impresora
+    4. Es como el agente de impresion pero para Android
+
+  Flujo:
+    Navegador → http://localhost:9100/print → App Android → Bluetooth → Impresora
+
+  Ventajas:
+    ✅ Funciona en HTTP
+    ✅ Transparente para el usuario (similar al agente de PC)
+    ✅ Usa mismos bytes ESC/POS
+
+  Desventajas:
+    ❌ Hay que instalar una app extra en el telefono
+    ❌ Hay que desarrollar y mantener la app
+    ❌ No funciona en iPhone (necesitaria app iOS separada)
+    ❌ El telefono debe tener la app corriendo para imprimir
+
+  Viabilidad: BAJA (mucho trabajo para un caso especifico)
+
+  13.3. TABLA COMPARATIVA
+  ────────────────────────
+
+  | Metodo              | HTTP  | iPhone | Android | Dificultad | Recomendada |
+  |---------------------|:-----:|:------:|:-------:|:----------:|:-----------:|
+  | Web Bluetooth API   | ❌    | ❌     | ✅      | Media      | Futura      |
+  | Impresora WiFi+BT    | ✅    | ✅     | ✅      | Baja       | ⭐ HOY      |
+  | Intent Android       | ✅    | N/A    | ✅      | Media      | Emergencia  |
+  | App puente Android   | ✅    | ❌     | ✅      | Alta       | No          |
+  | Impresora solo BT    | ❌    | ❌     | ❌      | Alta       | No          |
+
+  13.4. RECOMENDACION
+  ────────────────────
+
+  SI se quiere imprimir desde el telefono HOY:
+    → COMPRAR impresora con WiFi (la mas practica)
+    → Se conecta al router del negocio
+    → Funciona desde cualquier dispositivo sin HTTPS
+    → Se integra con la Solucion 3 multi-caja
+
+  SI ya se tiene impresora solo Bluetooth:
+    → No es viable con HTTP
+    → Solo funcionaria si se logra configurar HTTPS (ya se intento)
+    → Alternativa: buscar si la impresora tambien tiene WiFi
+    → Muchas impresoras economicas traen ambas conexiones
+
+  SI alguna vez se implementa HTTPS:
+    → Web Bluetooth API seria la solucion ideal
+    → Sin apps extras, sin agentes, sin nada
+    → Solo agregar el codigo de conexion Bluetooth
+    → Los bytes ESC/POS ya estan generados, solo falta el transporte
+
+  13.5. CODIGO DE REFERENCIA (para cuando haya HTTPS)
+  ──────────────────────────────────────────────────────
+
+  ARCHIVO NUEVO: src/lib/bluetooth-printer.ts
+  
+  // Service UUID comun para impresoras termicas BLE
+  const PRINTER_SERVICE_UUID = '0000ff00-0000-1000-8000-00805f9b34fb';
+  const PRINTER_WRITE_UUID  = '0000ff02-0000-1000-8000-00805f9b34fb';
+  
+  export interface BluetoothPrinter {
+    device: BluetoothDevice;
+    characteristic: BluetoothRemoteGATTCharacteristic;
+    name: string;
+  }
+  
+  // Listar impresoras BLE cercanas
+  export async function scanBluetoothPrinters(): Promise<BluetoothDevice[]> {
+    if (!navigator.bluetooth) {
+      throw new Error('Tu navegador no soporta Web Bluetooth');
+    }
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [PRINTER_SERVICE_UUID] }],
+      optionalServices: [PRINTER_SERVICE_UUID],
+    });
+    return [device]; // requestDevice devuelve 1 a la vez
+  }
+  
+  // Conectar a impresora BLE y enviar ESC/POS
+  export async function printViaBluetooth(
+    device: BluetoothDevice,
+    escposBuffer: Uint8Array
+  ): Promise<void> {
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(PRINTER_SERVICE_UUID);
+    const characteristic = await service.getCharacteristic(PRINTER_WRITE_UUID);
+    
+    // Enviar bytes en chunks de 512 (BLE tiene limite por paquete)
+    const CHUNK_SIZE = 512;
+    for (let i = 0; i < escposBuffer.length; i += CHUNK_SIZE) {
+      const chunk = escposBuffer.slice(i, i + CHUNK_SIZE);
+      await characteristic.writeValue(chunk);
+      // Pequeña pausa entre chunks para evitar buffer overflow
+      if (i + CHUNK_SIZE < escposBuffer.length) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+    
+    await server.disconnect();
+  }
+  
+  // Integracion con ticket-printer.ts:
+  // if (navigator.bluetooth) {
+  //   const devices = await scanBluetoothPrinters();
+  //   if (devices.length > 0) {
+  //     await printViaBluetooth(devices[0], escposBuffer);
+  //     return true;
+  //   }
+  // }
+
+================================================================================
+  14. ARCHIVOS ORIGINALES REFERENCIADOS
 ================================================================================
 
   - printer-agent/agent.js              ← Agente de impresion (no cambia)
@@ -627,6 +856,7 @@ con DHCP (IPs dinamicas). Necesita que:
   - src/components/config-tab.tsx       ← UI configuracion (modificar)
   - INICIAR-TODO-OCULTO.vbs             ← Arranca todo (servidor: solo Next.js)
   - INICIAR-AGENTE-OCULTO.vbs           ← Arranca solo agente (cajas)
+  - src/lib/bluetooth-printer.ts         ← (NUEVO) Impresion por BLE (para HTTPS)
 
 ================================================================================
   FIN DEL PLAN
