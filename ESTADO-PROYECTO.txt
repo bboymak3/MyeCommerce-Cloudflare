@@ -1,0 +1,196 @@
+# MyeCommerce POS - ESTADO DEL PROYECTO
+# Última actualización: 2026-08-17
+
+## VERSION ACTUAL: v2.9.66
+
+## REPOSITORIO GITHUB
+- Repo: https://github.com/csglider/MyeCommerce-v2.9.20 (PRIVADO)
+- Owner: csglider
+- Token: en archivo .env (GITHUB_TOKEN)
+- Releases: https://github.com/csglider/MyeCommerce-v2.9.20/releases
+
+## ESTRUCTURA LOCAL
+- Base del proyecto: /home/z/my-project/upload/base_v264/
+- ZIPs generados: /home/z/my-project/upload/
+- Código fuente del usuario viene en archivos RAR, se descomprime en base_v264
+
+## TECNOLOGIAS
+- Next.js 15.3 App Router + React 19
+- Prisma 5.22 + SQLite (prisma/dev.db)
+- Tailwind CSS 3.4
+- Node.js runtime en Windows (produccion del usuario)
+- Despliegue: Caddy (reverse proxy) + Node.js en Windows
+
+## SISTEMA DE ACTUALIZACION (v2.9.63+)
+
+### Flujo de actualización online:
+1. Usuario va a Configuracion > Actualizar Sistema > Buscar actualizaciones
+2. GET /api/check-version → consulta GitHub Releases API con token
+3. Fallback a public/versions.json si no hay internet
+4. Muestra lista de versiones con changelogs, badges, fechas
+5. POST /api/update → SSE con progreso en tiempo real:
+   - Paso 1: Verificar prerequisitos
+   - Paso 2: Respaldo automático (BD + uploads + logo)
+   - Paso 3: Descargar ZIP desde GitHub (redirect: manual para privados)
+   - Paso 4: Extraer ZIP
+   - Paso 5: Copiar archivos nuevos (lista UPDATE_ITEMS en update/route.ts)
+   - Paso 6: Limpiar temporales
+   - Paso 7: Migrar BD (prisma generate + prisma db push)
+   - Paso 8: REBUILD automático (script .bat detached que ejecuta npm run build + reinicio)
+   - Paso 9: Completado + auto-recarga de pagina a los 15 seg
+
+### Fix criticalo de private repo (v2.9.63):
+- browser_download_url en repos privados pierde auth en 302 redirect
+- Solucion: redirect: 'manual' + seguir Location header con token embebido
+- Aplicado en: update/route.ts y download-version/route.ts
+
+### Archivos clave del update system:
+- src/app/api/check-version/route.ts → consulta versiones
+- src/app/api/update/route.ts → ejecuta actualizacion completa con SSE
+- src/app/api/download-version/route.ts → proxy para descargar ZIP desde navegador
+- src/components/config-tab.tsx → interfaz de VersionChecker
+- public/versions.json → fallback local con 37 versiones (2.9.31 a 2.9.66)
+- ACTUALIZAR.vbs → actualizacion local (pendrive)
+- RECONSTRUIR.bat → rebuild manual por si falla el automatico
+
+### Preserva al actualizar (PRESERVE_LIST en update/route.ts):
+- prisma/dev.db (base de datos)
+- data/ (uploads, logos)
+- BACKUPS/
+- caddy/
+
+### Copia al actualizar (UPDATE_ITEMS en update/route.ts):
+- src/, public/, prisma/schema.prisma, prisma/migrations
+- package.json, package-lock.json
+- next.config.*, tsconfig.json, tailwind.config.*, postcss.config.*
+- .env, .env.local
+- Todos los .bat y .vbs (INSTALAR, ACTUALIZAR, INICIAR, DETENER, etc.)
+- caddy/Caddyfile, printer-agent/
+
+## SISTEMA DE VERSION DINAMICA (v2.9.66)
+
+### Problema resuelto:
+- Antes: version "v2.9.56" estaba HARDCODEADA en 11 lugares del codigo
+- Al actualizar, los archivos se copiaban pero el build viejo seguia mostrando "v2.9.56"
+
+### Solucion:
+- src/lib/app-version.ts → modulo server-side, lee package.json con fs
+- src/lib/app-version-client.ts → modulo client-side, carga desde /api/app-version
+- src/app/api/app-version/route.ts → endpoint que retorna version de package.json
+- TODOS los componentes ahora usan version dinamica:
+  - layout.tsx (titulo de pagina)
+  - page.tsx (header, nav, footer - 3 lugares)
+  - app-nav.tsx (sidebar)
+  - login-screen.tsx (2 lugares)
+  - reports-tab.tsx (HTML reportes + CSV - 2 lugares)
+  - cash-closing-tab.tsx (cierre de caja)
+  - catalog/route.ts (catalogo productos)
+  - ticket-printer.ts (comentarios)
+  - escpos-buffer.ts (comentarios)
+  - license.ts (comentarios)
+
+## DISENO VISUAL DEL CARRITO (v2.9.65)
+- public/cart-bg.svg → imagen SVG decorativa de carrito de compras
+- src/components/pos/cart/cart-panel.tsx modificado:
+  - Fondo sutil con SVG en header (7% opacidad)
+  - Icono de carrito al lado del titulo
+  - Estado vacio mejorado: ilustracion + texto descriptivo
+  - Productos decorativos flotantes
+
+## HISTORIAL DE VERSIONES TRABAJADAS
+
+### v2.9.63 - Sistema de actualizaciones mejorado
+- GitHub Releases API con token
+- Lista de versiones con changelogs
+- Rollback a versiones anteriores
+- Fallback a versions.json local
+- Estados de error claros (sin internet, repo no encontrado)
+- Fix descarga private repo (redirect: manual)
+
+### v2.9.64 - Mejora VersionChecker
+- Indicador de "Ultima verificacion: HH:MM:SS"
+- Optimizacion del flujo de actualizacion
+
+### v2.9.65 - Diseño visual del carrito
+- Imagen SVG de fondo decorativa
+- Icono de carrito en header
+- Estado vacio mejorado con ilustracion
+
+### v2.9.66 - Fix critico: version dinamica + rebuild
+- Eliminadas 11 referencias hardcodeadas a v2.9.56
+- Endpoint /api/app-version centralizado
+- Rebuild automatico via script .bat detached
+- Auto-recarga de pagina tras actualizar
+- RECONSTRUIR.bat para rebuild manual
+
+## TAREAS PENDIENTES
+
+### Pendiente de sesion anterior:
+- [ ] PDF de 2 paginas explicando opciones de actualizacion (online + local/pendrive)
+- [ ] Incluir PDF en cada version generada
+- [ ] PDF pedido por usuario: "y si me generas un pdf 2 paginas explicando las 2 opciones paso a paso como me las muestras aca y las agregas a cada version q generas"
+
+### Mejoras futuras sugeridas:
+- [ ] Revocar token de GitHub expuesto y crear uno nuevo (SEGURIDAD)
+- [ ] Agregar validacion de checksum/integridad del ZIP descargado
+- [ ] Boton de "Forzar reconstruccion" en la interfaz de configuracion
+- [ ] Progreso de rebuild visible en tiempo real (leer update-rebuild.log via SSE)
+
+## DATOS IMPORTANTES
+
+### Zona horaria del usuario:
+- America/Caracas (UTC-4)
+
+### Licencia del sistema:
+- Plan Profesional
+- Sistema de licencias propio con claves TRIAL/BASICA/PROFESIONAL
+
+### Moneda:
+- Doble moneda: USD ($) / Bolivares (Bs)
+- Tasa BCV configurable
+
+### Usuario:
+- Admin con acceso completo
+
+## CONSIDERACIONES PARA CONTINUAR
+
+1. Si se pierde la sesion, leer ESTE archivo primero
+2. El codigo fuente base siempre esta en /home/z/my-project/upload/base_v264/
+3. Cada version nueva se genera desde base_v264, se modifica, se zipea y se sube a GitHub Releases
+4. El usuario opera en Windows, el desarrollo aqui es Linux pero el .bat/.vbs son para Windows
+5. Los scripts de actualizacion usan PowerShell (Expand-Archive) y cmd.exe nativos de Windows
+6. El token de GitHub esta en .env - NO debe exponerse (ya fue expuesto en una sesion anterior)
+7. versions.json tiene 37 versiones ficticias (2.9.31-2.9.62) + reales (2.9.63-2.9.66)
+
+## ARCHIVOS QUE SE DEBEN INCLUIR EN CADA VERSION
+
+Cada ZIP de release debe contener:
+- [ ] src/ (codigo fuente)
+- [ ] public/ (assets + versions.json)
+- [ ] prisma/schema.prisma
+- [ ] package.json, package-lock.json
+- [ ] Todos los .bat y .vbs de despliegue
+- [ ] cart-bg.svg
+- [ ] app-version.ts, app-version-client.ts (version dinamica)
+- [ ] RECONSTRUIR.bat
+- [ ] .env (con GITHUB_TOKEN)
+- [ ] ACTUALIZAR.vbs + ACTUALIZAR.bat
+- [ ] INSTALAR.bat, INSTALAR-LIMPIO.vbs
+- [ ] INICIAR-TODO.bat, INICIAR-TODO-OCULTO.vbs
+- [ ] INICIAR-MYECCOMMERCE.bat, INICIAR-MYECCOMMERCE-OCULTO.vbs
+- [ ] DETENER-TODO.bat
+- [ ] RESPALDAR-BD.bat
+- [ ] CREAR-ADMIN.bat
+- [ ] PROGRESS.hta
+- [ ] caddy/Caddyfile
+- [ ] printer-agent/agent.js
+
+## NO INCLUIR EN EL ZIP:
+- node_modules/
+- .next/
+- .git/
+- *.db, *.db-journal, *.db-wal, *.db-shm
+- releases/
+- backups/
+- uploads/
+- temp_*

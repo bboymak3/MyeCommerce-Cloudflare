@@ -1,58 +1,16 @@
 ---
-Task ID: 1
-Agent: Main Agent
-Task: Fix all ticket config toggles, migration system, catalog logo, and product image upload
+Task ID: estado-proyecto
+Agent: Super Z (main)
+Task: Crear documento de seguimiento del estado del proyecto para no perder contexto entre sesiones
 
 Work Log:
-- Analyzed image uploaded by user showing ticket configuration toggles
-- Traced full data flow: config-tab.tsx → API settings → page.tsx → pos-tab.tsx → ticket-printer.ts
-- Found critical bug: ticketShowCashReceived and ticketShowLogo were defined in DB schema and config UI but NOT saved in API PUT, NOT in Settings interface, NOT passed as props to PosTab
-- Found all boolean toggles used `!== false` pattern which defaults to true for undefined values
-- Fixed API route (settings/route.ts): Added ticketShowCashReceived and ticketShowLogo to updateData, changed all toggles to `=== true` pattern
-- Fixed page.tsx: Added fields to Settings interface, default state, and PosTab props
-- Fixed pos/types.ts: Added ticketShowCashReceived and ticketShowLogo to PosTabProps
-- Fixed pos-tab.tsx: Destructured new props, included in ticketSettings object and dependency array
-- Fixed ticket-printer.ts: Added destructuring, changed `!== false` to `=== true` checks
-- Fixed escpos-buffer.ts: Changed `!== false` to `=== true` checks
-- Created src/lib/version.ts: Centralized version management from package.json
-- Created src/instrumentation.ts: Next.js startup hook to auto-run migrations and auto-backup
-- Enhanced src/lib/db-migration.ts: Complete rewrite with better versioning, applied versions tracking, detailed return values
-- Updated src/lib/auto-backup.ts: Added all missing tables (brands, heldSales, quotes, deliveryNotes, inventoryMovements, comboItems, expenseCategories, expenses), uses centralized version
-- Updated src/app/api/backup/route.ts: Full backup/restore now covers ALL 21 tables
-- Updated src/app/api/backup/stats/route.ts: Uses centralized version
-- Updated scripts/build-clean-zip.sh: Reads version from package.json dynamically
-- Fixed catalog logo: Changed container from 100px to 120px, used max-width/max-height instead of width/height, removed overflow:hidden
-- Fixed product image upload: Added client-side compression for photos >500KB (resizes to 1200px, JPEG quality 0.8), improved server-side error handling
-- Updated next.config.js: Added experimental serverActions body size limit
-- Updated package.json version to 2.9.58
+- Creado ESTADO-PROYECTO.txt con documentacion completa del proyecto
+- Incluye: version actual, estructura de archivos, sistema de actualizacion, historial, tareas pendientes, consideraciones
+- Copiado a /home/z/my-project/ESTADO-PROYECTO.txt (local permanente)
+- Subido como asset en GitHub Release v2.9.66
 
 Stage Summary:
-- All ticket toggles now properly save to DB and propagate to printer engine
-- Migration system runs automatically at startup via instrumentation.ts
-- Backup system covers all 21 database tables
-- Version centralized in src/lib/version.ts
-- Catalog logo adapts properly without being cut off
-- Product image upload compresses large phone photos before uploading
----
-Task ID: 1
-Agent: Main Agent
-Task: Evaluar código del usuario y aplicar sistema de actualizaciones mejorado
-
-Work Log:
-- Extrajo archivo RAR del usuario (240 archivos, proyecto Next.js completo)
-- Comparó check-version: usaba Tags API sin token → ahora usa Releases API con token + fallback local
-- Comparó update: solo aceptaba version → ahora acepta version + downloadUrl, detecta rollback
-- Comparó VersionChecker: simple → ahora con lista de versiones, changelogs, accordion, rollback, estados de error
-- Corrigió package.json: versión 2.9.58 → 2.9.63
-- Creó public/versions.json con 41 versiones (v2.9.31 a v2.9.63)
-- Creó src/app/api/download-version/route.ts (proxy para repos privados)
-- Creó .env con GITHUB_TOKEN
-- Creó carpeta releases/ con .gitkeep
-- Generó ZIP de instalación limpia (985KB) basado en código del usuario
-- Subió a GitHub Release v2.9.63 como asset
-
-Stage Summary:
-- Archivos modificados: package.json, check-version/route.ts, update/route.ts, config-tab.tsx
-- Archivos nuevos: versions.json, download-version/route.ts, .env, releases/.gitkeep
-- ZIP subido: https://github.com/csglider/MyeCommerce-v2.9.20/releases/download/v2.9.63/MyeCommerce-v2.9.63-INSTALACION-LIMPIA.zip
-
+- Archivo: ESTADO-PROYECTO.txt (7.5 KB)
+- Local: /home/z/my-project/ESTADO-PROYECTO.txt
+- GitHub: https://github.com/csglider/MyeCommerce-v2.9.20/releases/download/v2.9.66/ESTADO-PROYECTO.txt
+- Incluido en la carpeta base_v264/ para que vaya en proximos ZIPs
