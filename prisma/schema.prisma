@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -52,6 +53,7 @@ model Product {
   comboItems          ComboItem[]
   comboItemsRef       ComboItem[] @relation("ProductComboItems")
   inventoryMovements  InventoryMovement[]
+  @@map("products")
 }
 
 model Category {
@@ -61,6 +63,7 @@ model Category {
   color    String    @default("#6366f1")
   active   Boolean   @default(true)
   products Product[]
+  @@map("categories")
 }
 
 model Brand {
@@ -68,6 +71,7 @@ model Brand {
   name     String    @unique
   active   Boolean   @default(true)
   products Product[]
+  @@map("brands")
 }
 
 model Client {
@@ -97,6 +101,7 @@ model Client {
   @@index([docNumber])
   @@index([fullName])
   @@index([type])
+  @@map("clients")
 }
 
 model Sale {
@@ -133,6 +138,7 @@ model Sale {
 
   @@index([date])
   @@index([clientId])
+  @@map("sales")
 }
 
 model SaleItem {
@@ -144,6 +150,7 @@ model SaleItem {
   total     Float
   product   Product @relation(fields: [productId], references: [id])
   sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  @@map("sale_items")
 }
 
 model Settings {
@@ -193,6 +200,7 @@ model Settings {
   promoCurrentPrice    Float   @default(180)
   promoExpiryDate      String  @default("")
   updatedAt       DateTime @updatedAt
+  @@map("settings")
 }
 
 model Devolution {
@@ -210,6 +218,7 @@ model Devolution {
 
   @@index([date])
   @@index([saleId])
+  @@map("devolutions")
 }
 
 model DevolutionItem {
@@ -222,6 +231,7 @@ model DevolutionItem {
   total        Float
   product      Product    @relation(fields: [productId], references: [id])
   devolution   Devolution @relation(fields: [devolutionId], references: [id], onDelete: Cascade)
+  @@map("devolution_items")
 }
 
 model License {
@@ -245,6 +255,7 @@ model License {
   ownerRif          String   @default("")
   notes             String   @default("")
   updatedAt         DateTime @updatedAt
+  @@map("licenses")
 }
 
 model CashClosing {
@@ -304,6 +315,7 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   expenses    Expense[]
+  @@map("users")
 }
 
 model RoleConfig {
@@ -314,6 +326,7 @@ model RoleConfig {
   color       String   @default("#6366f1")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  @@map("role_configs")
 }
 
 model Supplier {
@@ -331,6 +344,7 @@ model Supplier {
   updatedAt  DateTime   @updatedAt
 
   @@index([name])
+  @@map("suppliers")
 }
 
 model Purchase {
@@ -349,6 +363,7 @@ model Purchase {
 
   @@index([date])
   @@index([supplierId])
+  @@map("purchases")
 }
 
 model ComboItem {
@@ -358,6 +373,7 @@ model ComboItem {
   quantity  Int     @default(1)
   combo     Product @relation(fields: [comboId], references: [id], onDelete: Cascade)
   product   Product @relation("ProductComboItems", fields: [productId], references: [id])
+  @@map("combo_items")
 }
 
 model PurchaseItem {
@@ -378,6 +394,7 @@ model PurchaseItem {
   product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
+  @@map("purchase_items")
 }
 
 model CreditPayment {
@@ -399,6 +416,7 @@ model CreditPayment {
   @@index([date])
   @@index([saleId])
   @@index([clientId])
+  @@map("credit_payments")
 }
 
 // ===== KARDEX DE INVENTARIO =====
@@ -427,6 +445,7 @@ model InventoryMovement {
   @@index([productId])
   @@index([date])
   @@index([movementType])
+  @@map("inventory_movements")
 }
 
 // ===== FACTURAS EN ESPERA =====
@@ -453,6 +472,7 @@ model HeldSale {
 
   @@index([userId])
   @@index([status])
+  @@map("held_sales")
 }
 
 model HeldSaleItem {
@@ -466,6 +486,7 @@ model HeldSaleItem {
   taxType     String   @default("general")
   heldSale    HeldSale @relation(fields: [heldSaleId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  @@map("held_sale_items")
 }
 
 // ===== PRESUPUESTOS / COTIZACIONES =====
@@ -492,6 +513,7 @@ model Quote {
 
   @@index([userId])
   @@index([status])
+  @@map("quotes")
 }
 
 model QuoteItem {
@@ -505,6 +527,7 @@ model QuoteItem {
   taxType     String   @default("general")
   quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  @@map("quote_items")
 }
 
 // ===== NOTAS DE ENTREGA =====
@@ -529,6 +552,7 @@ model DeliveryNote {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@map("delivery_notes")
 }
 
 model DeliveryNoteItem {
@@ -541,6 +565,7 @@ model DeliveryNoteItem {
   totalCost      Float    @default(0)
   deliveryNote   DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
+  @@map("delivery_note_items")
 }
 
 // ========== MODULO DE GASTOS ==========
@@ -554,6 +579,7 @@ model ExpenseCategory {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   expenses    Expense[]
+  @@map("expense_categories")
 }
 
 model Expense {
@@ -576,4 +602,5 @@ model Expense {
   @@index([date])
   @@index([categoryId])
   @@index([userId])
+  @@map("expenses")
 }

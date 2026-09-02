@@ -1,11 +1,12 @@
 export const runtime = 'edge';
-import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 
 export async function GET(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const { searchParams } = new URL(req.url);
     const format = searchParams.get('format') || 'xlsx'; // xlsx or csv or vcard

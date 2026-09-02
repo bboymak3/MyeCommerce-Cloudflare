@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextResponse } from 'next/server';
 
@@ -24,7 +24,8 @@ function desglosaVenta(s: { paymentMethod: string; total: number; totalBs: numbe
 }
 
 export async function GET() {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const today = new Date();
     const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());

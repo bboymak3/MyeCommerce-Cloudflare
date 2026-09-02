@@ -1,12 +1,13 @@
 export const runtime = 'edge';
-import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n) ? fb : n; };
 
 export async function GET(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
@@ -45,7 +46,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const body = await req.json() as any;
 
@@ -98,7 +100,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const body = await req.json() as any;
 
@@ -157,7 +160,8 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

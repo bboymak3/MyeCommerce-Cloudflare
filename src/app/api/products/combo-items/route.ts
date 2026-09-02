@@ -1,12 +1,13 @@
 export const runtime = 'edge';
-import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET /api/products/combo-items?comboId=xxx
 // Obtener todos los items de un combo
 export async function GET(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const { searchParams } = new URL(req.url);
     const comboId = searchParams.get('comboId');
@@ -29,7 +30,8 @@ export async function GET(req: NextRequest) {
 // POST /api/products/combo-items
 // Agregar un producto a un combo
 export async function POST(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const body = await req.json() as any;
     const { comboId, productId, quantity } = body;
@@ -67,7 +69,8 @@ export async function POST(req: NextRequest) {
 // DELETE /api/products/combo-items?id=xxx
 // Eliminar un item de un combo
 export async function DELETE(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

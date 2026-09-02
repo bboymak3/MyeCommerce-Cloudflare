@@ -1,11 +1,12 @@
 export const runtime = 'edge';
-import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET /api/credit - List credit accounts (clients with debt)
 export async function GET(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get('clientId');
@@ -151,7 +152,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/credit - Register payment (abono)
 export async function POST(req: NextRequest) {
-  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
+  const { env } = getRequestContext();
+  const db = createDbFromEnv(env as any);
   try {
     const body = await req.json() as any;
     const amount = parseFloat(body.amount);

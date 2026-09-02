@@ -10,7 +10,7 @@ const LOGO_KEY = 'store/logo';
 export async function GET() {
   try {
     const env = getRequestContext().env as any;
-    const bucket = env.BUCKET as R2Bucket;
+    const bucket = env.R2_PHOTOS as R2Bucket;
     if (!bucket) {
       return NextResponse.json({ error: 'R2 bucket not configured' }, { status: 500 });
     }
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     const env = getRequestContext().env as any;
-    const bucket = env.BUCKET as R2Bucket;
+    const bucket = env.R2_PHOTOS as R2Bucket;
     if (!bucket) {
       return NextResponse.json({ error: 'R2 bucket not configured' }, { status: 500 });
     }
