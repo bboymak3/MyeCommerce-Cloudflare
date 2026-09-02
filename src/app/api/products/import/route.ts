@@ -1,4 +1,6 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 
@@ -44,6 +46,7 @@ function buildColumnMap(headers: string[]): Record<string, string> {
 }
 
 export async function POST(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;

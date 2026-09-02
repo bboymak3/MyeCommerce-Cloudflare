@@ -1,12 +1,15 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const clientId = params.id;
+    const { id: clientId } = await params;
     const { searchParams } = new URL(req.url);
     const dateFrom = searchParams.get('from') || '';
     const dateTo = searchParams.get('to') || '';

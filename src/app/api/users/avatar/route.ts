@@ -1,10 +1,13 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Dedicated endpoint for avatar upload - avoids body size issues with main user update
 export async function POST(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     const { userId, avatar } = body;
 
     if (!userId) {

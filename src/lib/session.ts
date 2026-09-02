@@ -1,8 +1,8 @@
-import jwt from 'jsonwebtoken';
+// Session utilities - Edge Runtime compatible (jose library)
+import { SignJWT, jwtVerify } from 'jose';
 
-// JWT Secret — en produccion debe venir de variable de entorno
-const JWT_SECRET = process.env.JWT_SECRET || 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production';
-const JWT_EXPIRES_IN = '24h'; // Token expira en 24 horas
+const JWT_SECRET = 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production';
+const JWT_EXPIRES_IN = '24h';
 
 export interface SessionPayload {
   userId: string;
@@ -12,60 +12,56 @@ export interface SessionPayload {
   exp: number;
 }
 
-/**
- * Genera un token JWT firmado para la sesion del usuario.
- */
-export function createSessionToken(user: {
-  id: string;
-  username: string;
-  role: string;
-}): string {
-  const payload = {
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-  };
-
-  return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
-    algorithm: 'HS256',
-  });
+function getSecretKey(): Uint8Array {
+  return new TextEncoder().encode(JWT_SECRET);
 }
 
 /**
- * Verifica y decodifica un token JWT.
- * Retorna el payload si es valido, null si no.
+ * Generate a signed JWT session token using jose (Edge compatible).
+ * ASYNC because jose is async.
  */
-export function verifySessionToken(token: string): SessionPayload | null {
+export async function createSessionToken(user: {
+  id: string;
+  username: string;
+  role: string;
+}): Promise<string> {
+  return new SignJWT({ userId: user.id, username: user.username, role: user.role })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(JWT_EXPIRES_IN)
+    .sign(getSecretKey());
+}
+
+/**
+ * Verify and decode a JWT token using jose (Edge compatible).
+ * ASYNC because jose is async.
+ */
+export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const { payload } = await jwtVerify(token, getSecretKey(), {
       algorithms: ['HS256'],
-    }) as SessionPayload;
-    return decoded;
+    });
+    return payload as unknown as SessionPayload;
   } catch {
     return null;
   }
 }
 
 /**
- * Extrae el token JWT del header Authorization: Bearer <token>
- * Tambien acepta token via query param (para downloads) o cookie.
+ * Extract JWT token from request (Authorization header, query param, or cookie).
  */
 export function extractToken(request: Request): string | null {
-  // 1. Header Authorization: Bearer <token>
   const authHeader = request.headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }
 
-  // 2. Query param ?token=<token> (para downloads de archivos)
   const url = new URL(request.url);
   const tokenParam = url.searchParams.get('token');
   if (tokenParam) {
     return tokenParam;
   }
 
-  // 3. Cookie: session_token=<token>
   const cookieHeader = request.headers.get('cookie');
   if (cookieHeader) {
     const match = cookieHeader.match(/session_token=([^;]+)/);
@@ -78,10 +74,10 @@ export function extractToken(request: Request): string | null {
 }
 
 /**
- * Valida la sesion de una request.
- * Retorna el payload del usuario o null si no hay sesion valida.
+ * Validate a session from a request.
+ * ASYNC because verifySessionToken is now async.
  */
-export function validateSession(request: Request): SessionPayload | null {
+export async function validateSession(request: Request): Promise<SessionPayload | null> {
   const token = extractToken(request);
   if (!token) return null;
   return verifySessionToken(token);

@@ -86,7 +86,7 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [settings, setSettings] = useState<Settings>({
+  const [settings, setSettings] = useState<any>({
     id: "", storeName: "Mi Tienda", storeAddress: "", storePhone: "", storeRif: "",
     bcvRate: 36.5, taxRate: 0, currency: "USD", allowZeroStock: false, enableDiscount: false, maxDiscountPct: 20, theme: "blue",
     ticketFontSize: 8, ticketFontFamily: 'monospace', ticketHeaderMsg: "", ticketFooterMsg: "Gracias por su compra!",
@@ -181,7 +181,7 @@ export default function Home() {
   const handleLogin = (user: CurrentUser & { token?: string }) => {
     // Guardar token JWT y datos del usuario
     if (user.token) {
-      storeSession(user.token, user);
+      storeSession(user.token, user as any);
     }
     setCurrentUser(user);
   };
@@ -198,7 +198,7 @@ export default function Home() {
     setCurrentUser(updated);
     const token = localStorage.getItem("myecommerce_token");
     if (token) {
-      storeSession(token, updated);
+      storeSession(token, updated as any);
     }
   };
 

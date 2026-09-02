@@ -1,4 +1,6 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 function getVenezuelaNow(): Date {
@@ -153,6 +155,7 @@ function getPeriodDates(period: string): { start: Date; end: Date; label: string
 }
 
 export async function GET(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') || 'today';

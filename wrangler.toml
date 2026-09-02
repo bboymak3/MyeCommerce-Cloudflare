@@ -1,0 +1,20 @@
+# Cloudflare Pages configuration for MyeCommerce POS
+pages_build_output_dir = ".vercel/output/static"
+
+name = "myecommerce-pos"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 Database binding
+d1_databases = [
+  { binding = "DB", database_name = "myecommerce-ferreteria-central", database_id = "0581672e-a68f-47c4-96eb-257c50b4dd49" }
+]
+
+# R2 Storage binding
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "ferreteria-central-photos"
+
+[vars]
+NODE_ENV = "production"
+JWT_SECRET = "myecommerce-pos-jwt-secret-v2.9.34-change-in-production"

@@ -35,6 +35,13 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "MyeCommerce-v2.9.20",
+    "pos-astro",
+    "repo",
+    "scripts",
+    "skills",
+    "caddy",
+    "zip"
   ]
 }

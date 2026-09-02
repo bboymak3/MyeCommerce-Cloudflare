@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { jwtVerify } from 'jose';
 
 // Rutas API que NO requieren autenticacion
 const PUBLIC_ROUTES = [
@@ -16,67 +17,17 @@ const ADMIN_ROUTES = [
 ];
 
 // JWT Secret — debe coincidir con src/lib/session.ts
-const JWT_SECRET = process.env.JWT_SECRET || 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production';
-
-async function hmacSha256(secret: string, message: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
-  // Convert to base64url
-  const hashArray = Array.from(new Uint8Array(signature));
-  return hashArray
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function base64urlDecode(str: string): string {
-  // Base64url decode
-  str = str.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = str.length % 4;
-  if (pad) {
-    if (pad === 1) str += '=';
-    else if (pad === 2) str += '==';
-    else str += '=';
-  }
-  const raw = atob(str);
-  return raw;
-}
+const JWT_SECRET = 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production';
 
 async function verifyToken(token: string): Promise<{ userId: string; username: string; role: string } | null> {
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-
-    const payloadB64 = parts[1];
-    const payloadStr = base64urlDecode(payloadB64);
-    const payload = JSON.parse(payloadStr);
-
-    // Verificar expiracion
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return null;
-    }
-
-    // Verificar signature (HMAC SHA256)
-    const expectedSigHex = await hmacSha256(JWT_SECRET, parts[0] + '.' + parts[1]);
-
-    // jsonwebtoken produces base64url signature, need to convert to hex for comparison
-    const sigB64url = parts[2];
-    const sigHex = Array.from(atob(sigB64url.replace(/-/g, '+').replace(/_/g, '/')))
-      .map(b => b.charCodeAt(0).toString(16).padStart(2, '0'))
-      .join('');
-
-    if (expectedSigHex !== sigHex) return null;
-
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET), {
+      algorithms: ['HS256'],
+    });
     return {
-      userId: payload.userId,
-      username: payload.username,
-      role: payload.role,
+      userId: (payload as any).userId,
+      username: (payload as any).username,
+      role: (payload as any).role,
     };
   } catch {
     return null;

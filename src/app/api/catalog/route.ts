@@ -1,9 +1,12 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { headers } from 'next/headers';
 
 export async function GET(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get('category') || 'all';
@@ -40,7 +43,7 @@ export async function GET(req: NextRequest) {
     // Detectar origin para URLs absolutas de imagenes (funciona en nueva ventana y PDF)
     let baseUrl = '';
     try {
-      const headersList = headers();
+      const headersList = await headers();
       const referer = headersList.get('referer') || headersList.get('host') || '';
       if (referer.includes('://')) {
         const url = new URL(referer);

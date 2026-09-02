@@ -1,32 +1,32 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
+  // Skip type checking during build (pre-existing type errors in page components)
+  typescript: { ignoreBuildErrors: true },
+  // Cloudflare Pages compatible output
+  // Disable Next.js image optimization (not supported on Edge Runtime)
+  images: {
+    unoptimized: true,
   },
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb',
-    },
-  },
-  webpack: (config) => {
-    // jspdf referencia canvas y fflate como deps opcionales internas.
-    // canvas requiere compilacion nativa (no disponible en Windows facil).
-    // fflate no se usa en nuestro flujo. Se ignora para evitar errores.
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'canvas': false,
-      'fflate': false,
-    };
+  // Stub Node.js built-ins that don't exist in Edge Runtime
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        os: false,
+        child_process: false,
+        crypto: false,
+        stream: false,
+        http: false,
+        https: false,
+        zlib: false,
+        net: false,
+        tls: false,
+        dns: false,
+      };
+    }
     return config;
-  },
-  // Rewrite /uploads/products/file.jpg al API endpoint que sirve desde data/
-  async rewrites() {
-    return [
-      {
-        source: '/uploads/products/:file',
-        destination: '/api/product-images?file=:file',
-      },
-    ];
   },
 };
 

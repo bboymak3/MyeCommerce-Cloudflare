@@ -1,10 +1,13 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { validateLicenseKey, getLicenseFeatures, getLicenseLimits, getPlanInfo, type LicenseInfo } from '@/lib/license';
 import { getMachineId } from '@/lib/machine-id';
 
 // Obtener estado actual de la licencia
 export async function GET(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const currentMachineId = getMachineId();
     let license = await db.license.findFirst();
@@ -209,8 +212,9 @@ export async function GET(req: NextRequest) {
 
 // Activar una licencia con clave
 export async function POST(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     const { licenseKey, ownerName, ownerEmail, ownerPhone, ownerRif } = body;
 
     if (!licenseKey || !licenseKey.trim()) {

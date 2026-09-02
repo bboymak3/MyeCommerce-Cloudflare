@@ -1,12 +1,15 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { logInfo, logWarn } from '@/lib/logger';
 
 const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n) ? fb : n; };
 
 export async function POST(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     const { productId, oldStock, newStock, quantity, movementType, reason, unitCost } = body;
 
     if (!productId || !movementType || !reason || !reason.trim()) {

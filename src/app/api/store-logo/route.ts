@@ -1,50 +1,42 @@
+export const runtime = 'edge';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir, unlink, readFile } from 'fs/promises';
-import { join } from 'path';
-import { existsSync, readdirSync } from 'fs';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 
-const STORE_DIR = () => join(process.cwd(), 'public', 'store');
 const VALID_EXTS = ['png', 'jpg', 'gif', 'webp', 'bmp'];
+const LOGO_KEY = 'store/logo';
 
-function findLogoFile(): string | null {
-  const dir = STORE_DIR();
-  if (!existsSync(dir)) return null;
-  try {
-    const files = readdirSync(dir);
-    for (const ext of VALID_EXTS) {
-      const name = `logo.${ext}`;
-      if (files.includes(name)) return join(dir, name);
-    }
-  } catch {}
-  return null;
-}
-
-// GET — serve logo from filesystem (avoids Next.js static cache issues)
+// GET — serve logo from R2
 export async function GET() {
   try {
-    const logoPath = findLogoFile();
-    if (!logoPath) {
-      return NextResponse.json({ error: 'No hay logo' }, { status: 404 });
+    const env = getRequestContext().env as any;
+    const bucket = env.BUCKET as R2Bucket;
+    if (!bucket) {
+      return NextResponse.json({ error: 'R2 bucket not configured' }, { status: 500 });
     }
-    const buffer = await readFile(logoPath);
-    const ext = logoPath.split('.').pop() || 'png';
-    const mimeMap: Record<string, string> = {
-      png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
-    };
-    // Cache for 60 seconds so browser refreshes get updates
-    return new NextResponse(buffer, {
-      headers: {
-        'Content-Type': mimeMap[ext] || 'image/png',
-        'Cache-Control': 'public, max-age=60',
-        'Content-Disposition': `inline; filename="logo.${ext}"`,
-      },
-    });
+
+    // Try each extension to find the logo
+    for (const ext of VALID_EXTS) {
+      const object = await bucket.get(`${LOGO_KEY}.${ext}`);
+      if (object) {
+        const mimeMap: Record<string, string> = {
+          png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp',
+        };
+        const headers = new Headers();
+        headers.set('Content-Type', object.httpMetadata?.contentType || mimeMap[ext] || 'image/png');
+        headers.set('Cache-Control', 'public, max-age=60');
+        headers.set('Content-Disposition', `inline; filename="logo.${ext}"`);
+        return new NextResponse(object.body, { headers });
+      }
+    }
+
+    return NextResponse.json({ error: 'No hay logo' }, { status: 404 });
   } catch {
     return NextResponse.json({ error: 'Error al leer logo' }, { status: 500 });
   }
 }
 
-// POST — upload logo
+// POST — upload logo to R2
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -54,56 +46,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No se proporciono archivo' }, { status: 400 });
     }
 
-    // Validar tipo
     const validTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/bmp'];
     if (!validTypes.includes(file.type)) {
       return NextResponse.json({ error: 'Formato no soportado. Use PNG, JPG, GIF o WEBP' }, { status: 400 });
     }
 
-    // Validar tamano (max 2MB para logo de tienda)
     if (file.size > 2 * 1024 * 1024) {
       return NextResponse.json({ error: 'Imagen demasiado grande. Maximo 2MB' }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Crear directorio si no existe
-    const storeDir = STORE_DIR();
-    if (!existsSync(storeDir)) {
-      await mkdir(storeDir, { recursive: true });
+    const env = getRequestContext().env as any;
+    const bucket = env.BUCKET as R2Bucket;
+    if (!bucket) {
+      return NextResponse.json({ error: 'R2 bucket not configured' }, { status: 500 });
     }
 
-    // Determinar extension correcta basada en el tipo MIME
     const extMap: Record<string, string> = {
-      'image/png': 'png',
-      'image/jpeg': 'jpg',
-      'image/gif': 'gif',
-      'image/webp': 'webp',
-      'image/bmp': 'bmp',
+      'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/bmp': 'bmp',
     };
     const ext = extMap[file.type] || 'png';
-    const fileName = `logo.${ext}`;
-    const filePath = join(storeDir, fileName);
+    const key = `${LOGO_KEY}.${ext}`;
 
-    // Limpiar archivos logo viejos con otras extensiones
-    try {
-      const existing = readdirSync(storeDir);
-      for (const f of existing) {
-        if (f.startsWith('logo.') && f !== fileName) {
-          const oldExt = f.split('.').pop();
-          if (oldExt && VALID_EXTS.includes(oldExt)) {
-            unlink(join(storeDir, f)).catch(() => {});
-          }
-        }
+    // Delete old logos with different extensions
+    for (const oldExt of VALID_EXTS) {
+      if (oldExt !== ext) {
+        await bucket.delete(`${LOGO_KEY}.${oldExt}`).catch(() => {});
       }
-    } catch {}
+    }
 
-    await writeFile(filePath, buffer);
+    const bytes = await file.arrayBuffer();
+    await bucket.put(key, bytes, {
+      httpMetadata: { contentType: file.type || 'image/png' },
+    });
 
-    // Retornar la URL via API route para evitar cache de static files
-    const logoUrl = `/api/store-logo`;
-    return NextResponse.json({ url: logoUrl, message: 'Logo guardado correctamente' });
+    return NextResponse.json({ url: '/api/store-logo', message: 'Logo guardado correctamente' });
   } catch (error) {
     console.error('Error uploading logo:', error);
     return NextResponse.json({ error: 'Error al guardar logo' }, { status: 500 });

@@ -1,8 +1,11 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAppVersion } from '@/lib/version';
 
 export async function GET() {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const [
       products, categories, brands, sales, settings,
@@ -64,8 +67,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const data = await req.json();
+    const data: any = await req.json() as any;
 
     // Limpiar BD existente (orden: dependencias primero)
     // Tablas con relaciones foreign key primero
@@ -292,7 +296,7 @@ export async function POST(req: NextRequest) {
       await db.user.create({
         data: {
           username: 'admin',
-          password: hashPassword('admin'),
+          password: await hashPassword('admin'),
           fullName: 'Administrador',
           role: 'admin',
           isActive: true,

@@ -1,7 +1,10 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET() {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     let settings = await db.settings.findFirst();
     if (!settings) {
@@ -52,8 +55,9 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     let settings = await db.settings.findFirst();
 
     const bcvRate = parseFloat(body.bcvRate);

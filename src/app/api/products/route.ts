@@ -1,4 +1,6 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 function safeFloat(v: any, fallback: number = 0): number {
@@ -7,6 +9,7 @@ function safeFloat(v: any, fallback: number = 0): number {
 }
 
 export async function GET() {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const products = await db.product.findMany({
       where: { active: true },
@@ -25,8 +28,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     if (!body.name || !body.name.trim()) {
       return NextResponse.json({ error: 'Nombre del producto es requerido' }, { status: 400 });
     }
@@ -89,8 +93,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     if (!body.id) return NextResponse.json({ error: 'ID del producto es requerido' }, { status: 400 });
     if (body.name !== undefined && !body.name.trim()) {
       return NextResponse.json({ error: 'Nombre del producto es requerido' }, { status: 400 });
@@ -150,8 +155,9 @@ export async function PUT(req: NextRequest) {
 
 // ===== AJUSTE MASIVO DE PRECIOS =====
 export async function PATCH(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     const { action, categoryId, percentage, applyTo } = body;
 
     if (action !== 'bulk-price') {
@@ -214,6 +220,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

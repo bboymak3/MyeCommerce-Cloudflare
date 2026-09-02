@@ -1,8 +1,11 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET — Reporte de Utilidad / Pérdida por periodo
 export async function GET(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
@@ -20,7 +23,7 @@ export async function GET(req: NextRequest) {
     const bcvRate = settings?.bcvRate || 36.5;
 
     // 1. VENTAS del periodo
-    const sales = await db.sale.findMany({
+    const sales: any[] = await db.sale.findMany({
       where: { date: { gte: start, lte: end } },
       include: { items: { include: { product: { select: { cost: true } } } } },
     });

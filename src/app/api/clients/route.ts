@@ -1,8 +1,11 @@
-import { db } from '@/lib/db';
+export const runtime = 'edge';
+import { db as _defaultDb, createDbFromEnv } from '@/lib/db'
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET - Listar clientes
 export async function GET(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || '';
@@ -33,8 +36,9 @@ export async function GET(req: NextRequest) {
 
 // POST - Crear cliente
 export async function POST(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     if (!body.fullName?.trim() || !body.docNumber?.trim()) {
       return NextResponse.json({ error: 'Nombre y documento son requeridos' }, { status: 400 });
     }
@@ -72,8 +76,9 @@ export async function POST(req: NextRequest) {
 
 // PUT - Actualizar cliente
 export async function PUT(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
-    const body = await req.json();
+    const body = await req.json() as any;
     if (!body.id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
     if (body.docNumber) {
@@ -110,6 +115,7 @@ export async function PUT(req: NextRequest) {
 
 // DELETE - Desactivar cliente
 export async function DELETE(req: NextRequest) {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -128,6 +134,7 @@ export async function DELETE(req: NextRequest) {
 
 // PATCH - Crear Cliente Final si no existe
 export async function PATCH() {
+  let db = _defaultDb; try { const { env } = getRequestContext(); db = createDbFromEnv(env as any); } catch {}
   try {
     let finalClient = await db.client.findFirst({ where: { isFinalClient: true } });
     if (!finalClient) {
