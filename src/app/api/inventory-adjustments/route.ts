@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { logInfo, logWarn } from '@/lib/logger';
@@ -8,7 +8,7 @@ const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const { productId, oldStock, newStock, quantity, movementType, reason, unitCost } = body;

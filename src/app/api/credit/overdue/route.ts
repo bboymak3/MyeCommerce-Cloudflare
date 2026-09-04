@@ -1,12 +1,12 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextResponse } from 'next/server';
 
 // GET /api/credit/overdue - Returns count + summary of overdue credits
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const now = new Date();
     // Get all credit sales with due date before now

@@ -1,12 +1,12 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextResponse } from 'next/server';
 import { getAppVersion } from '@/lib/version';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const [products, categories, clients, sales, users, devolutions, cashClosings] = await Promise.all([
       db.product.count(),

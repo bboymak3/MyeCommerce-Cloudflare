@@ -1,11 +1,11 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
 
@@ -95,44 +95,47 @@ export async function POST(req: NextRequest) {
       return sum + (qty * unitPrice);
     }, 0);
 
-    // TRANSACTIONAL: create devolution + restore stock
-    const devolution = await db.$transaction(async (tx) => {
-      const newDevolution = await tx.devolution.create({
-        data: {
-          saleId: body.saleId,
-          reason: body.reason || 'Devolucion',
-          totalUsd,
-          totalBs: totalUsd * rate,
-          exchangeRate: rate,
-          status: body.status || 'completada',
-          items: {
+    // D1 BATCH TRANSACTION: all writes as a batch (no reads needed inside tx)
+    const ops: any[] = [];
+
+    // Create devolution (op index 0)
+    ops.push(db.devolution.create({
+      data: {
+        saleId: body.saleId,
+        reason: body.reason || 'Devolucion',
+        totalUsd,
+        totalBs: totalUsd * rate,
+        exchangeRate: rate,
+        status: body.status || 'completada',
+        items: {
       // Calcular total server-side por cada item (no confiar en el cliente)
-            create: body.items.map((item: any) => {
-              const qty = parseFloat(item.quantity) || 0;
-              const unitPrice = parseFloat(item.unitPrice) || 0;
-              return {
-                productId: item.productId,
-                productName: item.productName,
-                quantity: qty,
-                unitPrice,
-                total: qty * unitPrice,
-              };
-            }),
-          },
+          create: body.items.map((item: any) => {
+            const qty = parseFloat(item.quantity) || 0;
+            const unitPrice = parseFloat(item.unitPrice) || 0;
+            return {
+              productId: item.productId,
+              productName: item.productName,
+              quantity: qty,
+              unitPrice,
+              total: qty * unitPrice,
+            };
+          }),
         },
-        include: { items: true, sale: true },
-      });
+      },
+      include: { items: true, sale: true },
+    }));
 
-      // Restaurar stock
-      for (const item of body.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: parseFloat(item.quantity) } },
-        });
-      }
+    // Restaurar stock
+    for (const item of body.items) {
+      ops.push(db.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: parseFloat(item.quantity) } },
+      }));
+    }
 
-      return newDevolution;
-    });
+    // Execute batch transaction
+    const results = await db.$transaction(ops);
+    const devolution = results[0];
 
     return NextResponse.json(devolution);
   } catch (error) {

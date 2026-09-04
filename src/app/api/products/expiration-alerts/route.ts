@@ -1,11 +1,11 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const now = new Date();
     const warning15 = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days

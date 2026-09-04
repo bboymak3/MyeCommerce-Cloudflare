@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword, verifyPassword, needsRehash } from '@/lib/auth';
 import { createSessionToken, verifySessionToken } from '@/lib/session';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { createDbFromEnv } from '@/lib/db';
+import { createDbFromEnv, getTenantId } from '@/lib/db';
 
 // Rate limiting: max 5 intentos fallidos por IP en 5 minutos
 // NOTE: In Edge Runtime, this Map is per-isolate and may not persist across requests.
@@ -78,7 +78,7 @@ async function ensureAdminUser(db: any) {
 export async function POST(req: NextRequest) {
   try {
     const { env } = getRequestContext();
-    const db = createDbFromEnv(env as any);
+    const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
 
     // Ensure admin exists
     await ensureAdminUser(db);
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const { env } = getRequestContext();
-    const db = createDbFromEnv(env as any);
+    const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
 
     const authHeader = req.headers.get('authorization');
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -212,7 +212,7 @@ export async function DELETE(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const { env } = getRequestContext();
-    const db = createDbFromEnv(env as any);
+    const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
 
     const body = await req.json() as any as { userId?: string; currentPassword?: string; newPassword?: string };
     const { userId, currentPassword, newPassword } = body;

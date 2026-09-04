@@ -1,12 +1,12 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET — Listar gastos con filtros
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 // POST — Crear gasto
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const { categoryId, description, amount, date, paymentMethod = 'efectivo', reference = '', notes = '', userId } = body;
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 // PUT — Actualizar gasto
 export async function PUT(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const { id, categoryId, description, amount, date, paymentMethod, reference, notes, exchangeRate } = body;
@@ -157,7 +157,7 @@ export async function PUT(req: NextRequest) {
 // DELETE — Eliminar gasto
 export async function DELETE(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

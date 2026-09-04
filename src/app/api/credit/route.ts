@@ -1,12 +1,12 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET /api/credit - List credit accounts (clients with debt)
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get('clientId');
@@ -153,7 +153,7 @@ export async function GET(req: NextRequest) {
 // POST /api/credit - Register payment (abono)
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const amount = parseFloat(body.amount);
@@ -177,53 +177,60 @@ export async function POST(req: NextRequest) {
 
     const exchangeRate = parseFloat(body.exchangeRate) || 36.5;
 
-    // TRANSACTIONAL: re-check remaining inside transaction to prevent race condition
-    const payment = await db.$transaction(async (tx) => {
-      const freshSale = await tx.sale.findUnique({ where: { id: body.saleId } });
-      if (!freshSale) throw new Error('Venta no encontrada');
-      const txRemaining = Number(freshSale.total || 0) - Number(freshSale.creditPaid || 0);
-      const txAmount = Math.min(finalAmount, txRemaining);
-      if (txAmount <= 0) throw new Error('Esta venta ya esta completamente pagada');
+    // D1 BATCH TRANSACTION: reads first, then batch writes
+    // Re-check remaining to prevent race condition — READ FIRST
+    const freshSale = await db.sale.findUnique({ where: { id: body.saleId } });
+    if (!freshSale) throw new Error('Venta no encontrada');
+    const txRemaining = Number(freshSale.total || 0) - Number(freshSale.creditPaid || 0);
+    const txAmount = Math.min(finalAmount, txRemaining);
+    if (txAmount <= 0) throw new Error('Esta venta ya esta completamente pagada');
 
-      const newPaid = Number(freshSale.creditPaid || 0) + txAmount;
-
-      // Create payment record - usar SIEMPRE el clientId de la venta, no del body
-      const newPayment = await tx.creditPayment.create({
-        data: {
-          saleId: body.saleId,
-          clientId: sale.clientId || null, // Siempre usar el de la venta, nunca el del body
-          date: new Date(),
-          amount: txAmount,
-          exchangeRate,
-          amountBs: Number((txAmount * exchangeRate).toFixed(2)),
-          method: body.method || 'efectivo',
-          reference: body.reference || '',
-          notes: body.notes || '',
-          createdBy: body.createdBy || '',
-        },
-      });
-
-      // Update sale creditPaid
-      await tx.sale.update({
-        where: { id: body.saleId },
-        data: { creditPaid: Number((Number(freshSale.creditPaid || 0) + txAmount).toFixed(2)) },
-      });
-
-      // Update client credit balance
-      if (sale.clientId) {
-        const client = await tx.client.findUnique({ where: { id: sale.clientId } });
-        if (client) {
-          const currentBalance = Number(client.creditBalance || 0);
-          const newBalance = Math.max(0, currentBalance - txAmount);
-          await tx.client.update({
-            where: { id: sale.clientId },
-            data: { creditBalance: Number(newBalance.toFixed(2)) },
-          });
-        }
+    // Read client credit balance — READ FIRST
+    let clientCreditBalance: number | null = null;
+    if (sale.clientId) {
+      const client = await db.client.findUnique({ where: { id: sale.clientId } });
+      if (client) {
+        clientCreditBalance = Number(client.creditBalance || 0);
       }
+    }
 
-      return newPayment;
-    });
+    // Build batch write operations
+    const ops: any[] = [];
+
+    // Create payment record (op index 0) — usar SIEMPRE el clientId de la venta, no del body
+    ops.push(db.creditPayment.create({
+      data: {
+        saleId: body.saleId,
+        clientId: sale.clientId || null, // Siempre usar el de la venta, nunca el del body
+        date: new Date(),
+        amount: txAmount,
+        exchangeRate,
+        amountBs: Number((txAmount * exchangeRate).toFixed(2)),
+        method: body.method || 'efectivo',
+        reference: body.reference || '',
+        notes: body.notes || '',
+        createdBy: body.createdBy || '',
+      },
+    }));
+
+    // Update sale creditPaid
+    ops.push(db.sale.update({
+      where: { id: body.saleId },
+      data: { creditPaid: Number((Number(freshSale.creditPaid || 0) + txAmount).toFixed(2)) },
+    }));
+
+    // Update client credit balance
+    if (sale.clientId && clientCreditBalance !== null) {
+      const newBalance = Math.max(0, clientCreditBalance - txAmount);
+      ops.push(db.client.update({
+        where: { id: sale.clientId },
+        data: { creditBalance: Number(newBalance.toFixed(2)) },
+      }));
+    }
+
+    // Execute batch transaction
+    const results = await db.$transaction(ops);
+    const payment = results[0];
 
     return NextResponse.json(payment);
   } catch (error: any) {

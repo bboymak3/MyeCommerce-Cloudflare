@@ -60,3 +60,29 @@ Stage Summary:
 - Super admin credentials: superadmin / admin123
 - Created test tenant with owner: ferreteria-central-admin / ferre2024
 - Worker myecommerce-pos remains untouched
+
+---
+Task ID: 3
+Agent: main
+Task: Fix myecommerce-pos sales + connect with nexus-one multi-tenant
+
+Work Log:
+- DIAGNOSED: D1 does not support Prisma interactive transactions ($transaction async callback)
+- FIXED: Refactored 5 route files to use batch transactions: sales, purchases, credit, devolutions, delivery-notes
+- TESTED: Sales now work - created sale successfully (Invoice: 20260818)
+- ADDED: tenant_id column to ALL 26 tables in myecommerce-ferreteria-central D1
+- ADDED: Indexes on tenant_id for key tables
+- ADDED: /api/nexus-sso endpoint in myecommerce-pos for cross-auth with nexus-one
+- MODIFIED: middleware.ts to extract and inject x-tenant-id from JWT/cookies
+- MODIFIED: session.ts to include tenantId in JWT payload
+- MODIFIED: db.ts with getTenantId() helper for multi-tenant filtering
+- INJECTED: getTenantId(req.headers) + tenantId param in 38 API route files
+- FIXED: 22 route files had GET()/POST() without req parameter - added req: NextRequest
+- DEPLOYED: myecommerce-pos with all fixes - products, sales working
+- CONFIGURED: CF_API_TOKEN, CF_ACCOUNT_ID, MYECOMMERCE_URL env vars in nexus-one
+
+Stage Summary:
+- myecommerce-pos now supports multi-tenant via tenant_id column
+- All existing data has tenant_id='default' (backward compatible)
+- SSO bridge at /api/nexus-sso ready for nexus-one redirect
+- Sales/invoicing works correctly with batch transactions

@@ -1,11 +1,11 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const saleId = searchParams.get('id');
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const now = new Date();
@@ -71,92 +71,110 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // TRANSACTIONAL: create sale + update stock + update credit balance + invoice number
-    const sale = await db.$transaction(async (tx) => {
-      // Generate sequential invoice number (8-digit zero-padded)
-      const lastSale = await tx.sale.findFirst({
-        orderBy: { createdAt: 'desc' },
-        select: { invoiceNumber: true },
-      });
-      let nextNum = 1;
-      if (lastSale && lastSale.invoiceNumber) {
-        nextNum = parseInt(lastSale.invoiceNumber, 10) + 1;
-      }
-      const invoiceNumber = String(nextNum).padStart(8, '0');
+    // D1 BATCH TRANSACTION: all reads BEFORE transaction, then all writes as a batch
 
-      const newSale = await tx.sale.create({
-        data: {
-          date: now,
-          subtotal,
-          taxAmount: parseFloat(body.taxAmount || 0),
-          discount,
-          total,
-          totalBs: parseFloat(body.totalBs),
-          exchangeRate: parseFloat(body.exchangeRate),
-          paymentMethod: body.paymentMethod || 'efectivo',
-          referenceNumber: body.referenceNumber || '',
-          mixedPaymentJson: body.mixedPaymentJson || '',
-          customerName: body.customerName || '',
-          clientDocType: body.clientDocType || '',
-          clientDocNumber: body.clientDocNumber || '',
-          clientName: body.clientName || '',
-          clientAddress: body.clientAddress || '',
-          sellerName: body.sellerName || '',
-          sellerRole: body.sellerRole || '',
-          notes: body.notes || '',
-          clientId: body.clientId || null,
-          isCredit: body.isCredit || false,
-          creditPaid: body.isCredit ? 0 : undefined,
-          creditDays: body.isCredit ? (parseInt(body.creditDays) || 30) : undefined,
-          creditDueDate: body.isCredit ? (() => { const d = new Date(); d.setDate(d.getDate() + (parseInt(body.creditDays) || 30)); return d; })() : undefined,
-          invoiceNumber,
-          items: { create: body.items.map((item: any) => ({ productId: item.productId, quantity: parseFloat(item.quantity), unitPrice: parseFloat(item.unitPrice), total: parseFloat(item.total) })) },
-        },
-        include: { items: { include: { product: { select: { name: true, vendePorPeso: true, unidadPeso: true } } } }, client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } }, _count: { select: { creditPayments: true } } },
-      });
-
-      // Decrement stock
-      for (const item of body.items) {
-        const qty = parseFloat(item.quantity);
-        await tx.product.update({ where: { id: item.productId }, data: { stock: { decrement: qty } } });
-      }
-
-      // Register Kardex movements for each item (venta = salida)
-      const sName = body.sellerName || '';
-      const sRole = body.sellerRole || '';
-      const uId = String(body.userId || '');
-      for (const item of body.items) {
-        const qty = parseFloat(item.quantity);
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
-        const unitCost = product?.cost || 0;
-        const lastMove = await tx.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
-        const prevQty = lastMove?.balanceQty ?? (product?.stock ?? 0) + qty;
-        const prevTC = lastMove?.balanceTotalCost ?? (prevQty * unitCost);
-        const balQty = prevQty - qty;
-        const balTC = Math.max(0, prevTC - (qty * unitCost));
-        const balAvg = balQty > 0 ? balTC / balQty : 0;
-        await tx.inventoryMovement.create({
-          data: { productId: item.productId, date: now, movementType: 'venta', concept: `Venta ${invoiceNumber}`, quantity: -qty, absQuantity: qty, unitCost, totalCost: qty * unitCost, balanceQty: balQty, balanceTotalCost: balTC, balanceAvgCost: balAvg, userId: uId, userName: sName, userRole: sRole, referenceId: newSale.id },
-        });
-      }
-
-      // If credit sale, update client balance
-      if (body.isCredit && body.clientId) {
-        const client = await tx.client.findUnique({ where: { id: body.clientId } });
-        if (client) {
-          await tx.client.update({
-            where: { id: body.clientId },
-            data: { creditBalance: Number((Number(client.creditBalance || 0) + total).toFixed(2)) },
-          });
-        }
-      }
-
-      return newSale;
+    // 1. Generate sequential invoice number (8-digit zero-padded) — READ FIRST
+    const lastSale = await db.sale.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { invoiceNumber: true },
     });
+    let nextNum = 1;
+    if (lastSale && lastSale.invoiceNumber) {
+      nextNum = parseInt(lastSale.invoiceNumber, 10) + 1;
+    }
+    const invoiceNumber = String(nextNum).padStart(8, '0');
+
+    // 2. Read product costs and last inventory movements for kardex — READS FIRST
+    const sName = body.sellerName || '';
+    const sRole = body.sellerRole || '';
+    const uId = String(body.userId || '');
+    const kardexData: { productId: string; qty: number; unitCost: number; balQty: number; balTC: number; balAvg: number }[] = [];
+    for (const item of body.items) {
+      const qty = parseFloat(item.quantity);
+      const product = await db.product.findUnique({ where: { id: item.productId } });
+      const unitCost = product?.cost || 0;
+      const lastMove = await db.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
+      const prevQty = lastMove?.balanceQty ?? (product?.stock ?? 0) + qty;
+      const prevTC = lastMove?.balanceTotalCost ?? (prevQty * unitCost);
+      const balQty = prevQty - qty;
+      const balTC = Math.max(0, prevTC - (qty * unitCost));
+      const balAvg = balQty > 0 ? balTC / balQty : 0;
+      kardexData.push({ productId: item.productId, qty, unitCost, balQty, balTC, balAvg });
+    }
+
+    // 3. Read client credit balance if credit sale — READ FIRST
+    let clientCreditBalance: number | null = null;
+    if (body.isCredit && body.clientId) {
+      const client = await db.client.findUnique({ where: { id: body.clientId } });
+      if (client) {
+        clientCreditBalance = Number(client.creditBalance || 0);
+      }
+    }
+
+    // 4. Build batch write operations
+    const ops: any[] = [];
+
+    // Create sale (op index 0)
+    ops.push(db.sale.create({
+      data: {
+        date: now,
+        subtotal,
+        taxAmount: parseFloat(body.taxAmount || 0),
+        discount,
+        total,
+        totalBs: parseFloat(body.totalBs),
+        exchangeRate: parseFloat(body.exchangeRate),
+        paymentMethod: body.paymentMethod || 'efectivo',
+        referenceNumber: body.referenceNumber || '',
+        mixedPaymentJson: body.mixedPaymentJson || '',
+        customerName: body.customerName || '',
+        clientDocType: body.clientDocType || '',
+        clientDocNumber: body.clientDocNumber || '',
+        clientName: body.clientName || '',
+        clientAddress: body.clientAddress || '',
+        sellerName: body.sellerName || '',
+        sellerRole: body.sellerRole || '',
+        notes: body.notes || '',
+        clientId: body.clientId || null,
+        isCredit: body.isCredit || false,
+        creditPaid: body.isCredit ? 0 : undefined,
+        creditDays: body.isCredit ? (parseInt(body.creditDays) || 30) : undefined,
+        creditDueDate: body.isCredit ? (() => { const d = new Date(); d.setDate(d.getDate() + (parseInt(body.creditDays) || 30)); return d; })() : undefined,
+        invoiceNumber,
+        items: { create: body.items.map((item: any) => ({ productId: item.productId, quantity: parseFloat(item.quantity), unitPrice: parseFloat(item.unitPrice), total: parseFloat(item.total) })) },
+      },
+      include: { items: { include: { product: { select: { name: true, vendePorPeso: true, unidadPeso: true } } } }, client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } }, _count: { select: { creditPayments: true } } },
+    }));
+
+    // Decrement stock for each item
+    for (const item of body.items) {
+      const qty = parseFloat(item.quantity);
+      ops.push(db.product.update({ where: { id: item.productId }, data: { stock: { decrement: qty } } }));
+    }
+
+    // Create Kardex movements for each item (venta = salida)
+    // Note: referenceId set to '' because sale ID is not available in batch mode
+    for (const kd of kardexData) {
+      ops.push(db.inventoryMovement.create({
+        data: { productId: kd.productId, date: now, movementType: 'venta', concept: `Venta ${invoiceNumber}`, quantity: -kd.qty, absQuantity: kd.qty, unitCost: kd.unitCost, totalCost: kd.qty * kd.unitCost, balanceQty: kd.balQty, balanceTotalCost: kd.balTC, balanceAvgCost: kd.balAvg, userId: uId, userName: sName, userRole: sRole, referenceId: '' },
+      }));
+    }
+
+    // If credit sale, update client balance
+    if (body.isCredit && body.clientId && clientCreditBalance !== null) {
+      ops.push(db.client.update({
+        where: { id: body.clientId },
+        data: { creditBalance: Number((clientCreditBalance + total).toFixed(2)) },
+      }));
+    }
+
+    // Execute batch transaction
+    const results = await db.$transaction(ops);
+    const sale = results[0];
 
     return NextResponse.json(sale);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating sale:', error);
-    return NextResponse.json({ error: 'Error al registrar venta' }, { status: 500 });
+    return NextResponse.json({ error: `Error al registrar venta: ${error?.message || String(error)}` }, { status: 500 });
   }
 }

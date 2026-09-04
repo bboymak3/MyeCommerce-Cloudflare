@@ -1,12 +1,12 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 // GET — Listar categorías de gastos
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const categories = await db.expenseCategory.findMany({
       where: { active: true },
@@ -22,7 +22,7 @@ export async function GET() {
 // POST — Crear categoría
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const { name, description = '', icon = 'receipt', color = '#ef4444' } = body;
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
 // PUT — Actualizar categoría
 export async function PUT(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const { id, name, description, icon, color, active } = body;
@@ -90,7 +90,7 @@ export async function PUT(req: NextRequest) {
 // DELETE — Desactivar categoría (no eliminar si tiene gastos asociados)
 export async function DELETE(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

@@ -8,6 +8,7 @@ export interface SessionPayload {
   userId: string;
   username: string;
   role: string;
+  tenantId?: string;
   iat: number;
   exp: number;
 }
@@ -18,14 +19,17 @@ function getSecretKey(): Uint8Array {
 
 /**
  * Generate a signed JWT session token using jose (Edge compatible).
- * ASYNC because jose is async.
+ * Now includes optional tenantId for multi-tenant support.
  */
 export async function createSessionToken(user: {
   id: string;
   username: string;
   role: string;
+  tenantId?: string;
 }): Promise<string> {
-  return new SignJWT({ userId: user.id, username: user.username, role: user.role })
+  const payload: any = { userId: user.id, username: user.username, role: user.role };
+  if (user.tenantId) payload.tenantId = user.tenantId;
+  return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(JWT_EXPIRES_IN)
@@ -34,7 +38,6 @@ export async function createSessionToken(user: {
 
 /**
  * Verify and decode a JWT token using jose (Edge compatible).
- * ASYNC because jose is async.
  */
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
@@ -52,30 +55,20 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
  */
 export function extractToken(request: Request): string | null {
   const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
-
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
   const url = new URL(request.url);
   const tokenParam = url.searchParams.get('token');
-  if (tokenParam) {
-    return tokenParam;
-  }
-
+  if (tokenParam) return tokenParam;
   const cookieHeader = request.headers.get('cookie');
   if (cookieHeader) {
     const match = cookieHeader.match(/session_token=([^;]+)/);
-    if (match) {
-      return match[1];
-    }
+    if (match) return match[1];
   }
-
   return null;
 }
 
 /**
  * Validate a session from a request.
- * ASYNC because verifySessionToken is now async.
  */
 export async function validateSession(request: Request): Promise<SessionPayload | null> {
   const token = extractToken(request);

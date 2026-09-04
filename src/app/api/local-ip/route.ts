@@ -4,7 +4,7 @@ export const runtime = 'edge';
 
 // In Cloudflare, there's no local network interface.
 // Return the Cloudflare Workers URL instead.
-export async function GET() {
+export async function GET(req: NextRequest) {
   return NextResponse.json({
     url: 'https://myecommerce-pos.sismtema.workers.dev',
     secureUrl: 'https://myecommerce-pos.sismtema.workers.dev',

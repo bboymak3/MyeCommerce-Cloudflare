@@ -10,7 +10,7 @@ const AGENT_TIMEOUT = 15000; // 15s timeout para el agente
  * and the agent runs on http://localhost:9100.
  */
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get('action') || 'status';
 

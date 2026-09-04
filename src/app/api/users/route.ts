@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/auth';
@@ -21,9 +21,9 @@ function serializeUser(user: any) {
 }
 
 // GET: List all users (without passwords)
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const users = await db.user.findMany({
       orderBy: { createdAt: 'asc' },
@@ -38,7 +38,7 @@ export async function GET() {
 // POST: Create new user (cajero or admin)
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const { username, password, fullName, permissions, role } = body;
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
 // NOTE: Avatar is handled by /api/users/avatar endpoint to avoid body size issues
 export async function PUT(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
     const { id, fullName, permissions, isActive, role, password } = body;
@@ -149,7 +149,7 @@ export async function PUT(req: NextRequest) {
 // DELETE: Deactivate user (soft delete) or hard delete cajero
 export async function DELETE(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 const GITHUB_REPO = 'csglider/MyeCommerce-v2.9.20';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const localVersion = '2.9.63'; // Keep in sync with package.json
     let versions: any[] = [];

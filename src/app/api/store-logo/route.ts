@@ -7,7 +7,7 @@ const VALID_EXTS = ['png', 'jpg', 'gif', 'webp', 'bmp'];
 const LOGO_KEY = 'store/logo';
 
 // GET — serve logo from R2
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const env = getRequestContext().env as any;
     const bucket = env.R2_PHOTOS as R2Bucket;

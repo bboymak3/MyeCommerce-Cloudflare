@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-import { createDbFromEnv } from '@/lib/db'
+import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -7,7 +7,7 @@ const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
 
@@ -64,114 +64,104 @@ export async function POST(req: NextRequest) {
     });
     const nextNumber = (lastNote?.number || 0) + 1;
 
-    const deliveryNote = await db.$transaction(async (tx) => {
-      let totalUsd = 0;
+    // D1 BATCH TRANSACTION: reads first, then batch writes
+    // Pre-read all products and last movements for each item
+    const itemData: { productId: string; quantity: number; newStock: number; unitCost: number; totalCost: number; newBalanceQty: number; newBalanceTotalCost: number; newAvgCost: number; productName: string }[] = [];
+    let totalUsd = 0;
+    for (const item of body.items) {
+      const productId = item.productId;
+      const quantity = sf(item.quantity);
+      if (quantity <= 0 || !productId) continue;
 
-      const note = await tx.deliveryNote.create({
+      const product = await db.product.findUnique({ where: { id: productId } });
+      if (!product) continue;
+
+      const lastMovement = await db.inventoryMovement.findFirst({
+        where: { productId },
+        orderBy: { date: 'desc' },
+      });
+
+      const prevBalanceQty = lastMovement ? lastMovement.balanceQty : 0;
+      const prevBalanceTotalCost = lastMovement ? lastMovement.balanceTotalCost : 0;
+      const avgCost = prevBalanceQty > 0 ? prevBalanceTotalCost / prevBalanceQty : sf(product.cost);
+
+      const unitCost = avgCost;
+      const totalCost = parseFloat((quantity * unitCost).toFixed(4));
+      const newStock = parseFloat((product.stock - quantity).toFixed(4));
+
+      const newBalanceQty = parseFloat((prevBalanceQty - quantity).toFixed(4));
+      const newBalanceTotalCost = parseFloat((prevBalanceTotalCost - totalCost).toFixed(4));
+      const newAvgCost = newBalanceQty > 0
+        ? parseFloat((newBalanceTotalCost / newBalanceQty).toFixed(4))
+        : 0;
+
+      totalUsd += totalCost;
+      itemData.push({ productId, quantity, newStock, unitCost, totalCost, newBalanceQty, newBalanceTotalCost, newAvgCost, productName: item.productName || '' });
+    }
+
+    const totalBs = parseFloat((totalUsd * exchangeRate).toFixed(2));
+
+    // Build batch write operations
+    const ops: any[] = [];
+
+    // Create delivery note with nested items and correct totals (op index 0)
+    ops.push(db.deliveryNote.create({
+      data: {
+        number: nextNumber,
+        userId,
+        userName,
+        recipientName: body.recipientName || '',
+        recipientDoc: body.recipientDoc || '',
+        recipientAddr: body.recipientAddr || '',
+        reason: body.reason || '',
+        notes: body.notes || '',
+        totalUsd: parseFloat(totalUsd.toFixed(2)),
+        totalBs,
+        exchangeRate,
+        status: 'emitida',
+        items: {
+          create: itemData.map(d => ({
+            productId: d.productId,
+            productName: d.productName,
+            quantity: d.quantity,
+            unitCost: parseFloat(d.unitCost.toFixed(4)),
+            totalCost: d.totalCost,
+          })),
+        },
+      },
+      include: { items: true },
+    }));
+
+    // Update product stock and create inventory movements for each item
+    for (const d of itemData) {
+      ops.push(db.product.update({
+        where: { id: d.productId },
+        data: { stock: d.newStock },
+      }));
+
+      ops.push(db.inventoryMovement.create({
         data: {
-          number: nextNumber,
+          productId: d.productId,
+          movementType: 'nota_entrega',
+          concept: `Nota de entrega #${nextNumber}`,
+          quantity: -d.quantity,
+          absQuantity: d.quantity,
+          unitCost: parseFloat(d.unitCost.toFixed(4)),
+          totalCost: d.totalCost,
+          balanceQty: d.newBalanceQty,
+          balanceTotalCost: d.newBalanceTotalCost,
+          balanceAvgCost: d.newAvgCost,
           userId,
           userName,
-          recipientName: body.recipientName || '',
-          recipientDoc: body.recipientDoc || '',
-          recipientAddr: body.recipientAddr || '',
-          reason: body.reason || '',
-          notes: body.notes || '',
-          totalUsd: 0, // will update below
-          totalBs: 0,
-          exchangeRate,
-          status: 'emitida',
-          items: {
-            create: [], // placeholder
-          },
+          userRole,
+          referenceId: '', // Note ID not available in batch mode
         },
-      });
+      }));
+    }
 
-      // Process each item: decrement stock + create inventory movement
-      for (const item of body.items) {
-        const productId = item.productId;
-        const quantity = sf(item.quantity);
-
-        if (quantity <= 0 || !productId) continue;
-
-        // Get current product state
-        const product = await tx.product.findUnique({ where: { id: productId } });
-        if (!product) continue;
-
-        // Get last inventory movement for this product to calculate average cost
-        const lastMovement = await tx.inventoryMovement.findFirst({
-          where: { productId },
-          orderBy: { date: 'desc' },
-        });
-
-        const prevBalanceQty = lastMovement ? lastMovement.balanceQty : 0;
-        const prevBalanceTotalCost = lastMovement ? lastMovement.balanceTotalCost : 0;
-        const avgCost = prevBalanceQty > 0 ? prevBalanceTotalCost / prevBalanceQty : sf(product.cost);
-
-        const unitCost = avgCost;
-        const totalCost = parseFloat((quantity * unitCost).toFixed(4));
-
-        // Update product stock (decrement)
-        const newStock = parseFloat((product.stock - quantity).toFixed(4));
-        await tx.product.update({
-          where: { id: productId },
-          data: { stock: newStock },
-        });
-
-        // Create inventory movement (nota_entrega - exit)
-        const newBalanceQty = parseFloat((prevBalanceQty - quantity).toFixed(4));
-        const newBalanceTotalCost = parseFloat((prevBalanceTotalCost - totalCost).toFixed(4));
-        const newAvgCost = newBalanceQty > 0
-          ? parseFloat((newBalanceTotalCost / newBalanceQty).toFixed(4))
-          : 0;
-
-        await tx.inventoryMovement.create({
-          data: {
-            productId,
-            movementType: 'nota_entrega',
-            concept: `Nota de entrega #${nextNumber}`,
-            quantity: -quantity,
-            absQuantity: quantity,
-            unitCost: parseFloat(unitCost.toFixed(4)),
-            totalCost,
-            balanceQty: newBalanceQty,
-            balanceTotalCost: newBalanceTotalCost,
-            balanceAvgCost: newAvgCost,
-            userId,
-            userName,
-            userRole,
-            referenceId: note.id,
-          },
-        });
-
-        // Create delivery note item
-        await tx.deliveryNoteItem.create({
-          data: {
-            deliveryNoteId: note.id,
-            productId,
-            productName: item.productName || '',
-            quantity,
-            unitCost: parseFloat(unitCost.toFixed(4)),
-            totalCost,
-          },
-        });
-
-        totalUsd += totalCost;
-      }
-
-      // Update totals on the delivery note
-      const totalBs = parseFloat((totalUsd * exchangeRate).toFixed(2));
-      await tx.deliveryNote.update({
-        where: { id: note.id },
-        data: { totalUsd: parseFloat(totalUsd.toFixed(2)), totalBs },
-      });
-
-      // Return the completed note with items
-      return tx.deliveryNote.findUnique({
-        where: { id: note.id },
-        include: { items: true },
-      });
-    });
+    // Execute batch transaction
+    const results = await db.$transaction(ops);
+    const deliveryNote = results[0];
 
     return NextResponse.json(deliveryNote, { status: 201 });
   } catch (error: any) {
@@ -182,7 +172,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
 
@@ -213,67 +203,74 @@ export async function PUT(req: NextRequest) {
 
     // If anulada, restore stock and create compensating inventory movements
     if (body.status === 'anulada') {
-      await db.$transaction(async (tx) => {
-        for (const item of existing.items) {
-          const quantity = item.quantity;
-          if (quantity <= 0) continue;
+      // D1 BATCH TRANSACTION: reads first, then batch writes
+      // Pre-read all products and last movements for each item
+      const anularData: { productId: string; quantity: number; newStock: number; unitCost: number; totalCost: number; newBalanceQty: number; newBalanceTotalCost: number; newAvgCost: number }[] = [];
+      for (const item of existing.items) {
+        const quantity = item.quantity;
+        if (quantity <= 0) continue;
 
-          const product = await tx.product.findUnique({ where: { id: item.productId } });
-          if (!product) continue;
+        const product = await db.product.findUnique({ where: { id: item.productId } });
+        if (!product) continue;
 
-          // Restore stock (increment)
-          const newStock = parseFloat((product.stock + quantity).toFixed(4));
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: newStock },
-          });
+        const newStock = parseFloat((product.stock + quantity).toFixed(4));
 
-          // Get last inventory movement for average cost calculation
-          const lastMovement = await tx.inventoryMovement.findFirst({
-            where: { productId: item.productId },
-            orderBy: { date: 'desc' },
-          });
-
-          const prevBalanceQty = lastMovement ? lastMovement.balanceQty : 0;
-          const prevBalanceTotalCost = lastMovement ? lastMovement.balanceTotalCost : 0;
-          const avgCost = item.unitCost > 0 ? item.unitCost : (prevBalanceQty > 0 ? prevBalanceTotalCost / prevBalanceQty : 0);
-
-          const unitCost = avgCost;
-          const totalCost = parseFloat((quantity * unitCost).toFixed(4));
-
-          // Create compensating inventory movement (ajuste_entrada)
-          const newBalanceQty = parseFloat((prevBalanceQty + quantity).toFixed(4));
-          const newBalanceTotalCost = parseFloat((prevBalanceTotalCost + totalCost).toFixed(4));
-          const newAvgCost = newBalanceQty > 0
-            ? parseFloat((newBalanceTotalCost / newBalanceQty).toFixed(4))
-            : 0;
-
-          await tx.inventoryMovement.create({
-            data: {
-              productId: item.productId,
-              movementType: 'ajuste_entrada',
-              concept: `Anulacion nota de entrega #${existing.number}`,
-              quantity,
-              absQuantity: quantity,
-              unitCost: parseFloat(unitCost.toFixed(4)),
-              totalCost,
-              balanceQty: newBalanceQty,
-              balanceTotalCost: newBalanceTotalCost,
-              balanceAvgCost: newAvgCost,
-              userId,
-              userName,
-              userRole,
-              referenceId: existing.id,
-            },
-          });
-        }
-
-        // Update delivery note status
-        await tx.deliveryNote.update({
-          where: { id: body.id },
-          data: { status: 'anulada' },
+        const lastMovement = await db.inventoryMovement.findFirst({
+          where: { productId: item.productId },
+          orderBy: { date: 'desc' },
         });
-      });
+
+        const prevBalanceQty = lastMovement ? lastMovement.balanceQty : 0;
+        const prevBalanceTotalCost = lastMovement ? lastMovement.balanceTotalCost : 0;
+        const avgCost = item.unitCost > 0 ? item.unitCost : (prevBalanceQty > 0 ? prevBalanceTotalCost / prevBalanceQty : 0);
+
+        const unitCost = avgCost;
+        const totalCost = parseFloat((quantity * unitCost).toFixed(4));
+
+        const newBalanceQty = parseFloat((prevBalanceQty + quantity).toFixed(4));
+        const newBalanceTotalCost = parseFloat((prevBalanceTotalCost + totalCost).toFixed(4));
+        const newAvgCost = newBalanceQty > 0
+          ? parseFloat((newBalanceTotalCost / newBalanceQty).toFixed(4))
+          : 0;
+
+        anularData.push({ productId: item.productId, quantity, newStock, unitCost, totalCost, newBalanceQty, newBalanceTotalCost, newAvgCost });
+      }
+
+      // Build batch write operations
+      const ops: any[] = [];
+      for (const d of anularData) {
+        ops.push(db.product.update({
+          where: { id: d.productId },
+          data: { stock: d.newStock },
+        }));
+
+        ops.push(db.inventoryMovement.create({
+          data: {
+            productId: d.productId,
+            movementType: 'ajuste_entrada',
+            concept: `Anulacion nota de entrega #${existing.number}`,
+            quantity: d.quantity,
+            absQuantity: d.quantity,
+            unitCost: parseFloat(d.unitCost.toFixed(4)),
+            totalCost: d.totalCost,
+            balanceQty: d.newBalanceQty,
+            balanceTotalCost: d.newBalanceTotalCost,
+            balanceAvgCost: d.newAvgCost,
+            userId,
+            userName,
+            userRole,
+            referenceId: existing.id,
+          },
+        }));
+      }
+
+      // Update delivery note status
+      ops.push(db.deliveryNote.update({
+        where: { id: body.id },
+        data: { status: 'anulada' },
+      }));
+
+      await db.$transaction(ops);
 
       return NextResponse.json({ success: true, status: 'anulada' });
     }
@@ -294,7 +291,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const { env } = getRequestContext();
-  const db = createDbFromEnv(env as any);
+  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

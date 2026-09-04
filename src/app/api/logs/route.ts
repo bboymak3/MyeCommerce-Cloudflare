@@ -7,6 +7,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ entries: [], size: 0, totalLines: 0, errorCount: 0, warnCount: 0, infoCount: 0, exists: false, note: 'File-based logs not available on Cloudflare Edge.' });
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   return NextResponse.json({ success: true, message: 'Log clearing not available on Cloudflare.' });
 }

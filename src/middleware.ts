@@ -6,6 +6,7 @@ const PUBLIC_ROUTES = [
   '/api/auth',
   '/api/product-images',
   '/api/catalog',
+  '/api/nexus-sso',
 ];
 
 // Rutas API que requieren rol de administrador
@@ -19,7 +20,7 @@ const ADMIN_ROUTES = [
 // JWT Secret — debe coincidir con src/lib/session.ts
 const JWT_SECRET = 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production';
 
-async function verifyToken(token: string): Promise<{ userId: string; username: string; role: string } | null> {
+async function verifyToken(token: string): Promise<{ userId: string; username: string; role: string; tenantId?: string } | null> {
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET), {
       algorithms: ['HS256'],
@@ -28,6 +29,7 @@ async function verifyToken(token: string): Promise<{ userId: string; username: s
       userId: (payload as any).userId,
       username: (payload as any).username,
       role: (payload as any).role,
+      tenantId: (payload as any).tenantId || 'default',
     };
   } catch {
     return null;
@@ -35,43 +37,28 @@ async function verifyToken(token: string): Promise<{ userId: string; username: s
 }
 
 function extractToken(request: NextRequest): string | null {
-  // Header Authorization: Bearer <token>
   const authHeader = request.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
-
-  // Query param ?token=<token>
+  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
   const tokenParam = request.nextUrl.searchParams.get('token');
-  if (tokenParam) {
-    return tokenParam;
-  }
-
-  // Cookie: session_token=<token>
+  if (tokenParam) return tokenParam;
   const cookieToken = request.cookies.get('session_token')?.value;
-  if (cookieToken) {
-    return cookieToken;
-  }
-
+  if (cookieToken) return cookieToken;
   return null;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Solo verificar rutas bajo /api/
   if (!pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
 
-  // Permitir rutas publicas sin autenticacion
   for (const publicRoute of PUBLIC_ROUTES) {
     if (pathname === publicRoute || pathname.startsWith(publicRoute + '/')) {
       return NextResponse.next();
     }
   }
 
-  // Extraer y verificar token
   const token = extractToken(request);
   if (!token) {
     return NextResponse.json(
@@ -88,7 +75,6 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // Verificar rutas de administrador
   for (const adminRoute of ADMIN_ROUTES) {
     if (pathname === adminRoute || pathname.startsWith(adminRoute + '/')) {
       if (session.role !== 'admin') {
@@ -100,20 +86,20 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Inyectar informacion del usuario en headers para que las rutas API la puedan usar
+  // Inyectar informacion del usuario + TENANT en headers
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-user-id', session.userId);
   requestHeaders.set('x-user-role', session.role);
   requestHeaders.set('x-username', session.username);
+  // Multi-tenant: inyectar tenant_id (default = 'default' para compatibilidad)
+  const tenantId = session.tenantId || request.cookies.get('tenant_id')?.value || 'default';
+  requestHeaders.set('x-tenant-id', tenantId);
 
   return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
+    request: { headers: requestHeaders },
   });
 }
 
-// Configurar matcher para que solo se ejecute en rutas API
 export const config = {
   matcher: '/api/:path*',
 };
