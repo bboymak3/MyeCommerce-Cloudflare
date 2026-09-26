@@ -65,6 +65,8 @@ export async function POST(req: NextRequest) {
         taxInfo: body.taxInfo || '',
         isFinalClient: body.isFinalClient || false,
         creditLimit: body.creditLimit || 0,
+        notes: body.notes || '',
+        tag: body.tag || '',
       },
     });
     return NextResponse.json(client);
@@ -107,6 +109,8 @@ export async function PUT(req: NextRequest) {
         taxInfo: body.taxInfo,
         isFinalClient: body.isFinalClient,
         creditLimit: body.creditLimit !== undefined ? parseFloat(body.creditLimit) || 0 : undefined,
+        notes: body.notes,
+        tag: body.tag,
         isActive: body.isActive !== undefined ? body.isActive : true,
       },
     });

@@ -26,6 +26,7 @@ import PurchasesTab from "@/components/purchases-tab";
 import CreditTab from "@/components/credit-tab";
 import PayablesTab from "@/components/payables-tab";
 import CashShiftsTab from "@/components/cash-shifts-tab";
+import ReorderTab from "@/components/reorder-tab";
 import ExpensesTab from "@/components/expenses-tab";
 import DashboardTab from "@/components/dashboard-tab";
 import KardexTab from "@/components/kardex-tab";
@@ -407,6 +408,7 @@ export default function Home() {
     { value: "backup", label: "Respaldo", icon: "💾", allowed: currentUser?.role === "admin", restricted: false, plan: "" },
     { value: "suppliers", label: "Proveedores", icon: "🏪", allowed: true, restricted: false, plan: "" },
     { value: "purchases", label: "Compras", icon: "🛒", allowed: true, restricted: false, plan: "" },
+    { value: "reorder", label: "Reposicion", icon: "📈", allowed: true, restricted: false, plan: "" },
     { value: "credit", label: "Cuentas por Cobrar", icon: "💳", allowed: true, restricted: false, plan: "" },
     { value: "payables", label: "Cuentas por Pagar", icon: "🧾", allowed: true, restricted: false, plan: "" },
     { value: "kardex", label: "Inventario/Kardex", icon: "📦", allowed: true, restricted: false, plan: "" },
@@ -717,6 +719,11 @@ export default function Home() {
         <TabsContent value="purchases" activeTab={activeTab}>
           <ErrorBoundary name="Compras">
             <PurchasesTab bcvRate={settings.bcvRate ?? 36.5} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="reorder" activeTab={activeTab}>
+          <ErrorBoundary name="Reposicion">
+            <ReorderTab currency={settings.currency} />
           </ErrorBoundary>
         </TabsContent>
         <TabsContent value="credit" activeTab={activeTab}>

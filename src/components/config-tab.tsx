@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { authFetch } from "@/lib/auth-fetch";
+import { usePwaInstall } from "@/lib/use-pwa-install";
 
 interface Settings {
   id: string;
@@ -441,6 +442,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [bcvSource, setBcvSource] = useState((settings as any).bcvSource || "manual");
   const [bcvUpdatedAt, setBcvUpdatedAt] = useState<string>((settings as any).bcvUpdatedAt || "");
   const [bcvFetching, setBcvFetching] = useState(false);
+  const { installable, installed, promptInstall } = usePwaInstall();
   const [loyaltyEnabled, setLoyaltyEnabled] = useState((settings as any).loyaltyEnabled === true);
   const [loyaltyPointsPerUsd, setLoyaltyPointsPerUsd] = useState(((settings as any).loyaltyPointsPerUsd ?? 100).toString());
 
@@ -784,6 +786,25 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
 
   return (
     <div className="space-y-6">
+      {/* ====== Instalar como App ====== */}
+      {(installable || installed) && (
+        <Card className="border-primary/30">
+          <CardContent className="py-4 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-medium text-sm">📲 Instalar MyeCommerce como app</p>
+              <p className="text-xs text-muted-foreground">
+                {installed ? "Ya esta instalada en este dispositivo." : "Acceso directo en la pantalla de inicio, sin abrir el navegador."}
+              </p>
+            </div>
+            {!installed && (
+              <Button size="sm" onClick={async () => { const ok = await promptInstall(); if (ok) toast.success("App instalada"); }}>
+                Instalar
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* ====== Paleta de Colores ====== */}
       <Card>
         <CardHeader>
