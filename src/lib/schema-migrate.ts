@@ -33,13 +33,27 @@ export function ensureSchema(d1: D1Database | undefined): Promise<void> {
   return pending;
 }
 
-async function runEach(d1: D1Database, statements: string[], errors: string[]) {
+async function runEach(d1: D1Database, statements: string[], errors: string[], ignoreDuplicateColumn = false) {
   for (const sql of statements) {
     try {
       await d1.prepare(sql).run();
     } catch (error: any) {
+      if (ignoreDuplicateColumn && String(error?.message || '').includes('duplicate column')) continue;
       errors.push(`${sql.slice(0, 80)}... -> ${error?.message || error}`);
     }
+  }
+}
+
+// Ejecuta varios statements en un solo viaje a la D1 (mucho mas rapido que uno
+// por uno al arrancar un isolate). Si el batch entero falla (p. ej. una carrera
+// entre isolates agregando la misma columna a la vez), reintenta uno por uno
+// para no perder el resto por culpa de un solo statement.
+async function runBatch(d1: D1Database, statements: string[], errors: string[], ignoreDuplicateColumn = false) {
+  if (statements.length === 0) return;
+  try {
+    await d1.batch(statements.map((sql) => d1.prepare(sql)));
+  } catch {
+    await runEach(d1, statements, errors, ignoreDuplicateColumn);
   }
 }
 
@@ -67,43 +81,45 @@ function tableNameOf(createStatement: string): string | null {
 async function migrate(d1: D1Database): Promise<void> {
   const errors: string[] = [];
 
-  // 1) Tablas faltantes
-  await runEach(d1, CREATE_TABLE_STATEMENTS, errors);
+  // 1) Tablas faltantes — un solo viaje a la D1 para todas
+  await runBatch(d1, CREATE_TABLE_STATEMENTS, errors);
 
-  // 2) Columnas faltantes en tablas existentes (tenant_id y cualquier columna nueva)
+  // 2) Columnas faltantes en tablas existentes (tenant_id y cualquier columna nueva).
+  // Las PRAGMA table_info de todas las tablas se piden juntas en un solo viaje.
   const byTable = new Map<string, ColumnDef[]>();
   for (const stmt of CREATE_TABLE_STATEMENTS) {
     const table = tableNameOf(stmt);
     if (table) byTable.set(table, parseColumns(stmt));
   }
-  for (const table of SCHEMA_TABLES) {
-    const expected = byTable.get(table);
-    if (!expected) continue;
-    try {
-      const { results } = await d1.prepare(`PRAGMA table_info("${table}")`).all<{ name: string }>();
-      if (!results || results.length === 0) continue; // la tabla no existe (no deberia pasar tras el paso 1)
-      const existing = new Set(results.map(c => c.name));
+
+  const alterStatements: string[] = [];
+  try {
+    const pragmaResults = await d1.batch<{ name: string }>(
+      SCHEMA_TABLES.map((table) => d1.prepare(`PRAGMA table_info("${table}")`))
+    );
+    SCHEMA_TABLES.forEach((table, i) => {
+      const expected = byTable.get(table);
+      if (!expected) return;
+      const results = pragmaResults[i]?.results;
+      if (!results || results.length === 0) return; // la tabla no existe (no deberia pasar tras el paso 1)
+      const existing = new Set(results.map((c) => c.name));
       for (const col of expected) {
         if (existing.has(col.name)) continue;
         // ALTER TABLE ADD COLUMN no admite NOT NULL sin DEFAULT sobre una tabla con filas;
         // en este esquema toda columna no nula ya trae DEFAULT, asi que siempre es segura.
         const notNull = col.notNull && col.defaultClause ? ' NOT NULL' : '';
-        try {
-          await d1.prepare(`ALTER TABLE "${table}" ADD COLUMN "${col.name}" ${col.type}${notNull} ${col.defaultClause}`.trim()).run();
-        } catch (error: any) {
-          if (!String(error?.message || '').includes('duplicate column')) {
-            errors.push(`${col.name} en ${table} -> ${error?.message || error}`);
-          }
-        }
+        alterStatements.push(`ALTER TABLE "${table}" ADD COLUMN "${col.name}" ${col.type}${notNull} ${col.defaultClause}`.trim());
       }
-    } catch (error: any) {
-      errors.push(`PRAGMA ${table} -> ${error?.message || error}`);
-    }
+    });
+  } catch (error: any) {
+    errors.push(`PRAGMA table_info -> ${error?.message || error}`);
   }
+  // Si un isolate concurrente agrego la misma columna al mismo tiempo, el batch
+  // entero fallaria por "duplicate column": se reintenta una por una ignorando eso.
+  await runBatch(d1, alterStatements, errors, true);
 
-  // 3) Unicidad por negocio (usuario, factura, categoria... repetibles entre negocios)
-  await runEach(d1, DROP_LEGACY_UNIQUE_INDEXES, errors);
-  await runEach(d1, CREATE_INDEX_STATEMENTS, errors);
+  // 3) Unicidad por negocio (usuario, factura, categoria... repetibles entre negocios) — un viaje
+  await runBatch(d1, [...DROP_LEGACY_UNIQUE_INDEXES, ...CREATE_INDEX_STATEMENTS], errors);
 
   if (errors.length > 0) {
     console.warn(`[schema] Sincronizacion de esquema con ${errors.length} aviso(s):\n` + errors.join('\n'));
