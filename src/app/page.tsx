@@ -166,6 +166,28 @@ export default function Home() {
 
   // Auth: load user from localStorage
   useEffect(() => {
+    // SSO desde Nexus One: /api/nexus-sso redirige a /#sso=<token>
+    const ssoMatch = window.location.hash.match(/^#sso=(.+)$/);
+    if (ssoMatch) {
+      const ssoToken = decodeURIComponent(ssoMatch[1]);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      fetch("/api/auth", { headers: { Authorization: `Bearer ${ssoToken}` } })
+        .then(r => r.json() as Promise<{ valid?: boolean; user?: CurrentUser }>)
+        .then(data => {
+          if (data.valid && data.user) {
+            storeSession(ssoToken, data.user as any);
+            setCurrentUser(data.user);
+          } else {
+            clearSession();
+            setLoading(false);
+            toast.error("No se pudo iniciar sesion desde Nexus One.");
+          }
+        })
+        .catch(() => { clearSession(); setLoading(false); })
+        .finally(() => setAuthReady(true));
+      return;
+    }
+
     const stored = getStoredUser();
     const token = localStorage.getItem("myecommerce_token");
     if (stored && token) {

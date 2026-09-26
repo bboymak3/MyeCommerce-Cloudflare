@@ -1,102 +1,84 @@
-// SSO endpoint: Accepts Nexus One JWT token and creates a myecommerce session
-// This allows tenants from nexus-one to seamlessly access their POS
+// SSO endpoint: acepta un token de acceso de nexus-one y abre una sesion del POS
+// en el negocio (tenant) correspondiente.
+//
+// Flujo: nexus-one /api/sso emite un token de 5 minutos (firmado con NEXUS_SSO_SECRET)
+// -> redirige a GET /api/nexus-sso?token=... -> aqui se valida, se crea/actualiza el
+// usuario dentro del negocio y se redirige a /#sso=<token de sesion del POS>.
 export const runtime = 'edge';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { createDbFromEnv } from '@/lib/db';
+import { createDbFromEnv, DEFAULT_TENANT_ID } from '@/lib/db';
+import { hashPassword } from '@/lib/auth';
+import { createSessionToken, verifyNexusSsoToken } from '@/lib/session';
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
 
-const NEXUS_JWT_SECRET = new TextEncoder().encode('nexus-one-super-secret-change-in-production-2024');
+const POS_ROLES = new Set(['admin', 'vendedor', 'cajero']);
 
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const token = searchParams.get('token');
-    const slug = searchParams.get('slug');
-
+    const token = req.nextUrl.searchParams.get('token');
     if (!token) {
       return NextResponse.json({ error: 'Token requerido' }, { status: 400 });
     }
 
-    // Verify the nexus-one JWT
-    const { payload } = await jwtVerify(token, NEXUS_JWT_SECRET);
-
-    if (payload.userType !== 'tenant' || !payload.tenantId) {
-      return NextResponse.json({ error: 'Token no es de tenant' }, { status: 400 });
+    const sso = await verifyNexusSsoToken(token);
+    if (!sso) {
+      return NextResponse.json({ error: 'Token SSO invalido o expirado. Vuelva a entrar desde Nexus One.' }, { status: 401 });
     }
 
-    // Use the tenant_id from the token to identify the tenant in our D1
-    const tenantId = payload.tenantId as string;
-    const tenantSlug = payload.tenantSlug as string;
-
-    // Build the redirect URL with session cookies
-    const baseUrl = new URL(req.url).origin;
-    
-    // Create a myecommerce session for this tenant
-    // Find the user in our users table with this tenant_id
     const { env } = getRequestContext();
-    const db = createDbFromEnv(env as any);
+    // Los datos anteriores al modo multi-negocio estan en tenant_id 'default' y
+    // pertenecen al negocio LEGACY_TENANT_SLUG (wrangler.toml): se usan tal cual.
+    const legacySlug = (env as any).LEGACY_TENANT_SLUG || process.env.LEGACY_TENANT_SLUG;
+    const tenantId = legacySlug && sso.tenantSlug === legacySlug ? DEFAULT_TENANT_ID : sso.tenantId;
+    const db = createDbFromEnv(env as any, tenantId);
+    const role = sso.role && POS_ROLES.has(sso.role) ? sso.role : 'cajero';
 
-    const nexusUsername = payload.username as string;
-    
-    // Try to find existing user for this tenant
-    let user = await db.user.findFirst({
-      where: { username: nexusUsername, tenant_id: tenantId }
-    });
-
+    // nexus-one es la fuente de verdad para los usuarios que entran por SSO:
+    // se crean la primera vez y su rol se sincroniza en cada acceso.
+    let user = await db.user.findFirst({ where: { username: sso.username } });
     if (!user) {
-      // Auto-create the user for this tenant if they don't exist
       user = await db.user.create({
         data: {
-          username: nexusUsername,
-          password: 'nexus-sso-managed',
-          fullName: (payload as any).fullName || nexusUsername,
-          role: (payload as any).role || 'admin',
-          tenant_id: tenantId,
-        }
+          username: sso.username,
+          // Clave aleatoria: estos usuarios solo entran por SSO.
+          password: await hashPassword(crypto.randomUUID() + crypto.randomUUID()),
+          fullName: sso.fullName || sso.username,
+          role,
+          permissions: role === 'admin' ? '{"all":true}' : '',
+        },
       });
+    } else if (user.role !== role) {
+      user = await db.user.update({ where: { id: user.id }, data: { role } });
     }
 
-    // Create a myecommerce POS token (using our own JWT)
-    const myecommerceToken = await createMyecommerceToken(user, tenantId);
+    if (!user.isActive) {
+      return NextResponse.json({ error: 'Usuario desactivado en el POS. Contacte al administrador.' }, { status: 403 });
+    }
 
-    // Redirect to the POS app with the session set
-    const redirectUrl = new URL(baseUrl);
-    redirectUrl.searchParams.set('nexus_token', myecommerceToken);
-    redirectUrl.searchParams.set('tenant_id', tenantId);
-    redirectUrl.searchParams.set('tenant_slug', tenantSlug);
-    
-    // Set cookies and redirect to main page
-    const response = NextResponse.redirect(new URL('/?sso=1', baseUrl));
-    response.cookies.set('session_token', myecommerceToken, { 
-      path: '/', maxAge: 86400, httpOnly: false, sameSite: 'lax' 
+    await db.user.update({ where: { id: user.id }, data: { lastLogin: new Date() } });
+
+    const sessionToken = await createSessionToken({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      tenantId,
     });
-    response.cookies.set('tenant_id', tenantId, { 
-      path: '/', maxAge: 86400, httpOnly: false, sameSite: 'lax' 
+
+    // El token va en el fragmento (#): no se envia al servidor ni queda en logs.
+    const response = NextResponse.redirect(new URL(`/#sso=${encodeURIComponent(sessionToken)}`, req.nextUrl.origin));
+    response.cookies.set('session_token', sessionToken, {
+      path: '/', maxAge: 86400, httpOnly: true, secure: true, sameSite: 'lax',
     });
-    response.cookies.set('tenant_slug', tenantSlug, { 
-      path: '/', maxAge: 86400, httpOnly: false, sameSite: 'lax' 
+    // Cookies informativas (no dan acceso): seleccionan el negocio en el login local.
+    response.cookies.set('tenant_id', tenantId, {
+      path: '/', maxAge: 60 * 60 * 24 * 365, httpOnly: false, secure: true, sameSite: 'lax',
     });
-    
+    response.cookies.set('tenant_slug', sso.tenantSlug, {
+      path: '/', maxAge: 60 * 60 * 24 * 365, httpOnly: false, secure: true, sameSite: 'lax',
+    });
     return response;
   } catch (error: any) {
-    return NextResponse.json({ error: `SSO error: ${error.message}` }, { status: 400 });
+    console.error('[nexus-sso]', error);
+    return NextResponse.json({ error: `SSO error: ${error.message}` }, { status: 500 });
   }
-}
-
-async function createMyecommerceToken(user: any, tenantId: string): Promise<string> {
-  const { SignJWT } = await import('jose');
-  const secret = new TextEncoder().encode(
-    process.env.JWT_SECRET || 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production'
-  );
-  return new SignJWT({
-    userId: user.id,
-    username: user.username,
-    role: user.role,
-    tenantId,
-  })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('24h')
-    .sign(secret);
 }

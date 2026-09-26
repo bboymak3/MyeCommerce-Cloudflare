@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
+import { getRequestContext } from '@cloudflare/next-on-pages';
+import { verifySessionToken } from './lib/session';
+import { ensureSchema } from './lib/schema-migrate';
 
-// Rutas API que NO requieren autenticacion
-const PUBLIC_ROUTES = [
-  '/api/auth',
-  '/api/product-images',
-  '/api/catalog',
-  '/api/nexus-sso',
-];
+// Rutas API que NO requieren autenticacion (metodos permitidos sin sesion)
+const PUBLIC_ROUTES: Record<string, string[] | '*'> = {
+  '/api/auth': '*',
+  '/api/product-images': ['GET'],
+  '/api/nexus-sso': ['GET'],
+};
 
 // Rutas API que requieren rol de administrador
 const ADMIN_ROUTES = [
@@ -17,24 +18,10 @@ const ADMIN_ROUTES = [
   '/api/license',
 ];
 
-// JWT Secret — debe coincidir con src/lib/session.ts
-const JWT_SECRET = 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production';
+// Cabeceras que solo puede fijar este middleware (nunca el cliente)
+const TRUSTED_HEADERS = ['x-user-id', 'x-user-role', 'x-username', 'x-tenant-id'];
 
-async function verifyToken(token: string): Promise<{ userId: string; username: string; role: string; tenantId?: string } | null> {
-  try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(JWT_SECRET), {
-      algorithms: ['HS256'],
-    });
-    return {
-      userId: (payload as any).userId,
-      username: (payload as any).username,
-      role: (payload as any).role,
-      tenantId: (payload as any).tenantId || 'default',
-    };
-  } catch {
-    return null;
-  }
-}
+const TENANT_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
 function extractToken(request: NextRequest): string | null {
   const authHeader = request.headers.get('authorization');
@@ -46,6 +33,15 @@ function extractToken(request: NextRequest): string | null {
   return null;
 }
 
+/**
+ * Negocio para peticiones sin sesion (login, catalogo publico, imagenes):
+ * ?tenant=<id> o la cookie tenant_id que deja el SSO. Por defecto 'default'.
+ */
+function publicTenantId(request: NextRequest): string {
+  const candidate = request.nextUrl.searchParams.get('tenant') || request.cookies.get('tenant_id')?.value || '';
+  return TENANT_ID_RE.test(candidate) ? candidate : 'default';
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -53,13 +49,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  for (const publicRoute of PUBLIC_ROUTES) {
-    if (pathname === publicRoute || pathname.startsWith(publicRoute + '/')) {
-      return NextResponse.next();
-    }
+  // Migracion automatica de la D1 (una vez por instancia; no borra datos)
+  try {
+    await ensureSchema((getRequestContext().env as any).DB);
+  } catch (error) {
+    console.error('[schema] Error en migracion automatica:', error);
   }
 
+  const requestHeaders = new Headers(request.headers);
+  for (const h of TRUSTED_HEADERS) requestHeaders.delete(h);
+
   const token = extractToken(request);
+  const session = token ? await verifySessionToken(token) : null;
+
+  const isPublic = Object.entries(PUBLIC_ROUTES).some(([r, methods]) =>
+    (pathname === r || pathname.startsWith(r + '/')) &&
+    (methods === '*' || methods.includes(request.method))
+  );
+  if (isPublic) {
+    requestHeaders.set('x-tenant-id', session?.tenantId || publicTenantId(request));
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
   if (!token) {
     return NextResponse.json(
       { error: 'Acceso no autorizado. Inicie sesion.', code: 'UNAUTHORIZED' },
@@ -67,7 +78,6 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  const session = await verifyToken(token);
   if (!session) {
     return NextResponse.json(
       { error: 'Sesion expirada o invalida. Inicie sesion nuevamente.', code: 'SESSION_EXPIRED' },
@@ -86,14 +96,11 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Inyectar informacion del usuario + TENANT en headers
-  const requestHeaders = new Headers(request.headers);
+  // Inyectar informacion del usuario + NEGOCIO (solo desde el token firmado)
   requestHeaders.set('x-user-id', session.userId);
   requestHeaders.set('x-user-role', session.role);
   requestHeaders.set('x-username', session.username);
-  // Multi-tenant: inyectar tenant_id (default = 'default' para compatibilidad)
-  const tenantId = session.tenantId || request.cookies.get('tenant_id')?.value || 'default';
-  requestHeaders.set('x-tenant-id', tenantId);
+  requestHeaders.set('x-tenant-id', session.tenantId || 'default');
 
   return NextResponse.next({
     request: { headers: requestHeaders },

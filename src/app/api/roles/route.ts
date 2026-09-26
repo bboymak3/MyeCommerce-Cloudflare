@@ -26,7 +26,7 @@ const DEFAULT_ROLES = {
 async function seedDefaultRoles(db: any) {
   try {
     for (const [roleName, config] of Object.entries(DEFAULT_ROLES)) {
-      const existing = await db.roleConfig.findUnique({ where: { roleName } });
+      const existing = await db.roleConfig.findFirst({ where: { roleName } });
       if (!existing) {
         await db.roleConfig.create({
           data: { roleName, label: config.label, permissions: config.permissions, color: config.color },
@@ -63,7 +63,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Nombre de rol requerido' }, { status: 400 });
     }
 
-    const existing = await db.roleConfig.findUnique({ where: { roleName } });
+    const existing = await db.roleConfig.findFirst({ where: { roleName } });
     if (!existing) {
       return NextResponse.json({ error: 'Rol no encontrado' }, { status: 404 });
     }
@@ -74,7 +74,7 @@ export async function PUT(req: NextRequest) {
     if (color !== undefined) updateData.color = color;
 
     const updated = await db.roleConfig.update({
-      where: { roleName },
+      where: { id: existing.id },
       data: updateData,
     });
 
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nombre de rol requerido' }, { status: 400 });
     }
 
-    const existing = await db.roleConfig.findUnique({ where: { roleName } });
+    const existing = await db.roleConfig.findFirst({ where: { roleName } });
     if (existing) {
       return NextResponse.json({ error: 'El rol ya existe' }, { status: 409 });
     }
@@ -132,7 +132,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'No se puede eliminar el rol de administrador' }, { status: 403 });
     }
 
-    const existing = await db.roleConfig.findUnique({ where: { roleName } });
+    const existing = await db.roleConfig.findFirst({ where: { roleName } });
     if (!existing) {
       return NextResponse.json({ error: 'Rol no encontrado' }, { status: 404 });
     }
@@ -143,7 +143,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: `No se puede eliminar: ${usersWithRole} usuario(s) tienen este rol` }, { status: 409 });
     }
 
-    await db.roleConfig.delete({ where: { roleName } });
+    await db.roleConfig.delete({ where: { id: existing.id } });
     return NextResponse.json({ message: 'Rol eliminado correctamente' });
   } catch (error) {
     console.error('Error deleting role:', error);

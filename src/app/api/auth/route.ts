@@ -2,9 +2,9 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword, verifyPassword, needsRehash } from '@/lib/auth';
-import { createSessionToken, verifySessionToken } from '@/lib/session';
+import { createSessionToken, verifySessionToken, extractToken } from '@/lib/session';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { createDbFromEnv, getTenantId } from '@/lib/db';
+import { createDbFromEnv, getTenantId, DEFAULT_TENANT_ID } from '@/lib/db';
 
 // Rate limiting: max 5 intentos fallidos por IP en 5 minutos
 // NOTE: In Edge Runtime, this Map is per-isolate and may not persist across requests.
@@ -53,10 +53,13 @@ function serializeUser(user: any) {
   };
 }
 
-// Auto-seed admin user if no admin exists
-async function ensureAdminUser(db: any) {
+// Auto-seed admin user if no admin exists.
+// Solo para la instalacion base ('default'): los negocios de nexus-one reciben
+// su administrador por SSO y nunca deben tener un admin/admin creado aqui.
+async function ensureAdminUser(db: any, tenantId: string) {
+  if (tenantId !== DEFAULT_TENANT_ID) return;
   try {
-    const existing = await db.user.findUnique({ where: { username: 'admin' } });
+    const existing = await db.user.findFirst({ where: { username: 'admin' } });
     if (!existing) {
       await db.user.create({
         data: {
@@ -81,7 +84,7 @@ export async function POST(req: NextRequest) {
     const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
 
     // Ensure admin exists
-    await ensureAdminUser(db);
+    await ensureAdminUser(db, tenantId);
 
     const body = await req.json() as any as { username?: string; password?: string; userId?: string; currentPassword?: string; newPassword?: string };
     const { username, password } = body;
@@ -96,7 +99,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario y contrasena son requeridos' }, { status: 400 });
     }
 
-    const user = await db.user.findUnique({ where: { username } });
+    const user = await db.user.findFirst({ where: { username } });
 
     if (!user) {
       recordFailedAttempt(ip);
@@ -134,6 +137,7 @@ export async function POST(req: NextRequest) {
       id: updatedUser.id,
       username: updatedUser.username,
       role: updatedUser.role,
+      tenantId,
     });
 
     const responseData: Record<string, unknown> = {
@@ -167,8 +171,7 @@ export async function GET(req: NextRequest) {
     const { env } = getRequestContext();
     const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
 
-    const authHeader = req.headers.get('authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const token = extractToken(req);
 
     if (!token) {
       return NextResponse.json({ error: 'Token no proporcionado' }, { status: 401 });
@@ -248,6 +251,7 @@ export async function PUT(req: NextRequest) {
       id: updated.id,
       username: updated.username,
       role: updated.role,
+      tenantId,
     });
 
     const response = NextResponse.json({

@@ -10,6 +10,7 @@ datasource db {
 
 model Product {
   id                String     @id @default(cuid())
+  tenant_id String @default("default")
   name              String
   description       String     @default("")
   barcode           String     @default("")
@@ -53,32 +54,40 @@ model Product {
   comboItems          ComboItem[]
   comboItemsRef       ComboItem[] @relation("ProductComboItems")
   inventoryMovements  InventoryMovement[]
+  @@index([tenant_id])
   @@map("products")
 }
 
 model Category {
   id       String    @id @default(cuid())
-  name     String    @unique
+  tenant_id String @default("default")
+  name     String
   icon     String    @default("")
   color    String    @default("#6366f1")
   active   Boolean   @default(true)
   products Product[]
+  @@index([tenant_id])
+  @@unique([tenant_id, name])
   @@map("categories")
 }
 
 model Brand {
   id       String    @id @default(cuid())
-  name     String    @unique
+  tenant_id String @default("default")
+  name     String
   active   Boolean   @default(true)
   products Product[]
+  @@index([tenant_id])
+  @@unique([tenant_id, name])
   @@map("brands")
 }
 
 model Client {
   id             String   @id @default(cuid())
+  tenant_id String @default("default")
   type           String   @default("natural")
   docType        String   @default("V")
-  docNumber      String   @unique
+  docNumber      String
   fullName       String
   firstName      String   @default("")
   lastName       String   @default("")
@@ -101,11 +110,14 @@ model Client {
   @@index([docNumber])
   @@index([fullName])
   @@index([type])
+  @@index([tenant_id])
+  @@unique([tenant_id, docNumber])
   @@map("clients")
 }
 
 model Sale {
   id                String       @id @default(cuid())
+  tenant_id String @default("default")
   date              DateTime
   subtotal          Float
   taxAmount         Float        @default(0)
@@ -128,7 +140,7 @@ model Sale {
   creditDays        Int        @default(30)
   creditDueDate     DateTime?
   notes             String       @default("")
-  invoiceNumber     String       @unique
+  invoiceNumber     String
   items             SaleItem[]
   devolutions       Devolution[]
   creditPayments    CreditPayment[]
@@ -138,11 +150,14 @@ model Sale {
 
   @@index([date])
   @@index([clientId])
+  @@index([tenant_id])
+  @@unique([tenant_id, invoiceNumber])
   @@map("sales")
 }
 
 model SaleItem {
   id        String  @id @default(cuid())
+  tenant_id String @default("default")
   saleId    String
   productId String
   quantity  Float
@@ -150,11 +165,13 @@ model SaleItem {
   total     Float
   product   Product @relation(fields: [productId], references: [id])
   sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  @@index([tenant_id])
   @@map("sale_items")
 }
 
 model Settings {
   id              String @id @default(cuid())
+  tenant_id String @default("default")
   storeName       String @default("Mi Tienda")
   storeAddress    String @default("")
   storePhone      String @default("")
@@ -200,11 +217,13 @@ model Settings {
   promoCurrentPrice    Float   @default(180)
   promoExpiryDate      String  @default("")
   updatedAt       DateTime @updatedAt
+  @@index([tenant_id])
   @@map("settings")
 }
 
 model Devolution {
   id           String   @id @default(cuid())
+  tenant_id String @default("default")
   saleId       String
   sale         Sale     @relation(fields: [saleId], references: [id])
   date         DateTime @default(now())
@@ -218,11 +237,13 @@ model Devolution {
 
   @@index([date])
   @@index([saleId])
+  @@index([tenant_id])
   @@map("devolutions")
 }
 
 model DevolutionItem {
   id           String     @id @default(cuid())
+  tenant_id String @default("default")
   devolutionId String
   productId    String
   productName  String
@@ -231,12 +252,14 @@ model DevolutionItem {
   total        Float
   product      Product    @relation(fields: [productId], references: [id])
   devolution   Devolution @relation(fields: [devolutionId], references: [id], onDelete: Cascade)
+  @@index([tenant_id])
   @@map("devolution_items")
 }
 
 model License {
   id                String   @id @default(cuid())
-  machineId         String   @unique
+  tenant_id String @default("default")
+  machineId         String
   licenseKey        String   @default("")
   licenseType       String   @default("trial")
   activatedAt       DateTime @default(now())
@@ -255,11 +278,14 @@ model License {
   ownerRif          String   @default("")
   notes             String   @default("")
   updatedAt         DateTime @updatedAt
+  @@index([tenant_id])
+  @@unique([tenant_id, machineId])
   @@map("licenses")
 }
 
 model CashClosing {
   id              String   @id @default(cuid())
+  tenant_id String @default("default")
   date            DateTime
   closingType     String   @default("final")
   sellerName      String   @default("")
@@ -304,7 +330,8 @@ model CashClosing {
 
 model User {
   id          String   @id @default(cuid())
-  username    String   @unique
+  tenant_id String @default("default")
+  username    String
   password    String
   fullName    String   @default("")
   role        String   @default("cajero")
@@ -315,22 +342,28 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   expenses    Expense[]
+  @@index([tenant_id])
+  @@unique([tenant_id, username])
   @@map("users")
 }
 
 model RoleConfig {
   id          String   @id @default(cuid())
-  roleName    String   @unique
+  tenant_id String @default("default")
+  roleName    String
   label       String   @default("")
   permissions String   @default("{}")
   color       String   @default("#6366f1")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  @@index([tenant_id])
+  @@unique([tenant_id, roleName])
   @@map("role_configs")
 }
 
 model Supplier {
   id         String     @id @default(cuid())
+  tenant_id String @default("default")
   name       String
   rif        String     @default("")
   phone      String     @default("")
@@ -344,11 +377,13 @@ model Supplier {
   updatedAt  DateTime   @updatedAt
 
   @@index([name])
+  @@index([tenant_id])
   @@map("suppliers")
 }
 
 model Purchase {
   id           String         @id @default(cuid())
+  tenant_id String @default("default")
   date         DateTime       @default(now())
   number       String         @default("")
   supplierId   String?
@@ -363,21 +398,25 @@ model Purchase {
 
   @@index([date])
   @@index([supplierId])
+  @@index([tenant_id])
   @@map("purchases")
 }
 
 model ComboItem {
   id        String  @id @default(cuid())
+  tenant_id String @default("default")
   comboId   String
   productId String
   quantity  Int     @default(1)
   combo     Product @relation(fields: [comboId], references: [id], onDelete: Cascade)
   product   Product @relation("ProductComboItems", fields: [productId], references: [id])
+  @@index([tenant_id])
   @@map("combo_items")
 }
 
 model PurchaseItem {
   id           String   @id @default(cuid())
+  tenant_id String @default("default")
   purchaseId   String
   productId    String?
   productName  String   @default("")
@@ -394,11 +433,13 @@ model PurchaseItem {
   product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
+  @@index([tenant_id])
   @@map("purchase_items")
 }
 
 model CreditPayment {
   id           String   @id @default(cuid())
+  tenant_id String @default("default")
   saleId       String
   sale         Sale     @relation(fields: [saleId], references: [id])
   clientId     String?
@@ -416,12 +457,14 @@ model CreditPayment {
   @@index([date])
   @@index([saleId])
   @@index([clientId])
+  @@index([tenant_id])
   @@map("credit_payments")
 }
 
 // ===== KARDEX DE INVENTARIO =====
 model InventoryMovement {
   id          String   @id @default(cuid())
+  tenant_id String @default("default")
   productId   String
   product     Product  @relation(fields: [productId], references: [id])
   date        DateTime @default(now())
@@ -445,12 +488,14 @@ model InventoryMovement {
   @@index([productId])
   @@index([date])
   @@index([movementType])
+  @@index([tenant_id])
   @@map("inventory_movements")
 }
 
 // ===== FACTURAS EN ESPERA =====
 model HeldSale {
   id             String       @id @default(cuid())
+  tenant_id String @default("default")
   number         Int          @default(0)
   userId         String       @default("")
   userName       String       @default("")
@@ -472,11 +517,13 @@ model HeldSale {
 
   @@index([userId])
   @@index([status])
+  @@index([tenant_id])
   @@map("held_sales")
 }
 
 model HeldSaleItem {
   id          String   @id @default(cuid())
+  tenant_id String @default("default")
   heldSaleId  String
   productId   String
   productName String   @default("")
@@ -486,12 +533,14 @@ model HeldSaleItem {
   taxType     String   @default("general")
   heldSale    HeldSale @relation(fields: [heldSaleId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  @@index([tenant_id])
   @@map("held_sale_items")
 }
 
 // ===== PRESUPUESTOS / COTIZACIONES =====
 model Quote {
   id             String       @id @default(cuid())
+  tenant_id String @default("default")
   number         Int          @default(0)
   userId         String       @default("")
   userName       String       @default("")
@@ -513,11 +562,13 @@ model Quote {
 
   @@index([userId])
   @@index([status])
+  @@index([tenant_id])
   @@map("quotes")
 }
 
 model QuoteItem {
   id          String   @id @default(cuid())
+  tenant_id String @default("default")
   quoteId     String
   productId   String
   productName String   @default("")
@@ -527,12 +578,14 @@ model QuoteItem {
   taxType     String   @default("general")
   quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  @@index([tenant_id])
   @@map("quote_items")
 }
 
 // ===== NOTAS DE ENTREGA =====
 model DeliveryNote {
   id             String            @id @default(cuid())
+  tenant_id String @default("default")
   number         Int               @default(0)
   userId         String            @default("")
   userName       String            @default("")
@@ -552,11 +605,13 @@ model DeliveryNote {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([tenant_id])
   @@map("delivery_notes")
 }
 
 model DeliveryNoteItem {
   id             String   @id @default(cuid())
+  tenant_id String @default("default")
   deliveryNoteId String
   productId      String
   productName    String   @default("")
@@ -565,13 +620,15 @@ model DeliveryNoteItem {
   totalCost      Float    @default(0)
   deliveryNote   DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
+  @@index([tenant_id])
   @@map("delivery_note_items")
 }
 
 // ========== MODULO DE GASTOS ==========
 model ExpenseCategory {
   id          String    @id @default(cuid())
-  name        String    @unique
+  tenant_id String @default("default")
+  name        String
   description String    @default("")
   icon        String    @default("receipt")
   color       String    @default("#ef4444")
@@ -579,11 +636,14 @@ model ExpenseCategory {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   expenses    Expense[]
+  @@index([tenant_id])
+  @@unique([tenant_id, name])
   @@map("expense_categories")
 }
 
 model Expense {
   id            String          @id @default(cuid())
+  tenant_id String @default("default")
   categoryId    String
   category      ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   description   String
@@ -602,5 +662,6 @@ model Expense {
   @@index([date])
   @@index([categoryId])
   @@index([userId])
+  @@index([tenant_id])
   @@map("expenses")
 }

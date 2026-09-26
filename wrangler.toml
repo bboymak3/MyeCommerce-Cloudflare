@@ -12,9 +12,16 @@ d1_databases = [
 
 # R2 Storage binding
 [[r2_buckets]]
-binding = "BUCKET"
+binding = "R2_PHOTOS"
 bucket_name = "ferreteria-central-photos"
 
 [vars]
 NODE_ENV = "production"
-JWT_SECRET = "myecommerce-pos-jwt-secret-v2.9.34-change-in-production"
+# Negocio de nexus-one dueno de los datos existentes (tenant_id = 'default')
+LEGACY_TENANT_SLUG = "ferreteria-central"
+
+# Secretos (NO van en este archivo). Mientras JWT_SECRET no exista se usa la clave
+# anterior; el acceso desde nexus-one (SSO) requiere NEXUS_SSO_SECRET. Configurar con:
+#   npx wrangler pages secret put JWT_SECRET --project-name=myecommerce-pos
+#   npx wrangler pages secret put NEXUS_SSO_SECRET --project-name=myecommerce-pos
+# NEXUS_SSO_SECRET debe ser el mismo valor configurado en el proyecto nexus-one.
