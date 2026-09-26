@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "dev:cf": "npx wrangler pages dev .vercel/output/static --compatibility-date=2024-11-01 --binding DB=ok_db",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "build:cf": "npx @cloudflare/next-on-pages",
     "preview": "npx wrangler pages dev .vercel/output/static",
     "deploy:pos": "npx @cloudflare/next-on-pages && npx wrangler pages deploy .vercel/output/static --project-name=myecommerce-pos",
