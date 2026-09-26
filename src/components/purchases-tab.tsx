@@ -35,6 +35,8 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
 
   const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
+  const [isCredit, setIsCredit] = useState(false);
+  const [creditDays, setCreditDays] = useState("30");
   const [items, setItems] = useState<PurchaseItem[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [showProductDropdown, setShowProductDropdown] = useState(false);
@@ -180,7 +182,7 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
       const res = await authFetch("/api/purchases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ supplierId: supplierId || null, items, notes, exchangeRate: bcvRate }),
+        body: JSON.stringify({ supplierId: supplierId || null, items, notes, exchangeRate: bcvRate, isCredit: isCredit && !!supplierId, creditDays: parseInt(creditDays) || 30 }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       toast.success(`Compra registrada: $${totalUsd.toFixed(2)} (${items.length} productos)`);
@@ -304,6 +306,21 @@ export default function PurchasesTab({ bcvRate = 36.5 }: { bcvRate?: number }) {
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Observaciones..." />
             </div>
           </div>
+
+          {supplierId && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-1.5 text-sm cursor-pointer select-none">
+                <input type="checkbox" checked={isCredit} onChange={(e) => setIsCredit(e.target.checked)} className="w-4 h-4" />
+                Compra a credito
+              </label>
+              {isCredit && (
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs">Dias de plazo</Label>
+                  <Input type="number" min="1" value={creditDays} onChange={(e) => setCreditDays(e.target.value)} className="w-20 h-8 text-sm" />
+                </div>
+              )}
+            </div>
+          )}
 
           <Separator />
 

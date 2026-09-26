@@ -66,6 +66,26 @@ sin clave que publica la tasa oficial del Banco Central de Venezuela
   sesión); sin ese secreto configurado en Cloudflare, la ruta rechaza toda
   petición.
 
+## Cuentas por pagar, turnos de caja y puntos de fidelidad
+
+- **Cuentas por Pagar:** una compra a proveedor puede marcarse "a credito"
+  (con dias de plazo). El proveedor acumula `payableBalance` y en la pestana
+  **Cuentas por Pagar** se ve cuanto se le debe a cada uno, cuales facturas
+  estan vencidas, y se registran abonos parciales (`pos_supplier_payments`,
+  espejo de `pos_credit_payments` pero para proveedores).
+- **Turnos de Caja:** cada cajero abre su turno con el efectivo inicial
+  (USD y Bs) antes de vender; el sistema asocia automaticamente cada venta
+  al turno abierto de quien la registra. Al cerrar, compara el efectivo
+  contado contra el esperado (inicial + ventas en efectivo de ese turno) y
+  guarda la diferencia. Pestana **Turnos de Caja**, ruta `pos_cash_shifts`.
+- **Puntos de Fidelidad:** se activa en Configuracion (`loyaltyEnabled`,
+  puntos por cada $1 de descuento en `loyaltyPointsPerUsd`). Cada producto
+  define cuantos puntos otorga por unidad vendida (`Product.loyaltyPoints`).
+  En el punto de venta, si el cliente seleccionado tiene puntos acumulados,
+  el cajero puede canjearlos como descuento adicional; la venta guarda
+  `pointsEarned`/`pointsRedeemed` y el saldo del cliente se actualiza al
+  confirmar.
+
 ## Secretos (Cloudflare Pages → Settings → Variables and Secrets)
 
 Ninguno va en `wrangler.toml` ni en el código:

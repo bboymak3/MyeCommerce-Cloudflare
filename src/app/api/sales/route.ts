@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
 
     const settings = await db.settings.findFirst();
     const allowZeroStock = settings?.allowZeroStock === true;
+    const loyaltyEnabled = settings?.loyaltyEnabled === true;
 
     // Always validate quantity format and product existence
     for (const item of body.items) {
@@ -87,8 +88,10 @@ export async function POST(req: NextRequest) {
     // 2. Read product costs and last inventory movements for kardex — READS FIRST
     const sName = body.sellerName || '';
     const sRole = body.sellerRole || '';
-    const uId = String(body.userId || '');
+    const uId = req.headers.get('x-user-id') || String(body.userId || '');
+    const openShift = uId ? await db.cashShift.findFirst({ where: { userId: uId, status: 'open' } }) : null;
     const kardexData: { productId: string; qty: number; unitCost: number; balQty: number; balTC: number; balAvg: number }[] = [];
+    let pointsEarned = 0;
     for (const item of body.items) {
       const qty = parseFloat(item.quantity);
       const product = await db.product.findUnique({ where: { id: item.productId } });
@@ -101,16 +104,35 @@ export async function POST(req: NextRequest) {
       const balTC = Math.max(0, prevTC - (qty * unitCost));
       const balAvg = balQty > 0 ? balTC / balQty : 0;
       kardexData.push({ productId: item.productId, qty, unitCost, balQty, balTC, balAvg });
+      pointsEarned += (product?.loyaltyPoints || 0) * qty;
     }
+    pointsEarned = Math.round(pointsEarned);
 
-    // 3. Read client credit balance if credit sale — READ FIRST
+    // 3. Read client (credit balance / loyalty points) if a client is attached — READ FIRST
     let clientCreditBalance: number | null = null;
-    if (body.isCredit && body.clientId) {
+    let clientLoyaltyPoints: number | null = null;
+    let pointsRedeemed = 0;
+    if (body.clientId) {
       const client = await db.client.findUnique({ where: { id: body.clientId } });
       if (client) {
         clientCreditBalance = Number(client.creditBalance || 0);
+        clientLoyaltyPoints = Math.round(Number(client.loyaltyPoints || 0));
+        if (loyaltyEnabled && !client.isFinalClient) {
+          pointsRedeemed = Math.round(parseFloat(body.pointsRedeemed) || 0);
+          if (pointsRedeemed < 0) pointsRedeemed = 0;
+          if (pointsRedeemed > clientLoyaltyPoints) {
+            return NextResponse.json({ error: `El cliente solo tiene ${clientLoyaltyPoints} puntos disponibles` }, { status: 400 });
+          }
+        } else {
+          pointsEarned = 0;
+        }
+      } else {
+        pointsEarned = 0;
       }
+    } else {
+      pointsEarned = 0;
     }
+    if (!loyaltyEnabled) { pointsEarned = 0; pointsRedeemed = 0; }
 
     // 4. Build batch write operations
     const ops: any[] = [];
@@ -142,6 +164,9 @@ export async function POST(req: NextRequest) {
         creditDays: body.isCredit ? (parseInt(body.creditDays) || 30) : undefined,
         creditDueDate: body.isCredit ? (() => { const d = new Date(); d.setDate(d.getDate() + (parseInt(body.creditDays) || 30)); return d; })() : undefined,
         invoiceNumber,
+        shiftId: openShift?.id || null,
+        pointsEarned,
+        pointsRedeemed,
         items: { create: body.items.map((item: any) => ({ productId: item.productId, quantity: parseFloat(item.quantity), unitPrice: parseFloat(item.unitPrice), total: parseFloat(item.total) })) },
       },
       include: { items: { include: { product: { select: { name: true, vendePorPeso: true, unidadPeso: true } } } }, client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } }, _count: { select: { creditPayments: true } } },
@@ -161,12 +186,18 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // If credit sale, update client balance
-    if (body.isCredit && body.clientId && clientCreditBalance !== null) {
-      ops.push(db.client.update({
-        where: { id: body.clientId },
-        data: { creditBalance: Number((clientCreditBalance + total).toFixed(2)) },
-      }));
+    // Actualizar cliente: saldo de credito (si aplica) y puntos de fidelidad
+    if (body.clientId && (clientCreditBalance !== null || clientLoyaltyPoints !== null)) {
+      const clientData: any = {};
+      if (body.isCredit && clientCreditBalance !== null) {
+        clientData.creditBalance = Number((clientCreditBalance + total).toFixed(2));
+      }
+      if (loyaltyEnabled && clientLoyaltyPoints !== null && (pointsEarned > 0 || pointsRedeemed > 0)) {
+        clientData.loyaltyPoints = Math.max(0, clientLoyaltyPoints - pointsRedeemed + pointsEarned);
+      }
+      if (Object.keys(clientData).length > 0) {
+        ops.push(db.client.update({ where: { id: body.clientId }, data: clientData }));
+      }
     }
 
     // Execute batch transaction
