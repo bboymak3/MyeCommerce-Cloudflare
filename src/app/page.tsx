@@ -102,6 +102,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
+  // Negocio de Nexus One suspendido o vencido: motivo del bloqueo
+  const [nexusBlock, setNexusBlock] = useState<string | null>(null);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
   const [activateKey, setActivateKey] = useState("");
   const [activating, setActivating] = useState(false);
@@ -296,7 +298,11 @@ export default function Home() {
         })
 
       const ar = licenseData ? (licenseData.maxActivations - (licenseData.activationCount || 0)) : 0;
-      if (licenseData && !licenseData.error && licenseData.machineMismatch && !licenseData.isExpired && licenseData.licenseType !== 'trial' && ar > 0) {
+      const nexusLicense = licenseData as { managedBy?: string; isValid?: boolean; blockedReason?: string } | null;
+      if (nexusLicense && nexusLicense.managedBy === 'nexus') {
+        // Licencia gestionada por el super admin de Nexus One (sin claves)
+        setNexusBlock(nexusLicense.isValid ? null : (nexusLicense.blockedReason || 'Este negocio no esta activo.'));
+      } else if (licenseData && !licenseData.error && licenseData.machineMismatch && !licenseData.isExpired && licenseData.licenseType !== 'trial' && ar > 0) {
         // Maquina diferente pero hay activaciones restantes → modal amigable
         setTimeout(() => setShowBlockedModal(true), 500);
       } else if (licenseData && !licenseData.error && licenseData.machineMismatch && !licenseData.isExpired && licenseData.licenseType !== 'trial' && ar <= 0) {
@@ -768,6 +774,15 @@ export default function Home() {
 
       {/* MODALES */}
 
+      <Dialog open={!!nexusBlock}>
+        <DialogContent className="max-w-md" onInteractOutside={(e: any) => e.preventDefault()} onEscapeKeyDown={(e: any) => e.preventDefault()}>
+          <DialogHeader><DialogTitle className="text-center text-destructive text-xl">Negocio no disponible</DialogTitle></DialogHeader>
+          <div className="text-center space-y-4">
+            <p className="text-sm">{nexusBlock}</p>
+            <Button variant="outline" className="w-full" onClick={handleLogout}>Cerrar sesion</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={showExpiredModal} onOpenChange={setShowExpiredModal}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="text-center text-destructive text-xl">Licencia Expirada</DialogTitle></DialogHeader>

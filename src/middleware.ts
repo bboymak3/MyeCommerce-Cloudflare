@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { verifySessionToken } from './lib/session';
 import { ensureSchema } from './lib/schema-migrate';
+import { getNexusTenant } from './lib/nexus-tenant';
 
 // Rutas API que NO requieren autenticacion (metodos permitidos sin sesion)
 const PUBLIC_ROUTES: Record<string, string[] | '*'> = {
@@ -93,6 +94,16 @@ export async function middleware(request: NextRequest) {
           { status: 403 }
         );
       }
+    }
+  }
+
+  // Negocio de Nexus One suspendido o con la suscripcion vencida: se bloquea la API.
+  // /api/license sigue disponible para que la pantalla muestre el motivo.
+  if (!(pathname === '/api/license' || pathname.startsWith('/api/license/'))) {
+    const env = getRequestContext().env as any;
+    const nexus = await getNexusTenant(env.DB, session.tenantId || 'default', env.LEGACY_TENANT_SLUG);
+    if (nexus && !nexus.active) {
+      return NextResponse.json({ error: nexus.reason, code: 'TENANT_INACTIVE' }, { status: 403 });
     }
   }
 

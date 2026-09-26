@@ -9,6 +9,7 @@ import { getRequestContext } from '@cloudflare/next-on-pages';
 import { createDbFromEnv, DEFAULT_TENANT_ID } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { createSessionToken, verifyNexusSsoToken } from '@/lib/session';
+import { getNexusTenant } from '@/lib/nexus-tenant';
 import { NextRequest, NextResponse } from 'next/server';
 
 const POS_ROLES = new Set(['admin', 'vendedor', 'cajero']);
@@ -30,6 +31,10 @@ export async function GET(req: NextRequest) {
     // pertenecen al negocio LEGACY_TENANT_SLUG (wrangler.toml): se usan tal cual.
     const legacySlug = (env as any).LEGACY_TENANT_SLUG || process.env.LEGACY_TENANT_SLUG;
     const tenantId = legacySlug && sso.tenantSlug === legacySlug ? DEFAULT_TENANT_ID : sso.tenantId;
+    const nexus = await getNexusTenant((env as any).DB, tenantId, legacySlug);
+    if (nexus && !nexus.active) {
+      return NextResponse.json({ error: nexus.reason }, { status: 403 });
+    }
     const db = createDbFromEnv(env as any, tenantId);
     const role = sso.role && POS_ROLES.has(sso.role) ? sso.role : 'cajero';
 
