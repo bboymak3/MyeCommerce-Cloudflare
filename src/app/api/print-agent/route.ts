@@ -11,7 +11,7 @@ const AGENT_TIMEOUT = 15000; // 15s timeout para el agente
  */
 
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams } = new URL(req.url);
   const action = searchParams.get('action') || 'status';
 
   let url: string;

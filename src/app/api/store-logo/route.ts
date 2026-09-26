@@ -2,9 +2,14 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getRequestContext } from '@cloudflare/next-on-pages';
+import { getTenantId, DEFAULT_TENANT_ID } from '@/lib/db';
 
 const VALID_EXTS = ['png', 'jpg', 'gif', 'webp', 'bmp'];
-const LOGO_KEY = 'store/logo';
+// Logo por negocio. La instalacion base ('default') conserva la ruta original.
+function logoKey(req: NextRequest): string {
+  const tenantId = getTenantId(req.headers);
+  return tenantId === DEFAULT_TENANT_ID ? 'store/logo' : `tenants/${tenantId}/store/logo`;
+}
 
 // GET — serve logo from R2
 export async function GET(req: NextRequest) {
@@ -15,6 +20,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'R2 bucket not configured' }, { status: 500 });
     }
 
+    const LOGO_KEY = logoKey(req);
     // Try each extension to find the logo
     for (const ext of VALID_EXTS) {
       const object = await bucket.get(`${LOGO_KEY}.${ext}`);
@@ -65,6 +71,7 @@ export async function POST(req: NextRequest) {
       'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/bmp': 'bmp',
     };
     const ext = extMap[file.type] || 'png';
+    const LOGO_KEY = logoKey(req);
     const key = `${LOGO_KEY}.${ext}`;
 
     // Delete old logos with different extensions

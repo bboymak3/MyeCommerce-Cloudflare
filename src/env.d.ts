@@ -5,6 +5,18 @@ declare module '@cloudflare/next-on-pages' {
     DB: D1Database;
     R2_PHOTOS: R2Bucket;
     NODE_ENV: string;
+    // Secretos (npx wrangler pages secret put ...), nunca en wrangler.toml
     JWT_SECRET: string;
+    NEXUS_SSO_SECRET: string;
+  }
+}
+
+declare global {
+  interface CloudflareEnv {
+    DB: D1Database;
+    R2_PHOTOS: R2Bucket;
+    NODE_ENV: string;
+    JWT_SECRET: string;
+    NEXUS_SSO_SECRET: string;
   }
 }

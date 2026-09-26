@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getAppVersion } from '@/lib/version';
 
 export async function GET(req: NextRequest) {

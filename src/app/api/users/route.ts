@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if username already exists
-    const existing = await db.user.findUnique({ where: { username } });
+    const existing = await db.user.findFirst({ where: { username } });
     if (existing) {
       return NextResponse.json({ error: 'El nombre de usuario ya existe' }, { status: 409 });
     }

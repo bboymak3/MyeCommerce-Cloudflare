@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const GITHUB_REPO = 'csglider/MyeCommerce-v2.9.20';
 

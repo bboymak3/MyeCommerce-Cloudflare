@@ -1,5 +1,5 @@
 export const runtime = 'edge';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 // On Cloudflare Edge, automatic file-based backups are not supported.
 // Backup/restore is handled via the /api/backup endpoint (JSON export/import).

@@ -1,6 +1,11 @@
+-- MyeCommerce POS - esquema D1 (SQLite) multi-negocio.
+-- Generado desde prisma/schema.prisma con: npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+-- Cada tabla lleva tenant_id (id del negocio en nexus-one; 'default' = datos previos a multi-negocio).
+
 -- CreateTable
-CREATE TABLE "Product" (
+CREATE TABLE IF NOT EXISTS "products" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
     "barcode" TEXT NOT NULL DEFAULT '',
@@ -35,13 +40,14 @@ CREATE TABLE "Product" (
     "active" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Product_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "Product_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "Brand" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "products_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "categories" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "products_brandId_fkey" FOREIGN KEY ("brandId") REFERENCES "brands" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "Category" (
+CREATE TABLE IF NOT EXISTS "categories" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "name" TEXT NOT NULL,
     "icon" TEXT NOT NULL DEFAULT '',
     "color" TEXT NOT NULL DEFAULT '#6366f1',
@@ -49,15 +55,17 @@ CREATE TABLE "Category" (
 );
 
 -- CreateTable
-CREATE TABLE "Brand" (
+CREATE TABLE IF NOT EXISTS "brands" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "name" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true
 );
 
 -- CreateTable
-CREATE TABLE "Client" (
+CREATE TABLE IF NOT EXISTS "clients" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "type" TEXT NOT NULL DEFAULT 'natural',
     "docType" TEXT NOT NULL DEFAULT 'V',
     "docNumber" TEXT NOT NULL,
@@ -78,8 +86,9 @@ CREATE TABLE "Client" (
 );
 
 -- CreateTable
-CREATE TABLE "Sale" (
+CREATE TABLE IF NOT EXISTS "sales" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "date" DATETIME NOT NULL,
     "subtotal" REAL NOT NULL,
     "taxAmount" REAL NOT NULL DEFAULT 0,
@@ -105,24 +114,26 @@ CREATE TABLE "Sale" (
     "invoiceNumber" TEXT NOT NULL,
     "clientId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Sale_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "sales_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "SaleItem" (
+CREATE TABLE IF NOT EXISTS "sale_items" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "saleId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "quantity" REAL NOT NULL,
     "unitPrice" REAL NOT NULL,
     "total" REAL NOT NULL,
-    CONSTRAINT "SaleItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "SaleItem_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "sale_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "sale_items_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "sales" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "Settings" (
+CREATE TABLE IF NOT EXISTS "settings" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "storeName" TEXT NOT NULL DEFAULT 'Mi Tienda',
     "storeAddress" TEXT NOT NULL DEFAULT '',
     "storePhone" TEXT NOT NULL DEFAULT '',
@@ -165,8 +176,9 @@ CREATE TABLE "Settings" (
 );
 
 -- CreateTable
-CREATE TABLE "Devolution" (
+CREATE TABLE IF NOT EXISTS "devolutions" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "saleId" TEXT NOT NULL,
     "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "reason" TEXT NOT NULL,
@@ -175,25 +187,27 @@ CREATE TABLE "Devolution" (
     "exchangeRate" REAL NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'completada',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "Devolution_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "devolutions_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "sales" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "DevolutionItem" (
+CREATE TABLE IF NOT EXISTS "devolution_items" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "devolutionId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "productName" TEXT NOT NULL,
     "quantity" REAL NOT NULL,
     "unitPrice" REAL NOT NULL,
     "total" REAL NOT NULL,
-    CONSTRAINT "DevolutionItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "DevolutionItem_devolutionId_fkey" FOREIGN KEY ("devolutionId") REFERENCES "Devolution" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "devolution_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "devolution_items_devolutionId_fkey" FOREIGN KEY ("devolutionId") REFERENCES "devolutions" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "License" (
+CREATE TABLE IF NOT EXISTS "licenses" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "machineId" TEXT NOT NULL,
     "licenseKey" TEXT NOT NULL DEFAULT '',
     "licenseType" TEXT NOT NULL DEFAULT 'trial',
@@ -216,8 +230,9 @@ CREATE TABLE "License" (
 );
 
 -- CreateTable
-CREATE TABLE "CashClosing" (
+CREATE TABLE IF NOT EXISTS "CashClosing" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "date" DATETIME NOT NULL,
     "closingType" TEXT NOT NULL DEFAULT 'final',
     "sellerName" TEXT NOT NULL DEFAULT '',
@@ -259,8 +274,9 @@ CREATE TABLE "CashClosing" (
 );
 
 -- CreateTable
-CREATE TABLE "User" (
+CREATE TABLE IF NOT EXISTS "users" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "username" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "fullName" TEXT NOT NULL DEFAULT '',
@@ -274,8 +290,9 @@ CREATE TABLE "User" (
 );
 
 -- CreateTable
-CREATE TABLE "RoleConfig" (
+CREATE TABLE IF NOT EXISTS "role_configs" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "roleName" TEXT NOT NULL,
     "label" TEXT NOT NULL DEFAULT '',
     "permissions" TEXT NOT NULL DEFAULT '{}',
@@ -285,8 +302,9 @@ CREATE TABLE "RoleConfig" (
 );
 
 -- CreateTable
-CREATE TABLE "Supplier" (
+CREATE TABLE IF NOT EXISTS "suppliers" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "name" TEXT NOT NULL,
     "rif" TEXT NOT NULL DEFAULT '',
     "phone" TEXT NOT NULL DEFAULT '',
@@ -300,8 +318,9 @@ CREATE TABLE "Supplier" (
 );
 
 -- CreateTable
-CREATE TABLE "Purchase" (
+CREATE TABLE IF NOT EXISTS "purchases" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "number" TEXT NOT NULL DEFAULT '',
     "supplierId" TEXT,
@@ -311,22 +330,24 @@ CREATE TABLE "Purchase" (
     "notes" TEXT NOT NULL DEFAULT '',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Purchase_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "Supplier" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "purchases_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "suppliers" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "ComboItem" (
+CREATE TABLE IF NOT EXISTS "combo_items" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "comboId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "quantity" INTEGER NOT NULL DEFAULT 1,
-    CONSTRAINT "ComboItem_comboId_fkey" FOREIGN KEY ("comboId") REFERENCES "Product" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT "ComboItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "combo_items_comboId_fkey" FOREIGN KEY ("comboId") REFERENCES "products" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "combo_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "PurchaseItem" (
+CREATE TABLE IF NOT EXISTS "purchase_items" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "purchaseId" TEXT NOT NULL,
     "productId" TEXT,
     "productName" TEXT NOT NULL DEFAULT '',
@@ -341,13 +362,14 @@ CREATE TABLE "PurchaseItem" (
     "calcMargin" REAL NOT NULL DEFAULT 0,
     "calcPrice" REAL NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "PurchaseItem_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT "PurchaseItem_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES "Purchase" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "purchase_items_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "purchase_items_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES "purchases" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "CreditPayment" (
+CREATE TABLE IF NOT EXISTS "credit_payments" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "saleId" TEXT NOT NULL,
     "clientId" TEXT,
     "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -359,13 +381,14 @@ CREATE TABLE "CreditPayment" (
     "notes" TEXT NOT NULL DEFAULT '',
     "createdBy" TEXT NOT NULL DEFAULT '',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "CreditPayment_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "Sale" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "CreditPayment_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "credit_payments_saleId_fkey" FOREIGN KEY ("saleId") REFERENCES "sales" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "credit_payments_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "InventoryMovement" (
+CREATE TABLE IF NOT EXISTS "inventory_movements" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "productId" TEXT NOT NULL,
     "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "movementType" TEXT NOT NULL,
@@ -382,12 +405,13 @@ CREATE TABLE "InventoryMovement" (
     "userRole" TEXT NOT NULL DEFAULT '',
     "referenceId" TEXT NOT NULL DEFAULT '',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "InventoryMovement_productId_fkey" FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "inventory_movements_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "HeldSale" (
+CREATE TABLE IF NOT EXISTS "held_sales" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "number" INTEGER NOT NULL DEFAULT 0,
     "userId" TEXT NOT NULL DEFAULT '',
     "userName" TEXT NOT NULL DEFAULT '',
@@ -404,12 +428,13 @@ CREATE TABLE "HeldSale" (
     "status" TEXT NOT NULL DEFAULT 'espera',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "HeldSale_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "held_sales_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "HeldSaleItem" (
+CREATE TABLE IF NOT EXISTS "held_sale_items" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "heldSaleId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "productName" TEXT NOT NULL DEFAULT '',
@@ -418,12 +443,13 @@ CREATE TABLE "HeldSaleItem" (
     "total" REAL NOT NULL,
     "taxType" TEXT NOT NULL DEFAULT 'general',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "HeldSaleItem_heldSaleId_fkey" FOREIGN KEY ("heldSaleId") REFERENCES "HeldSale" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "held_sale_items_heldSaleId_fkey" FOREIGN KEY ("heldSaleId") REFERENCES "held_sales" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "Quote" (
+CREATE TABLE IF NOT EXISTS "quotes" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "number" INTEGER NOT NULL DEFAULT 0,
     "userId" TEXT NOT NULL DEFAULT '',
     "userName" TEXT NOT NULL DEFAULT '',
@@ -440,12 +466,13 @@ CREATE TABLE "Quote" (
     "status" TEXT NOT NULL DEFAULT 'pendiente',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Quote_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "quotes_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "clients" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "QuoteItem" (
+CREATE TABLE IF NOT EXISTS "quote_items" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "quoteId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "productName" TEXT NOT NULL DEFAULT '',
@@ -454,12 +481,13 @@ CREATE TABLE "QuoteItem" (
     "total" REAL NOT NULL,
     "taxType" TEXT NOT NULL DEFAULT 'general',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "QuoteItem_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "Quote" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "quote_items_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "quotes" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "DeliveryNote" (
+CREATE TABLE IF NOT EXISTS "delivery_notes" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "number" INTEGER NOT NULL DEFAULT 0,
     "userId" TEXT NOT NULL DEFAULT '',
     "userName" TEXT NOT NULL DEFAULT '',
@@ -477,8 +505,9 @@ CREATE TABLE "DeliveryNote" (
 );
 
 -- CreateTable
-CREATE TABLE "DeliveryNoteItem" (
+CREATE TABLE IF NOT EXISTS "delivery_note_items" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "deliveryNoteId" TEXT NOT NULL,
     "productId" TEXT NOT NULL,
     "productName" TEXT NOT NULL DEFAULT '',
@@ -486,12 +515,13 @@ CREATE TABLE "DeliveryNoteItem" (
     "unitCost" REAL NOT NULL DEFAULT 0,
     "totalCost" REAL NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "DeliveryNoteItem_deliveryNoteId_fkey" FOREIGN KEY ("deliveryNoteId") REFERENCES "DeliveryNote" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+    CONSTRAINT "delivery_note_items_deliveryNoteId_fkey" FOREIGN KEY ("deliveryNoteId") REFERENCES "delivery_notes" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "ExpenseCategory" (
+CREATE TABLE IF NOT EXISTS "expense_categories" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL DEFAULT '',
     "icon" TEXT NOT NULL DEFAULT 'receipt',
@@ -502,8 +532,9 @@ CREATE TABLE "ExpenseCategory" (
 );
 
 -- CreateTable
-CREATE TABLE "Expense" (
+CREATE TABLE IF NOT EXISTS "expenses" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
     "categoryId" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "amount" REAL NOT NULL,
@@ -516,112 +547,190 @@ CREATE TABLE "Expense" (
     "userId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "Expense_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "ExpenseCategory" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Expense_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "expenses_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "expense_categories" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "expenses_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Category_name_key" ON "Category"("name");
+CREATE INDEX IF NOT EXISTS "products_tenant_id_idx" ON "products"("tenant_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Brand_name_key" ON "Brand"("name");
+CREATE INDEX IF NOT EXISTS "categories_tenant_id_idx" ON "categories"("tenant_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Client_docNumber_key" ON "Client"("docNumber");
+CREATE UNIQUE INDEX IF NOT EXISTS "categories_tenant_id_name_key" ON "categories"("tenant_id", "name");
 
 -- CreateIndex
-CREATE INDEX "Client_docNumber_idx" ON "Client"("docNumber");
+CREATE INDEX IF NOT EXISTS "brands_tenant_id_idx" ON "brands"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Client_fullName_idx" ON "Client"("fullName");
+CREATE UNIQUE INDEX IF NOT EXISTS "brands_tenant_id_name_key" ON "brands"("tenant_id", "name");
 
 -- CreateIndex
-CREATE INDEX "Client_type_idx" ON "Client"("type");
+CREATE INDEX IF NOT EXISTS "clients_docNumber_idx" ON "clients"("docNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Sale_invoiceNumber_key" ON "Sale"("invoiceNumber");
+CREATE INDEX IF NOT EXISTS "clients_fullName_idx" ON "clients"("fullName");
 
 -- CreateIndex
-CREATE INDEX "Sale_date_idx" ON "Sale"("date");
+CREATE INDEX IF NOT EXISTS "clients_type_idx" ON "clients"("type");
 
 -- CreateIndex
-CREATE INDEX "Sale_clientId_idx" ON "Sale"("clientId");
+CREATE INDEX IF NOT EXISTS "clients_tenant_id_idx" ON "clients"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Devolution_date_idx" ON "Devolution"("date");
+CREATE UNIQUE INDEX IF NOT EXISTS "clients_tenant_id_docNumber_key" ON "clients"("tenant_id", "docNumber");
 
 -- CreateIndex
-CREATE INDEX "Devolution_saleId_idx" ON "Devolution"("saleId");
+CREATE INDEX IF NOT EXISTS "sales_date_idx" ON "sales"("date");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "License_machineId_key" ON "License"("machineId");
+CREATE INDEX IF NOT EXISTS "sales_clientId_idx" ON "sales"("clientId");
 
 -- CreateIndex
-CREATE INDEX "CashClosing_date_idx" ON "CashClosing"("date");
+CREATE INDEX IF NOT EXISTS "sales_tenant_id_idx" ON "sales"("tenant_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
+CREATE UNIQUE INDEX IF NOT EXISTS "sales_tenant_id_invoiceNumber_key" ON "sales"("tenant_id", "invoiceNumber");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "RoleConfig_roleName_key" ON "RoleConfig"("roleName");
+CREATE INDEX IF NOT EXISTS "sale_items_tenant_id_idx" ON "sale_items"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Supplier_name_idx" ON "Supplier"("name");
+CREATE INDEX IF NOT EXISTS "settings_tenant_id_idx" ON "settings"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Purchase_date_idx" ON "Purchase"("date");
+CREATE INDEX IF NOT EXISTS "devolutions_date_idx" ON "devolutions"("date");
 
 -- CreateIndex
-CREATE INDEX "Purchase_supplierId_idx" ON "Purchase"("supplierId");
+CREATE INDEX IF NOT EXISTS "devolutions_saleId_idx" ON "devolutions"("saleId");
 
 -- CreateIndex
-CREATE INDEX "CreditPayment_date_idx" ON "CreditPayment"("date");
+CREATE INDEX IF NOT EXISTS "devolutions_tenant_id_idx" ON "devolutions"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "CreditPayment_saleId_idx" ON "CreditPayment"("saleId");
+CREATE INDEX IF NOT EXISTS "devolution_items_tenant_id_idx" ON "devolution_items"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "CreditPayment_clientId_idx" ON "CreditPayment"("clientId");
+CREATE INDEX IF NOT EXISTS "licenses_tenant_id_idx" ON "licenses"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "InventoryMovement_productId_idx" ON "InventoryMovement"("productId");
+CREATE UNIQUE INDEX IF NOT EXISTS "licenses_tenant_id_machineId_key" ON "licenses"("tenant_id", "machineId");
 
 -- CreateIndex
-CREATE INDEX "InventoryMovement_date_idx" ON "InventoryMovement"("date");
+CREATE INDEX IF NOT EXISTS "CashClosing_date_idx" ON "CashClosing"("date");
 
 -- CreateIndex
-CREATE INDEX "InventoryMovement_movementType_idx" ON "InventoryMovement"("movementType");
+CREATE INDEX IF NOT EXISTS "users_tenant_id_idx" ON "users"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "HeldSale_userId_idx" ON "HeldSale"("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "users_tenant_id_username_key" ON "users"("tenant_id", "username");
 
 -- CreateIndex
-CREATE INDEX "HeldSale_status_idx" ON "HeldSale"("status");
+CREATE INDEX IF NOT EXISTS "role_configs_tenant_id_idx" ON "role_configs"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Quote_userId_idx" ON "Quote"("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "role_configs_tenant_id_roleName_key" ON "role_configs"("tenant_id", "roleName");
 
 -- CreateIndex
-CREATE INDEX "Quote_status_idx" ON "Quote"("status");
+CREATE INDEX IF NOT EXISTS "suppliers_name_idx" ON "suppliers"("name");
 
 -- CreateIndex
-CREATE INDEX "DeliveryNote_userId_idx" ON "DeliveryNote"("userId");
+CREATE INDEX IF NOT EXISTS "suppliers_tenant_id_idx" ON "suppliers"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "DeliveryNote_status_idx" ON "DeliveryNote"("status");
+CREATE INDEX IF NOT EXISTS "purchases_date_idx" ON "purchases"("date");
 
 -- CreateIndex
-CREATE INDEX "DeliveryNote_createdAt_idx" ON "DeliveryNote"("createdAt");
+CREATE INDEX IF NOT EXISTS "purchases_supplierId_idx" ON "purchases"("supplierId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ExpenseCategory_name_key" ON "ExpenseCategory"("name");
+CREATE INDEX IF NOT EXISTS "purchases_tenant_id_idx" ON "purchases"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Expense_date_idx" ON "Expense"("date");
+CREATE INDEX IF NOT EXISTS "combo_items_tenant_id_idx" ON "combo_items"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Expense_categoryId_idx" ON "Expense"("categoryId");
+CREATE INDEX IF NOT EXISTS "purchase_items_tenant_id_idx" ON "purchase_items"("tenant_id");
 
 -- CreateIndex
-CREATE INDEX "Expense_userId_idx" ON "Expense"("userId");
+CREATE INDEX IF NOT EXISTS "credit_payments_date_idx" ON "credit_payments"("date");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "credit_payments_saleId_idx" ON "credit_payments"("saleId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "credit_payments_clientId_idx" ON "credit_payments"("clientId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "credit_payments_tenant_id_idx" ON "credit_payments"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "inventory_movements_productId_idx" ON "inventory_movements"("productId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "inventory_movements_date_idx" ON "inventory_movements"("date");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "inventory_movements_movementType_idx" ON "inventory_movements"("movementType");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "inventory_movements_tenant_id_idx" ON "inventory_movements"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "held_sales_userId_idx" ON "held_sales"("userId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "held_sales_status_idx" ON "held_sales"("status");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "held_sales_tenant_id_idx" ON "held_sales"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "held_sale_items_tenant_id_idx" ON "held_sale_items"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "quotes_userId_idx" ON "quotes"("userId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "quotes_status_idx" ON "quotes"("status");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "quotes_tenant_id_idx" ON "quotes"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "quote_items_tenant_id_idx" ON "quote_items"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "delivery_notes_userId_idx" ON "delivery_notes"("userId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "delivery_notes_status_idx" ON "delivery_notes"("status");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "delivery_notes_createdAt_idx" ON "delivery_notes"("createdAt");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "delivery_notes_tenant_id_idx" ON "delivery_notes"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "delivery_note_items_tenant_id_idx" ON "delivery_note_items"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "expense_categories_tenant_id_idx" ON "expense_categories"("tenant_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX IF NOT EXISTS "expense_categories_tenant_id_name_key" ON "expense_categories"("tenant_id", "name");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "expenses_date_idx" ON "expenses"("date");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "expenses_categoryId_idx" ON "expenses"("categoryId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "expenses_userId_idx" ON "expenses"("userId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "expenses_tenant_id_idx" ON "expenses"("tenant_id");
 
