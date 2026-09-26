@@ -170,7 +170,9 @@ export default function Home() {
     const ssoMatch = window.location.hash.match(/^#sso=(.+)$/);
     if (ssoMatch) {
       const ssoToken = decodeURIComponent(ssoMatch[1]);
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      // Quitar el token de la URL solo DESPUES de guardar la sesion: en Next.js
+      // replaceState re-monta la pagina, y si aun no hay sesion guardada se ve el login.
+      const clearHash = () => window.history.replaceState(null, "", window.location.pathname + window.location.search);
       fetch("/api/auth", { headers: { Authorization: `Bearer ${ssoToken}` } })
         .then(r => r.json() as Promise<{ valid?: boolean; user?: CurrentUser }>)
         .then(data => {
@@ -184,7 +186,7 @@ export default function Home() {
           }
         })
         .catch(() => { clearSession(); setLoading(false); })
-        .finally(() => setAuthReady(true));
+        .finally(() => { setAuthReady(true); clearHash(); });
       return;
     }
 
