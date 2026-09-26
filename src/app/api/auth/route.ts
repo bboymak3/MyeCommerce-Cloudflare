@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json() as any as { username?: string; password?: string; tenantSlug?: string; userId?: string; currentPassword?: string; newPassword?: string };
     const { username, password } = body;
 
-    // Negocio: el codigo escrito en el login (Nexus One) o el de la cookie del SSO
+    // Negocio: el codigo de la cookie del SSO/login anterior, o el escrito a mano (deep links/soporte)
     let tenantId = getTenantId(req.headers);
     const tenantSlug = (body.tenantSlug || '').trim().toLowerCase();
     if (tenantSlug) {
@@ -95,11 +95,7 @@ export async function POST(req: NextRequest) {
       }
       tenantId = resolved;
     }
-    const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
-    if (nexus && !nexus.active) {
-      return NextResponse.json({ error: nexus.reason }, { status: 403 });
-    }
-    const db = createDbFromEnv(env as any, tenantId);
+    let db = createDbFromEnv(env as any, tenantId);
 
     // admin/admin automatico solo en instalaciones independientes (sin Nexus One).
     // Con Nexus One los usuarios entran por SSO o los crea el administrador del negocio.
@@ -117,7 +113,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario y contrasena son requeridos' }, { status: 400 });
     }
 
-    const user = await db.user.findFirst({ where: { username } });
+    let user: any = await db.user.findFirst({ where: { username } });
+    let passwordVerified = false;
+
+    // El usuario no existe en el negocio adivinado por la cookie (o no hay cookie todavia,
+    // p. ej. primer ingreso en este dispositivo): se busca por usuario en todos los
+    // negocios para no obligar a escribir un "codigo de negocio" en el login.
+    if (!user) {
+      try {
+        const { results } = await (env as any).DB
+          .prepare('SELECT * FROM pos_users WHERE username = ?')
+          .bind(username)
+          .all();
+        for (const row of (results || []) as any[]) {
+          if (await verifyPassword(password, row.password)) {
+            user = { ...row, isActive: !!row.isActive };
+            tenantId = row.tenant_id;
+            db = createDbFromEnv(env as any, tenantId);
+            passwordVerified = true;
+            break;
+          }
+        }
+      } catch { /* sin tabla pos_users u otro error: sigue sin usuario */ }
+    }
 
     if (!user) {
       recordFailedAttempt(ip);
@@ -128,7 +146,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Usuario desactivado. Contacte al administrador.' }, { status: 403 });
     }
 
-    if (!(await verifyPassword(password, user.password))) {
+    if (!passwordVerified && !(await verifyPassword(password, user.password))) {
       recordFailedAttempt(ip);
       return NextResponse.json({ error: 'Usuario o contrasena incorrectos' }, { status: 401 });
     }
@@ -158,9 +176,20 @@ export async function POST(req: NextRequest) {
       tenantId,
     });
 
+    // Negocio y estado de licencia (Nexus One) para el aviso de confirmacion del login.
+    // No bloquea el ingreso aqui: el middleware ya restringe la API si esta inactivo.
+    const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
+
     const responseData: Record<string, unknown> = {
       ...serializeUser(updatedUser),
       token,
+      business: nexus ? {
+        name: nexus.name,
+        active: nexus.active,
+        reason: nexus.reason,
+        plan: nexus.plan,
+        expiresAt: nexus.expiresAt,
+      } : null,
     };
 
     const isDefaultPassword = password === 'admin' && user.username === 'admin';
@@ -176,10 +205,10 @@ export async function POST(req: NextRequest) {
       path: '/',
       maxAge: 24 * 60 * 60,
     });
-    // Recordar el negocio para el proximo login en este equipo
-    if (tenantSlug) {
-      response.cookies.set('tenant_id', tenantId, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, sameSite: 'lax' });
-      response.cookies.set('tenant_slug', tenantSlug, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, sameSite: 'lax' });
+    // Recordar el negocio resuelto para que el proximo login en este equipo sea directo
+    response.cookies.set('tenant_id', tenantId, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, sameSite: 'lax' });
+    if (nexus?.slug) {
+      response.cookies.set('tenant_slug', nexus.slug, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, sameSite: 'lax' });
     }
 
     return response;

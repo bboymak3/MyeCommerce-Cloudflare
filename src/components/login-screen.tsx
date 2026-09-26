@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import type { CurrentUser } from "./users-tab";
+
+interface BusinessInfo {
+  name: string;
+  active: boolean;
+  reason: string;
+  plan: string;
+  expiresAt: string | null;
+}
+
+const SUPPORT_WHATSAPP = "584220550136";
 
 interface LoginScreenProps {
   onLogin: (user: CurrentUser & { token?: string }) => void;
@@ -15,18 +25,15 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: LoginScreenProps) {
   const [username, setUsername] = useState("");
-  // Negocio (slug de Nexus One). Se recuerda en la cookie tenant_slug tras entrar.
-  const [tenantSlug, setTenantSlug] = useState("");
-  useEffect(() => {
-    const m = document.cookie.match(/(?:^|;\s*)tenant_slug=([^;]*)/);
-    if (m) setTenantSlug(decodeURIComponent(m[1]));
-  }, []);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Aviso de confirmacion del negocio + estado de licencia, antes de entrar
+  const [confirmUser, setConfirmUser] = useState<(CurrentUser & { token?: string; business?: BusinessInfo | null }) | null>(null);
+
   // Estado para forzar cambio de contraseña
   const [showForceChange, setShowForceChange] = useState(false);
-  const [pendingUser, setPendingUser] = useState<CurrentUser | null>(null);
+  const [pendingUser, setPendingUser] = useState<(CurrentUser & { token?: string; business?: BusinessInfo | null }) | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
@@ -73,10 +80,10 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password, tenantSlug: tenantSlug.trim().toLowerCase() || undefined }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
-      const data = await res.json();
+      const data = await res.json() as any;
 
       if (!res.ok) {
         toast.error(data.error || "Error al iniciar sesion");
@@ -91,18 +98,36 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
         return;
       }
 
-      // Store token JWT and user data
-      if (data.token) {
-        localStorage.setItem("myecommerce_token", data.token);
-      }
-      localStorage.setItem("myecommerce_user", JSON.stringify(data));
-      onLogin(data);
-      toast.success(`Bienvenido, ${data.fullName || data.username}`);
+      finalizeOrConfirm(data);
     } catch {
       toast.error("Error de conexion con el servidor");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Si hay negocio (Nexus One), primero se confirma antes de entrar; si no, entra directo
+  const finalizeOrConfirm = (data: CurrentUser & { token?: string; business?: BusinessInfo | null }) => {
+    if (data.business) {
+      setConfirmUser(data);
+    } else {
+      completeLogin(data);
+    }
+  };
+
+  const completeLogin = (data: CurrentUser & { token?: string }) => {
+    if (data.token) {
+      localStorage.setItem("myecommerce_token", data.token);
+    }
+    localStorage.setItem("myecommerce_user", JSON.stringify(data));
+    onLogin(data);
+    toast.success(`Bienvenido, ${data.fullName || data.username}`);
+  };
+
+  const cancelLogin = () => {
+    setConfirmUser(null);
+    setPassword("");
+    fetch("/api/auth", { method: "DELETE" }).catch(() => { /* silent */ });
   };
 
   const handleForceChangePassword = async (e: React.FormEvent) => {
@@ -133,21 +158,18 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json() as any;
 
       if (!res.ok) {
         toast.error(data.error || "Error al cambiar la contrasena");
         return;
       }
 
-      // Contraseña cambiada — guardar nuevo token si viene
+      // Contraseña cambiada — usar el nuevo token pero mantener el negocio/licencia ya conocidos
       if (pendingUser) {
-        if (data.token) {
-          localStorage.setItem("myecommerce_token", data.token);
-        }
-        localStorage.setItem("myecommerce_user", JSON.stringify(pendingUser));
-        onLogin(pendingUser);
+        setShowForceChange(false);
         toast.success("Contrasena actualizada correctamente");
+        finalizeOrConfirm({ ...pendingUser, token: data.token || pendingUser.token });
       }
     } catch {
       toast.error("Error de conexion con el servidor");
@@ -271,21 +293,6 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
           <CardContent className="p-6">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="tenantSlug" className="text-slate-300 text-sm">
-                  Negocio <span className="text-slate-500 text-xs">(codigo de su negocio en Nexus One, opcional)</span>
-                </Label>
-                <Input
-                  id="tenantSlug"
-                  type="text"
-                  placeholder="ej: mi-ferreteria"
-                  value={tenantSlug}
-                  onChange={(e) => setTenantSlug(e.target.value)}
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  className="bg-slate-900 border-slate-600 text-white placeholder:text-slate-500 focus:ring-primary focus:border-primary"
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="username" className="text-slate-300 text-sm">
                   Usuario
                 </Label>
@@ -342,6 +349,73 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
           MyeCommerce POS v2.9.56 &bull; Doble Moneda $/Bs
         </p>
       </div>
+
+      {confirmUser?.business && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <Card className="w-full max-w-sm border-slate-700 bg-slate-800 shadow-2xl">
+            <CardContent className="p-6 space-y-4">
+              {confirmUser.business.active ? (
+                <>
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary/10 mb-3">
+                      <svg className="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4" />
+                      </svg>
+                    </div>
+                    <p className="text-slate-400 text-sm">Este es su negocio</p>
+                    <h2 className="text-xl font-bold text-white mt-1">{confirmUser.business.name}</h2>
+                    <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/15 text-green-400">
+                      Licencia activa
+                    </span>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <Button variant="outline" className="flex-1 border-slate-600 text-slate-200" onClick={cancelLogin}>
+                      Cancelar
+                    </Button>
+                    <Button className="flex-1" onClick={() => { const u = confirmUser; setConfirmUser(null); completeLogin(u); }}>
+                      Aceptar
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-500/10 mb-3">
+                      <svg className="w-7 h-7 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                      </svg>
+                    </div>
+                    <p className="text-slate-400 text-sm">Su negocio</p>
+                    <h2 className="text-xl font-bold text-white mt-1">{confirmUser.business.name}</h2>
+                    <span className="inline-block mt-2 px-3 py-1 rounded-full text-xs font-semibold bg-red-500/15 text-red-400">
+                      Licencia vencida
+                    </span>
+                    <p className="text-slate-300 text-sm mt-3">{confirmUser.business.reason}</p>
+                    <p className="text-slate-400 text-sm mt-2">Contacte a servicio tecnico para renovar su licencia.</p>
+                  </div>
+                  <a
+                    href={`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(
+                      `Hola, mi negocio "${confirmUser.business.name}" tiene la licencia vencida y quiero renovarla.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 w-full h-11 rounded-md bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                      <path d="M12.031 5.999C8.148 5.999 5 9.147 5 13.03c0 1.406.42 2.796 1.2 3.976L5 22l5.144-1.174a7.98 7.98 0 001.887.229h.004c3.883 0 7.031-3.148 7.031-7.031A7.006 7.006 0 0012.031 5.999zm4.148 11.176a5.95 5.95 0 01-4.146 1.712h-.003a5.944 5.944 0 01-3.032-.83l-.218-.13-2.256.593.602-2.201-.142-.226a5.92 5.92 0 01-.908-3.16 5.949 5.949 0 011.702-4.191A5.95 5.95 0 0112.031 7c1.588 0 3.081.62 4.204 1.744a5.948 5.948 0 011.744 4.207c0 1.588-.62 3.081-1.8 4.224z"/>
+                    </svg>
+                    Contactar por WhatsApp
+                  </a>
+                  <Button variant="outline" className="w-full border-slate-600 text-slate-200" onClick={cancelLogin}>
+                    Cerrar
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

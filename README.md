@@ -66,6 +66,18 @@ sin clave que publica la tasa oficial del Banco Central de Venezuela
   sesión); sin ese secreto configurado en Cloudflare, la ruta rechaza toda
   petición.
 
+## Login
+
+Solo pide usuario y contrasena. El negocio (Nexus One) se resuelve solo:
+primero por la cookie `tenant_id` que dejo el ingreso anterior o el SSO: si
+el usuario no existe ahi (o es la primera vez en ese dispositivo), busca ese
+usuario en todos los negocios de la D1 y entra al que corresponda — ya no
+hace falta escribir un "codigo de negocio". Tras validar la contrasena se
+muestra un aviso con el nombre del negocio y el estado de su licencia
+(**Aceptar**/**Cancelar** entra o no); si la licencia esta vencida o
+suspendida, en su lugar muestra un enlace directo a WhatsApp para
+contactar a soporte y renovarla.
+
 ## Cuentas por pagar, turnos de caja y puntos de fidelidad
 
 - **Cuentas por Pagar:** una compra a proveedor puede marcarse "a credito"
