@@ -1,5 +1,7 @@
 export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getNexusTenant, planToLicenseType } from '@/lib/nexus-tenant';
+import { getLicenseLimits } from '@/lib/license';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
@@ -112,8 +114,11 @@ export async function POST(req: NextRequest) {
     };
 
     // Obtener licencia para verificar limite
-    const license = await db.license.findFirst();
-    const maxProducts = license?.maxProducts ?? 30;
+    const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
+    const license = nexus ? null : await db.license.findFirst();
+    const maxProducts = nexus
+      ? getLicenseLimits(planToLicenseType(nexus.plan)).maxProducts
+      : license?.maxProducts ?? 30;
     const currentCount = await db.product.count({ where: { active: true } });
     const availableSlots = maxProducts - currentCount;
 

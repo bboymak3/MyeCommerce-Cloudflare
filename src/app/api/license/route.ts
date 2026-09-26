@@ -4,6 +4,7 @@ import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { validateLicenseKey, getLicenseFeatures, getLicenseLimits, getPlanInfo, type LicenseInfo } from '@/lib/license';
 import { getMachineId } from '@/lib/machine-id';
+import { getNexusTenant, planToLicenseType } from '@/lib/nexus-tenant';
 
 // Obtener estado actual de la licencia
 export async function GET(req: NextRequest) {
@@ -11,6 +12,42 @@ export async function GET(req: NextRequest) {
   const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const currentMachineId = getMachineId();
+
+    // Negocios de Nexus One: la licencia la controla el super admin (plan, estado y fecha de corte)
+    const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
+    if (nexus) {
+      const licenseType = planToLicenseType(nexus.plan);
+      const limits = getLicenseLimits(licenseType);
+      const expiresAt = nexus.expiresAt || new Date(Date.now() + 3650 * 86400000).toISOString();
+      const daysRemaining = Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86400000));
+      return NextResponse.json({
+        isValid: nexus.active,
+        managedBy: 'nexus',
+        licenseType,
+        machineId: currentMachineId,
+        licenseKey: '',
+        activatedAt: new Date().toISOString(),
+        expiresAt,
+        daysRemaining,
+        isExpired: !nexus.active,
+        maxProducts: limits.maxProducts,
+        maxDailySales: limits.maxDailySales,
+        maxUsers: limits.maxUsers,
+        ownerName: nexus.name,
+        ownerEmail: '',
+        ownerPhone: '',
+        ownerRif: '',
+        features: getLicenseFeatures(licenseType),
+        maxActivations: 1,
+        activationCount: 1,
+        previousMachines: [] as string[],
+        isSameMachine: true,
+        machineMismatch: false,
+        mismatchReason: '',
+        blockedReason: nexus.reason,
+      });
+    }
+
     let license = await db.license.findFirst();
 
     if (!license) {
@@ -216,6 +253,11 @@ export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
   const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
+    const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
+    if (nexus) {
+      return NextResponse.json({ error: 'La licencia de este negocio se gestiona desde Nexus One (plan y fecha de corte).' }, { status: 400 });
+    }
+
     const body = await req.json() as any;
     const { licenseKey, ownerName, ownerEmail, ownerPhone, ownerRif } = body;
 
