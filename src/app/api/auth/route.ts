@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword, needsRehash } from '@/lib/auth';
 import { createSessionToken, verifySessionToken, extractToken } from '@/lib/session';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { createDbFromEnv, getTenantId, DEFAULT_TENANT_ID } from '@/lib/db';
+import { getNexusTenant, tenantIdFromSlug, isNexusDeployment } from '@/lib/nexus-tenant';
 
 // Rate limiting: max 5 intentos fallidos por IP en 5 minutos
 // NOTE: In Edge Runtime, this Map is per-isolate and may not persist across requests.
@@ -81,13 +82,30 @@ async function ensureAdminUser(db: any, tenantId: string) {
 export async function POST(req: NextRequest) {
   try {
     const { env } = getRequestContext();
-    const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
-
-    // Ensure admin exists
-    await ensureAdminUser(db, tenantId);
-
-    const body = await req.json() as any as { username?: string; password?: string; userId?: string; currentPassword?: string; newPassword?: string };
+    const body = await req.json() as any as { username?: string; password?: string; tenantSlug?: string; userId?: string; currentPassword?: string; newPassword?: string };
     const { username, password } = body;
+
+    // Negocio: el codigo escrito en el login (Nexus One) o el de la cookie del SSO
+    let tenantId = getTenantId(req.headers);
+    const tenantSlug = (body.tenantSlug || '').trim().toLowerCase();
+    if (tenantSlug) {
+      const resolved = await tenantIdFromSlug((env as any).DB, tenantSlug, (env as any).LEGACY_TENANT_SLUG);
+      if (!resolved) {
+        return NextResponse.json({ error: 'Negocio no encontrado. Verifique el codigo del negocio.' }, { status: 404 });
+      }
+      tenantId = resolved;
+    }
+    const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
+    if (nexus && !nexus.active) {
+      return NextResponse.json({ error: nexus.reason }, { status: 403 });
+    }
+    const db = createDbFromEnv(env as any, tenantId);
+
+    // admin/admin automatico solo en instalaciones independientes (sin Nexus One).
+    // Con Nexus One los usuarios entran por SSO o los crea el administrador del negocio.
+    if (!(await isNexusDeployment((env as any).DB))) {
+      await ensureAdminUser(db, tenantId);
+    }
 
     // Rate limiting por IP
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('cf-connecting-ip') || 'unknown';
@@ -158,6 +176,11 @@ export async function POST(req: NextRequest) {
       path: '/',
       maxAge: 24 * 60 * 60,
     });
+    // Recordar el negocio para el proximo login en este equipo
+    if (tenantSlug) {
+      response.cookies.set('tenant_id', tenantId, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, sameSite: 'lax' });
+      response.cookies.set('tenant_slug', tenantSlug, { path: '/', maxAge: 60 * 60 * 24 * 365, secure: true, sameSite: 'lax' });
+    }
 
     return response;
   } catch (error) {

@@ -13,6 +13,7 @@ import {
 interface DashboardProps {
   bcvRate: number;
   currency: string;
+  onSessionExpired?: () => void;
 }
 
 interface DashboardData {
@@ -54,18 +55,22 @@ const METHOD_LABELS: Record<string, string> = {
   mixto: "Mixto",
 };
 
-export default function DashboardTab({ bcvRate, currency }: DashboardProps) {
+export default function DashboardTab({ bcvRate, currency, onSessionExpired }: DashboardProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async () => {
+    setError(null);
     try {
-      const res = await authFetch("/api/dashboard");
-      const json = await res.json();
-      if (!json.error) setData(json);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  }, []);
+      const res = await authFetch("/api/dashboard", {}, onSessionExpired);
+      const json = await res.json().catch(() => ({ error: "Respuesta invalida del servidor" })) as any;
+      if (json.error) { setError(json.error); return; }
+      setData(json);
+    } catch (e: any) {
+      setError(e?.message || "No se pudo conectar con el servidor");
+    } finally { setLoading(false); }
+  }, [onSessionExpired]);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
@@ -75,10 +80,20 @@ export default function DashboardTab({ bcvRate, currency }: DashboardProps) {
     return () => clearInterval(interval);
   }, [loadDashboard]);
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <p className="text-muted-foreground animate-pulse">Cargando dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 text-center px-4">
+        <p className="text-destructive font-medium">No se pudo cargar el dashboard</p>
+        <p className="text-sm text-muted-foreground max-w-sm">{error || "Ocurrio un error inesperado"}</p>
+        <Button onClick={loadDashboard} variant="outline" size="sm">Reintentar</Button>
       </div>
     );
   }

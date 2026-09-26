@@ -94,7 +94,8 @@ export async function POST(req: NextRequest) {
       const product = await db.product.findUnique({ where: { id: item.productId } });
       const unitCost = product?.cost || 0;
       const lastMove = await db.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
-      const prevQty = lastMove?.balanceQty ?? (product?.stock ?? 0) + qty;
+      // Saldo anterior = stock real antes de descontar (el kardex siempre cuadra con el inventario)
+      const prevQty = product?.stock ?? lastMove?.balanceQty ?? 0;
       const prevTC = lastMove?.balanceTotalCost ?? (prevQty * unitCost);
       const balQty = prevQty - qty;
       const balTC = Math.max(0, prevTC - (qty * unitCost));

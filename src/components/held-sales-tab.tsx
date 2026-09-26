@@ -152,7 +152,14 @@ export default function HeldSalesTab({
       }
       const data = await res.json();
       // API may return the array directly or wrapped in an object
-      const list: HeldSale[] = Array.isArray(data) ? data : data.heldSales ?? data.data ?? [];
+      const raw: any[] = Array.isArray(data) ? data : data.heldSales ?? data.data ?? [];
+      // La API devuelve `total` e `items`; la vista usa totalUsd / itemsCount
+      const list: HeldSale[] = raw.map((h: any) => ({
+        ...h,
+        totalUsd: typeof h.totalUsd === "number" ? h.totalUsd : Number(h.total) || 0,
+        itemsCount: typeof h.itemsCount === "number" ? h.itemsCount
+          : Array.isArray(h.items) ? h.items.reduce((n: number, it: any) => n + (Number(it.quantity) || 0), 0) : 0,
+      }));
       setHeldSales(list);
     } catch (err: any) {
       toast.error(err.message || "No se pudieron cargar las facturas en espera");

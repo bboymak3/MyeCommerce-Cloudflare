@@ -9,6 +9,8 @@ const PUBLIC_ROUTES: Record<string, string[] | '*'> = {
   '/api/auth': '*',
   '/api/product-images': ['GET'],
   '/api/nexus-sso': ['GET'],
+  // Protegida por su propio secreto CRON_SECRET (ver la ruta), no por sesion
+  '/api/cron/bcv-rate': ['POST'],
 };
 
 // Rutas API que requieren rol de administrador

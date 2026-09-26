@@ -111,6 +111,7 @@ export async function PUT(req: NextRequest) {
       promoOldPrice: parseFloat(body.promoOldPrice) || 280,
       promoCurrentPrice: parseFloat(body.promoCurrentPrice) || 180,
       promoExpiryDate: body.promoExpiryDate || '',
+      bcvAutoUpdate: body.bcvAutoUpdate === true,
     };
 
     if (settings) {

@@ -709,7 +709,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
             + Nuevo Admin
           </Button>
         </div>
-        <div className="rounded-lg border overflow-hidden">
+        <div className="rounded-lg border overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/50">
@@ -762,8 +762,8 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
           </Button>
         </div>
 
-        <div className="rounded-lg border overflow-hidden">
-          <div className="max-h-96 overflow-y-auto">
+        <div className="rounded-lg border overflow-x-auto">
+          <div className="max-h-96 overflow-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-muted/50">
                 <tr>
@@ -865,8 +865,8 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
           </Button>
         </div>
 
-        <div className="rounded-lg border overflow-hidden">
-          <div className="max-h-96 overflow-y-auto">
+        <div className="rounded-lg border overflow-x-auto">
+          <div className="max-h-96 overflow-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-muted/50">
                 <tr>

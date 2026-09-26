@@ -115,7 +115,8 @@ export default function PosTab(props: PosTabProps) {
   useEffect(() => { if (propSellerName && !sellerName) setSellerName(propSellerName); }, [propSellerName]);
 
   // Auto-focus search on mount
-  useEffect(() => { searchInputRef.current?.focus(); }, []);
+  // Enfocar el buscador solo con teclado/mouse: en celular abriria el teclado y desplazaria la pantalla
+  useEffect(() => { if (window.matchMedia('(pointer: fine)').matches) searchInputRef.current?.focus(); }, []);
 
   // Fetch local IP for QR
   useEffect(() => {
@@ -133,8 +134,16 @@ export default function PosTab(props: PosTabProps) {
     prevPaymentMethodRef.current = paymentMethod;
   }, [paymentMethod, isCredit, cart.length]);
 
-  // Load initial cart from held sale / quote
+  // Load initial cart from held sale / quote.
+  // initialCart llega como un arreglo nuevo en cada render del padre: cargarlo solo
+  // una vez por contenido, para no pisar los cambios del cajero ni repetir el aviso.
+  const loadedInitialCartRef = useRef("");
   useEffect(() => {
+    const signature = initialCart && initialCart.length > 0
+      ? JSON.stringify(initialCart.map((i: any) => [i.id, i.quantity]))
+      : "";
+    if (signature === loadedInitialCartRef.current) return;
+    loadedInitialCartRef.current = signature;
     if (initialCart && initialCart.length > 0) {
       cartHook.setCart(initialCart);
       if (initialClient) {

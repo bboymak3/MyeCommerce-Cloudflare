@@ -43,6 +43,10 @@ export async function GET(req: NextRequest) {
     const key = isThumb ? `thumbs/t_${file}` : `products/${file}`;
     let object = await bucket.get(key);
 
+    // Las miniaturas no se generan al subir: usar la imagen completa
+    if (!object && isThumb) {
+      object = await bucket.get(`products/${file}`);
+    }
     // Fallback to just the filename
     if (!object) {
       object = await bucket.get(file);

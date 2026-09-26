@@ -125,11 +125,30 @@ export async function POST(req: NextRequest) {
       include: { items: true, sale: true },
     }));
 
-    // Restaurar stock
+    // Restaurar stock y registrar la entrada en el kardex
+    const now = new Date();
     for (const item of body.items) {
+      const qty = parseFloat(item.quantity);
+      const product = await db.product.findUnique({ where: { id: item.productId } });
+      const lastMove = await db.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
+      const unitCost = product?.cost || 0;
+      const prevQty = product?.stock ?? 0;
+      const prevTC = lastMove && lastMove.balanceQty > 0 ? (lastMove.balanceTotalCost / lastMove.balanceQty) * prevQty : prevQty * unitCost;
+      const balQty = prevQty + qty;
+      const balTC = prevTC + qty * unitCost;
       ops.push(db.product.update({
         where: { id: item.productId },
-        data: { stock: { increment: parseFloat(item.quantity) } },
+        data: { stock: { increment: qty } },
+      }));
+      ops.push(db.inventoryMovement.create({
+        data: {
+          productId: item.productId, date: now, movementType: 'devolucion',
+          concept: `Devolucion venta ${sale.invoiceNumber || ''}`.trim(),
+          quantity: qty, absQuantity: qty, unitCost, totalCost: qty * unitCost,
+          balanceQty: balQty, balanceTotalCost: balTC, balanceAvgCost: balQty > 0 ? balTC / balQty : 0,
+          userId: req.headers.get('x-user-id') || '', userName: req.headers.get('x-username') || '',
+          userRole: req.headers.get('x-user-role') || '', referenceId: body.saleId,
+        },
       }));
     }
 

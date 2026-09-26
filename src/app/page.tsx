@@ -502,16 +502,16 @@ export default function Home() {
       {/* HEADER */}
       <header className="border-b bg-card sticky top-0 z-40">
         {/* ── Row 1: Store info + date + user (arriba) ── */}
-        <div className="container mx-auto px-4 py-2 flex items-center justify-between border-b border-border/50">
-          <div className="flex items-center gap-3">
+        <div className="container mx-auto px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-y-1 border-b border-border/50">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <AppNav activeTab={activeTab} onTabChange={(v: string) => {
               const tab = availableTabs.find(t => t.value === v);
               if (!tab) return;
               if (!tab.allowed) { toast.error(`"${tab.label}" requiere plan ${tab.plan}. Actualice su licencia.`); return; }
               safeSetTab(v);
             }} tabs={availableTabs.map(t => ({ value: t.value, label: t.label, icon: t.icon, restricted: t.restricted, plan: t.plan }))} stockAlertCount={stockAlertCount} currentUser={currentUser.fullName || currentUser.username} onLogout={handleLogout} version="2.9.56" />
-            <div>
-              <h1 className="text-xl font-bold text-primary">
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold text-primary truncate">
                 {settings.storeName}
                 {showWatermark && <span className="text-xs font-normal text-yellow-600 ml-2">(TRIAL)</span>}
               </h1>
@@ -531,17 +531,17 @@ export default function Home() {
                   </button>
                 )}
                 <span>Bs</span>
-                {!editingBcv && <span className="text-[9px] text-muted-foreground/60">(click para cambiar)</span>}
+                {!editingBcv && <span className="hidden sm:inline text-[9px] text-muted-foreground/60">(click para cambiar)</span>}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden md:block text-right text-xs text-muted-foreground">
               <p>{new Date().toLocaleDateString("es-VE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
               <p>{new Date().toLocaleTimeString("es-VE")}</p>
             </div>
             <ThemeSwitcher />
-            <Separator orientation="vertical" className="h-8" />
+            <Separator orientation="vertical" className="h-8 hidden sm:block" />
             <div className="flex items-center gap-2">
               {currentUser.avatar ? (
                 <img crossOrigin="anonymous" src={currentUser.avatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover border border-primary/30" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -568,16 +568,16 @@ export default function Home() {
           </div>
         </div>
         {/* ── Row 2: Module menu (debajo) ── */}
-        <div className="container mx-auto px-4 py-1.5">
+        <div className="container mx-auto px-3 sm:px-4 py-1.5">
           <div id="top-nav-slot" />
         </div>
       </header>
 
       {/* MAIN */}
-      <main className="flex-1 container mx-auto px-4 py-4">
+      <main className="flex-1 container mx-auto px-2 sm:px-4 py-3 sm:py-4">
         <TabsContent value="dashboard" activeTab={activeTab}>
           <ErrorBoundary name="Dashboard">
-            <DashboardTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} />
+            <DashboardTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} onSessionExpired={handleSessionExpired} />
           </ErrorBoundary>
         </TabsContent>
         <TabsContent value="pos" activeTab={activeTab}>
@@ -775,7 +775,7 @@ export default function Home() {
       {/* MODALES */}
 
       <Dialog open={!!nexusBlock}>
-        <DialogContent className="max-w-md" onInteractOutside={(e: any) => e.preventDefault()} onEscapeKeyDown={(e: any) => e.preventDefault()}>
+        <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="text-center text-destructive text-xl">Negocio no disponible</DialogTitle></DialogHeader>
           <div className="text-center space-y-4">
             <p className="text-sm">{nexusBlock}</p>

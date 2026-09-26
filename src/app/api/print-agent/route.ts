@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), AGENT_TIMEOUT);
-    const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+    const res = await fetch(url, { signal: controller.signal }); // 'cache' no existe en Cloudflare Workers
     clearTimeout(timeout);
     const text = await res.text();
     try {

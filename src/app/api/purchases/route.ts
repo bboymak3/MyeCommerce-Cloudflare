@@ -64,7 +64,8 @@ export async function POST(req: NextRequest) {
       const unitCost = item.isBox ? parseFloat(item.calcUnitCost || 0) : parseFloat(item.unitCost || 0);
       const product = await db.product.findUnique({ where: { id: item.productId } });
       const lastMove = await db.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
-      const prevQty = lastMove?.balanceQty ?? (product?.stock ?? 0) - qty;
+      // Saldo anterior = stock real antes de sumar la compra
+      const prevQty = product?.stock ?? lastMove?.balanceQty ?? 0;
       const prevTC = lastMove?.balanceTotalCost ?? (prevQty * (product?.cost || unitCost));
       const entryTotalCost = qty * unitCost;
       const balQty = prevQty + qty;

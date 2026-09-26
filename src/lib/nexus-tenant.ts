@@ -75,3 +75,36 @@ export async function getNexusTenant(
 export function planToLicenseType(plan: string): 'basica' | 'profesional' {
   return plan === 'business' || plan === 'premium' ? 'profesional' : 'basica';
 }
+
+/**
+ * Resuelve el codigo (slug) de un negocio de Nexus One a su tenant_id en el POS.
+ * El negocio LEGACY_TENANT_SLUG usa 'default' (datos anteriores). null si no existe.
+ */
+export async function tenantIdFromSlug(
+  d1: D1Database | undefined,
+  slug: string,
+  legacySlug?: string
+): Promise<string | null> {
+  if (!d1 || !slug) return null;
+  if (legacySlug && slug === legacySlug) return DEFAULT_TENANT_ID;
+  try {
+    const row: any = await d1.prepare('SELECT id FROM nx_tenants WHERE slug = ?').bind(slug).first();
+    return row?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+let nexusDeployment: boolean | null = null;
+/** true si esta D1 es compartida con Nexus One (existe la tabla nx_tenants). */
+export async function isNexusDeployment(d1: D1Database | undefined): Promise<boolean> {
+  if (!d1) return false;
+  if (nexusDeployment !== null) return nexusDeployment;
+  try {
+    await d1.prepare('SELECT 1 FROM nx_tenants LIMIT 1').first();
+    nexusDeployment = true;
+  } catch {
+    nexusDeployment = false;
+  }
+  return nexusDeployment;
+}

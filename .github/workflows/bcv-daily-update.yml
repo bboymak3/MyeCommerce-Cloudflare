@@ -1,0 +1,34 @@
+name: Actualizar tasa BCV diaria
+
+# Dispara /api/cron/bcv-rate una vez al dia. Cloudflare Pages no soporta Cron
+# Triggers (eso es solo para Workers), asi que este workflow hace ese papel.
+#
+# Configurar en Settings > Secrets and variables > Actions de este repo:
+#   POS_URL      = https://<tu-sitio>.pages.dev   (sin barra al final)
+#   CRON_SECRET  = el mismo valor puesto con:
+#                  npx wrangler pages secret put CRON_SECRET --project-name=<tu-proyecto>
+
+on:
+  schedule:
+    # 09:00 UTC = 05:00 hora de Venezuela (UTC-4), antes del horario comercial
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  update-bcv-rate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a /api/cron/bcv-rate
+        run: |
+          if [ -z "${{ secrets.POS_URL }}" ] || [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "Faltan los secrets POS_URL y/o CRON_SECRET. Configuralos en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          http_code=$(curl -s -o response.json -w "%{http_code}" -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.POS_URL }}/api/cron/bcv-rate")
+          echo "HTTP $http_code"
+          cat response.json
+          if [ "$http_code" -ge 400 ]; then
+            exit 1
+          fi
