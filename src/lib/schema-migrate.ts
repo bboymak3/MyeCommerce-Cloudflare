@@ -4,7 +4,7 @@
 //  1. CREATE TABLE IF NOT EXISTS para las tablas que falten.
 //  2. Agrega la columna tenant_id ('default') a las tablas que no la tengan.
 //  3. Reemplaza los indices UNIQUE globales por indices UNIQUE por negocio.
-//  4. Registra la version aplicada en _app_migrations para no repetir el trabajo.
+//  4. Registra la version aplicada en pos_app_migrations para no repetir el trabajo.
 import {
   SCHEMA_TABLES,
   CREATE_TABLE_STATEMENTS,
@@ -12,7 +12,7 @@ import {
   CREATE_INDEX_STATEMENTS,
 } from './schema-sql.generated';
 
-const MIGRATION_ID = '2026-09-26-multitenant';
+const MIGRATION_ID = '2026-09-26-multitenant-pos-prefix';
 
 let pending: Promise<void> | null = null;
 
@@ -33,7 +33,7 @@ export function ensureSchema(d1: D1Database | undefined): Promise<void> {
 
 async function isApplied(d1: D1Database): Promise<boolean> {
   try {
-    const row = await d1.prepare('SELECT id FROM _app_migrations WHERE id = ?').bind(MIGRATION_ID).first();
+    const row = await d1.prepare('SELECT id FROM pos_app_migrations WHERE id = ?').bind(MIGRATION_ID).first();
     return !!row;
   } catch {
     return false; // la tabla aun no existe
@@ -82,8 +82,8 @@ async function migrate(d1: D1Database): Promise<void> {
   }
 
   // 4) Registrar (aunque haya avisos no criticos, p. ej. un indice sobre una columna antigua)
-  await d1.prepare('CREATE TABLE IF NOT EXISTS "_app_migrations" ("id" TEXT NOT NULL PRIMARY KEY, "applied_at" TEXT NOT NULL)').run();
-  await d1.prepare('INSERT OR IGNORE INTO "_app_migrations" ("id", "applied_at") VALUES (?, ?)')
+  await d1.prepare('CREATE TABLE IF NOT EXISTS "pos_app_migrations" ("id" TEXT NOT NULL PRIMARY KEY, "applied_at" TEXT NOT NULL)').run();
+  await d1.prepare('INSERT OR IGNORE INTO "pos_app_migrations" ("id", "applied_at") VALUES (?, ?)')
     .bind(MIGRATION_ID, new Date().toISOString()).run();
   console.log(`[schema] Migracion ${MIGRATION_ID} aplicada`);
 }

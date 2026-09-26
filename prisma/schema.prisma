@@ -55,7 +55,7 @@ model Product {
   comboItemsRef       ComboItem[] @relation("ProductComboItems")
   inventoryMovements  InventoryMovement[]
   @@index([tenant_id])
-  @@map("products")
+  @@map("pos_products")
 }
 
 model Category {
@@ -68,7 +68,7 @@ model Category {
   products Product[]
   @@index([tenant_id])
   @@unique([tenant_id, name])
-  @@map("categories")
+  @@map("pos_categories")
 }
 
 model Brand {
@@ -79,7 +79,7 @@ model Brand {
   products Product[]
   @@index([tenant_id])
   @@unique([tenant_id, name])
-  @@map("brands")
+  @@map("pos_brands")
 }
 
 model Client {
@@ -112,7 +112,7 @@ model Client {
   @@index([type])
   @@index([tenant_id])
   @@unique([tenant_id, docNumber])
-  @@map("clients")
+  @@map("pos_clients")
 }
 
 model Sale {
@@ -152,7 +152,7 @@ model Sale {
   @@index([clientId])
   @@index([tenant_id])
   @@unique([tenant_id, invoiceNumber])
-  @@map("sales")
+  @@map("pos_sales")
 }
 
 model SaleItem {
@@ -166,7 +166,7 @@ model SaleItem {
   product   Product @relation(fields: [productId], references: [id])
   sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   @@index([tenant_id])
-  @@map("sale_items")
+  @@map("pos_sale_items")
 }
 
 model Settings {
@@ -218,7 +218,7 @@ model Settings {
   promoExpiryDate      String  @default("")
   updatedAt       DateTime @updatedAt
   @@index([tenant_id])
-  @@map("settings")
+  @@map("pos_settings")
 }
 
 model Devolution {
@@ -238,7 +238,7 @@ model Devolution {
   @@index([date])
   @@index([saleId])
   @@index([tenant_id])
-  @@map("devolutions")
+  @@map("pos_devolutions")
 }
 
 model DevolutionItem {
@@ -253,7 +253,7 @@ model DevolutionItem {
   product      Product    @relation(fields: [productId], references: [id])
   devolution   Devolution @relation(fields: [devolutionId], references: [id], onDelete: Cascade)
   @@index([tenant_id])
-  @@map("devolution_items")
+  @@map("pos_devolution_items")
 }
 
 model License {
@@ -280,7 +280,7 @@ model License {
   updatedAt         DateTime @updatedAt
   @@index([tenant_id])
   @@unique([tenant_id, machineId])
-  @@map("licenses")
+  @@map("pos_licenses")
 }
 
 model CashClosing {
@@ -326,6 +326,7 @@ model CashClosing {
   createdAt       DateTime @default(now())
 
   @@index([date])
+  @@map("pos_cash_closings")
 }
 
 model User {
@@ -344,7 +345,7 @@ model User {
   expenses    Expense[]
   @@index([tenant_id])
   @@unique([tenant_id, username])
-  @@map("users")
+  @@map("pos_users")
 }
 
 model RoleConfig {
@@ -358,7 +359,7 @@ model RoleConfig {
   updatedAt   DateTime @updatedAt
   @@index([tenant_id])
   @@unique([tenant_id, roleName])
-  @@map("role_configs")
+  @@map("pos_role_configs")
 }
 
 model Supplier {
@@ -378,7 +379,7 @@ model Supplier {
 
   @@index([name])
   @@index([tenant_id])
-  @@map("suppliers")
+  @@map("pos_suppliers")
 }
 
 model Purchase {
@@ -399,7 +400,7 @@ model Purchase {
   @@index([date])
   @@index([supplierId])
   @@index([tenant_id])
-  @@map("purchases")
+  @@map("pos_purchases")
 }
 
 model ComboItem {
@@ -411,7 +412,7 @@ model ComboItem {
   combo     Product @relation(fields: [comboId], references: [id], onDelete: Cascade)
   product   Product @relation("ProductComboItems", fields: [productId], references: [id])
   @@index([tenant_id])
-  @@map("combo_items")
+  @@map("pos_combo_items")
 }
 
 model PurchaseItem {
@@ -434,7 +435,7 @@ model PurchaseItem {
   purchase     Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   createdAt    DateTime @default(now())
   @@index([tenant_id])
-  @@map("purchase_items")
+  @@map("pos_purchase_items")
 }
 
 model CreditPayment {
@@ -458,7 +459,7 @@ model CreditPayment {
   @@index([saleId])
   @@index([clientId])
   @@index([tenant_id])
-  @@map("credit_payments")
+  @@map("pos_credit_payments")
 }
 
 // ===== KARDEX DE INVENTARIO =====
@@ -489,7 +490,7 @@ model InventoryMovement {
   @@index([date])
   @@index([movementType])
   @@index([tenant_id])
-  @@map("inventory_movements")
+  @@map("pos_inventory_movements")
 }
 
 // ===== FACTURAS EN ESPERA =====
@@ -518,7 +519,7 @@ model HeldSale {
   @@index([userId])
   @@index([status])
   @@index([tenant_id])
-  @@map("held_sales")
+  @@map("pos_held_sales")
 }
 
 model HeldSaleItem {
@@ -534,7 +535,7 @@ model HeldSaleItem {
   heldSale    HeldSale @relation(fields: [heldSaleId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   @@index([tenant_id])
-  @@map("held_sale_items")
+  @@map("pos_held_sale_items")
 }
 
 // ===== PRESUPUESTOS / COTIZACIONES =====
@@ -563,7 +564,7 @@ model Quote {
   @@index([userId])
   @@index([status])
   @@index([tenant_id])
-  @@map("quotes")
+  @@map("pos_quotes")
 }
 
 model QuoteItem {
@@ -579,7 +580,7 @@ model QuoteItem {
   quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
   @@index([tenant_id])
-  @@map("quote_items")
+  @@map("pos_quote_items")
 }
 
 // ===== NOTAS DE ENTREGA =====
@@ -606,7 +607,7 @@ model DeliveryNote {
   @@index([status])
   @@index([createdAt])
   @@index([tenant_id])
-  @@map("delivery_notes")
+  @@map("pos_delivery_notes")
 }
 
 model DeliveryNoteItem {
@@ -621,7 +622,7 @@ model DeliveryNoteItem {
   deliveryNote   DeliveryNote @relation(fields: [deliveryNoteId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
   @@index([tenant_id])
-  @@map("delivery_note_items")
+  @@map("pos_delivery_note_items")
 }
 
 // ========== MODULO DE GASTOS ==========
@@ -638,7 +639,7 @@ model ExpenseCategory {
   expenses    Expense[]
   @@index([tenant_id])
   @@unique([tenant_id, name])
-  @@map("expense_categories")
+  @@map("pos_expense_categories")
 }
 
 model Expense {
@@ -663,5 +664,5 @@ model Expense {
   @@index([categoryId])
   @@index([userId])
   @@index([tenant_id])
-  @@map("expenses")
+  @@map("pos_expenses")
 }
