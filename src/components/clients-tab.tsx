@@ -28,6 +28,9 @@ interface Client {
   isActive: boolean;
   creditBalance: number;
   creditLimit: number;
+  loyaltyPoints?: number;
+  notes?: string;
+  tag?: string;
   _count?: { sales: number };
 };
 
@@ -67,6 +70,8 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
     address: "",
     taxInfo: "",
     creditLimit: "",
+    notes: "",
+    tag: "",
   });
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -143,11 +148,19 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
     return 'pendiente';
   };
 
-  const histSummary = histSales.length > 0 ? {
-    count: histSales.length,
-    totalUsd: histSales.reduce((s: number, v: any) => s + (v.total || 0), 0),
-    totalBs: histSales.reduce((s: number, v: any) => s + (v.totalBs || 0), 0),
-  } : null;
+  const histSummary = histSales.length > 0 ? (() => {
+    const totalUsd = histSales.reduce((s: number, v: any) => s + (v.total || 0), 0);
+    const totalBs = histSales.reduce((s: number, v: any) => s + (v.totalBs || 0), 0);
+    const lastPurchase = histSales.reduce((latest: string | null, v: any) =>
+      !latest || new Date(v.date) > new Date(latest) ? v.date : latest, null as string | null);
+    return {
+      count: histSales.length,
+      totalUsd,
+      totalBs,
+      avgTicket: totalUsd / histSales.length,
+      lastPurchase,
+    };
+  })() : null;
 
   const reprintFromHistory = async (sale: any) => {
     try {
@@ -344,7 +357,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
 
   const openCreate = () => {
     setEditingClient(null);
-    setFormData({ type: "natural", docType: "V", docNumber: "", firstName: "", lastName: "", businessName: "", phone: "", email: "", address: "", taxInfo: "", creditLimit: "" });
+    setFormData({ type: "natural", docType: "V", docNumber: "", firstName: "", lastName: "", businessName: "", phone: "", email: "", address: "", taxInfo: "", creditLimit: "", notes: "", tag: "" });
     setShowDialog(true);
   };
 
@@ -396,6 +409,8 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
       address: client.address,
       taxInfo: client.taxInfo,
       creditLimit: (client.creditLimit || 0).toString(),
+      notes: client.notes || "",
+      tag: client.tag || "",
     });
     setShowDialog(true);
   };
@@ -637,6 +652,9 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
                         {client.isFinalClient && (
                           <Badge variant="secondary" className="ml-1 text-[8px]">FINAL</Badge>
                         )}
+                        {client.tag && (
+                          <Badge variant="outline" className="ml-1 text-[8px]">{client.tag}</Badge>
+                        )}
                       </div>
                       {client.address && (
                         <div className="text-[10px] text-muted-foreground">{client.address}</div>
@@ -859,6 +877,26 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
               </div>
             )}
 
+            <div>
+              <Label>Etiqueta <span className="text-muted-foreground text-xs">(para segmentar, ej: Mayorista, VIP)</span></Label>
+              <Input
+                value={formData.tag}
+                onChange={(e) => setFormData({ ...formData, tag: e.target.value })}
+                placeholder="ej: VIP, Frecuente, Mayorista"
+              />
+            </div>
+
+            <div>
+              <Label>Notas</Label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Preferencias, acuerdos especiales, etc."
+                rows={2}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
             {/* Preview del documento completo */}
             <div className="p-2 bg-muted/50 rounded text-xs">
               <span className="text-muted-foreground">Documento:</span>{" "}
@@ -887,7 +925,13 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
             <DialogTitle>
               Historial de Compras — {histClient?.fullName}
               {histClient?.docNumber && <span className="font-mono text-sm text-muted-foreground ml-2">({histClient.docType}-{histClient.docNumber})</span>}
+              {!!histClient?.loyaltyPoints && (
+                <Badge variant="outline" className="ml-2 align-middle">⭐ {histClient.loyaltyPoints} pts</Badge>
+              )}
             </DialogTitle>
+            {histClient?.notes && (
+              <p className="text-xs text-muted-foreground mt-1">📝 {histClient.notes}</p>
+            )}
           </DialogHeader>
 
           {/* Filtro por fecha */}
@@ -906,7 +950,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
 
           {/* Resumen dinamico */}
           {histSummary && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
               <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-2 text-center">
                 <p className="text-lg font-bold text-blue-700 dark:text-blue-400">{histSummary.count}</p>
                 <p className="text-[10px] text-muted-foreground">Ventas</p>
@@ -918,6 +962,16 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
               <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 text-center">
                 <p className="text-lg font-bold text-amber-700 dark:text-amber-400">Bs {histSummary.totalBs.toFixed(2)}</p>
                 <p className="text-[10px] text-muted-foreground">Total Bs</p>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg p-2 text-center">
+                <p className="text-lg font-bold text-purple-700 dark:text-purple-400">{currency} {histSummary.avgTicket.toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground">Ticket Prom.</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/30 rounded-lg p-2 text-center">
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                  {histSummary.lastPurchase ? new Date(histSummary.lastPurchase).toLocaleDateString("es-VE") : "-"}
+                </p>
+                <p className="text-[10px] text-muted-foreground">Ultima Compra</p>
               </div>
             </div>
           )}
