@@ -24,6 +24,8 @@ import BackupTab from "@/components/backup-tab";
 import SuppliersTab from "@/components/suppliers-tab";
 import PurchasesTab from "@/components/purchases-tab";
 import CreditTab from "@/components/credit-tab";
+import PayablesTab from "@/components/payables-tab";
+import CashShiftsTab from "@/components/cash-shifts-tab";
 import ExpensesTab from "@/components/expenses-tab";
 import DashboardTab from "@/components/dashboard-tab";
 import KardexTab from "@/components/kardex-tab";
@@ -398,6 +400,7 @@ export default function Home() {
     { value: "reports", label: "Informes", icon: "📈", allowed: true, restricted: false, plan: "" },
     { value: "devolutions", label: "Devoluciones", icon: "🔄", allowed: canDevolutions, restricted: !canDevolutions, plan: "BASICA+" },
     { value: "cash-closing", label: "Cierre de Caja", icon: "💰", allowed: canCashClosing, restricted: !canCashClosing, plan: "BASICA+" },
+    { value: "cash-shifts", label: "Turnos de Caja", icon: "🕐", allowed: true, restricted: false, plan: "" },
     { value: "config", label: "Configuracion", icon: "⚙️", allowed: true, restricted: false, plan: "" },
     { value: "license", label: "Licencia", icon: "🔑", allowed: true, restricted: false, plan: "" },
     { value: "users", label: "Usuarios", icon: "👤", allowed: currentUser?.role === "admin", restricted: false, plan: "" },
@@ -405,6 +408,7 @@ export default function Home() {
     { value: "suppliers", label: "Proveedores", icon: "🏪", allowed: true, restricted: false, plan: "" },
     { value: "purchases", label: "Compras", icon: "🛒", allowed: true, restricted: false, plan: "" },
     { value: "credit", label: "Cuentas por Cobrar", icon: "💳", allowed: true, restricted: false, plan: "" },
+    { value: "payables", label: "Cuentas por Pagar", icon: "🧾", allowed: true, restricted: false, plan: "" },
     { value: "kardex", label: "Inventario/Kardex", icon: "📦", allowed: true, restricted: false, plan: "" },
     { value: "held-sales", label: "Ventas en Espera", icon: "⏸️", allowed: true, restricted: false, plan: "" },
     { value: "quotes", label: "Presupuestos", icon: "📋", allowed: true, restricted: false, plan: "" },
@@ -586,6 +590,7 @@ export default function Home() {
               storeName={settings.storeName} storeAddress={settings.storeAddress} storeRif={settings.storeRif}
               storePhone={settings.storePhone} currency={settings.currency} allowZeroStock={settings.allowZeroStock}
               enableDiscount={settings.enableDiscount} maxDiscountPct={settings.maxDiscountPct ?? 20}
+              loyaltyEnabled={(settings as any).loyaltyEnabled === true} loyaltyPointsPerUsd={(settings as any).loyaltyPointsPerUsd ?? 100}
               canSaleNotes={license?.features?.saleNotes || false} canFrequentCustomers={canFrequentCustomers}
               sellerName={currentUser.fullName || currentUser.username}
               sellerRole={currentUser.role}
@@ -673,6 +678,11 @@ export default function Home() {
             {canCashClosing ? <CashClosingTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} /> : <UpgradePrompt feature="Cierre de Caja" plan="BASICA+" />}
           </ErrorBoundary>
         </TabsContent>
+        <TabsContent value="cash-shifts" activeTab={activeTab}>
+          <ErrorBoundary name="Turnos de Caja">
+            <CashShiftsTab currency={settings.currency} />
+          </ErrorBoundary>
+        </TabsContent>
         <TabsContent value="reports" activeTab={activeTab}>
           <ErrorBoundary name="Informes">
             <ReportsTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} />
@@ -713,6 +723,11 @@ export default function Home() {
           <ErrorBoundary name="CxC">
             <CreditTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency}
               sellerName={currentUser.fullName || currentUser.username} />
+          </ErrorBoundary>
+        </TabsContent>
+        <TabsContent value="payables" activeTab={activeTab}>
+          <ErrorBoundary name="CxP">
+            <PayablesTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency} />
           </ErrorBoundary>
         </TabsContent>
         <TabsContent value="kardex" activeTab={activeTab}>

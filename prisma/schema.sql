@@ -80,6 +80,9 @@ CREATE TABLE IF NOT EXISTS "pos_clients" (
     "isFinalClient" BOOLEAN NOT NULL DEFAULT false,
     "creditBalance" REAL NOT NULL DEFAULT 0,
     "creditLimit" REAL NOT NULL DEFAULT 0,
+    "loyaltyPoints" INTEGER NOT NULL DEFAULT 0,
+    "notes" TEXT NOT NULL DEFAULT '',
+    "tag" TEXT NOT NULL DEFAULT '',
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
@@ -113,8 +116,12 @@ CREATE TABLE IF NOT EXISTS "pos_sales" (
     "notes" TEXT NOT NULL DEFAULT '',
     "invoiceNumber" TEXT NOT NULL,
     "clientId" TEXT,
+    "shiftId" TEXT,
+    "pointsEarned" INTEGER NOT NULL DEFAULT 0,
+    "pointsRedeemed" INTEGER NOT NULL DEFAULT 0,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "pos_sales_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "pos_clients" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "pos_sales_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "pos_clients" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "pos_sales_shiftId_fkey" FOREIGN KEY ("shiftId") REFERENCES "pos_cash_shifts" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -175,6 +182,8 @@ CREATE TABLE IF NOT EXISTS "pos_settings" (
     "bcvAutoUpdate" BOOLEAN NOT NULL DEFAULT false,
     "bcvSource" TEXT NOT NULL DEFAULT 'manual',
     "bcvUpdatedAt" DATETIME,
+    "loyaltyEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "loyaltyPointsPerUsd" REAL NOT NULL DEFAULT 100,
     "updatedAt" DATETIME NOT NULL
 );
 
@@ -315,6 +324,7 @@ CREATE TABLE IF NOT EXISTS "pos_suppliers" (
     "address" TEXT NOT NULL DEFAULT '',
     "contact" TEXT NOT NULL DEFAULT '',
     "notes" TEXT NOT NULL DEFAULT '',
+    "payableBalance" REAL NOT NULL DEFAULT 0,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
@@ -331,9 +341,55 @@ CREATE TABLE IF NOT EXISTS "pos_purchases" (
     "totalBs" REAL NOT NULL DEFAULT 0,
     "exchangeRate" REAL NOT NULL DEFAULT 0,
     "notes" TEXT NOT NULL DEFAULT '',
+    "isCredit" BOOLEAN NOT NULL DEFAULT false,
+    "paidAmount" REAL NOT NULL DEFAULT 0,
+    "dueDate" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     CONSTRAINT "pos_purchases_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "pos_suppliers" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "pos_supplier_payments" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
+    "purchaseId" TEXT NOT NULL,
+    "supplierId" TEXT,
+    "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "amount" REAL NOT NULL,
+    "exchangeRate" REAL NOT NULL DEFAULT 0,
+    "amountBs" REAL NOT NULL DEFAULT 0,
+    "method" TEXT NOT NULL DEFAULT 'efectivo',
+    "reference" TEXT NOT NULL DEFAULT '',
+    "notes" TEXT NOT NULL DEFAULT '',
+    "createdBy" TEXT NOT NULL DEFAULT '',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "pos_supplier_payments_purchaseId_fkey" FOREIGN KEY ("purchaseId") REFERENCES "pos_purchases" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "pos_supplier_payments_supplierId_fkey" FOREIGN KEY ("supplierId") REFERENCES "pos_suppliers" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE IF NOT EXISTS "pos_cash_shifts" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tenant_id" TEXT NOT NULL DEFAULT 'default',
+    "userId" TEXT NOT NULL,
+    "userName" TEXT NOT NULL DEFAULT '',
+    "userRole" TEXT NOT NULL DEFAULT '',
+    "openedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "closedAt" DATETIME,
+    "openingCashUsd" REAL NOT NULL DEFAULT 0,
+    "openingCashBs" REAL NOT NULL DEFAULT 0,
+    "closingCashUsd" REAL,
+    "closingCashBs" REAL,
+    "expectedCashUsd" REAL NOT NULL DEFAULT 0,
+    "expectedCashBs" REAL NOT NULL DEFAULT 0,
+    "diffUsd" REAL NOT NULL DEFAULT 0,
+    "diffBs" REAL NOT NULL DEFAULT 0,
+    "salesCount" INTEGER NOT NULL DEFAULT 0,
+    "totalUsd" REAL NOT NULL DEFAULT 0,
+    "totalBs" REAL NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "notes" TEXT NOT NULL DEFAULT ''
 );
 
 -- CreateTable
@@ -591,6 +647,9 @@ CREATE INDEX IF NOT EXISTS "pos_sales_date_idx" ON "pos_sales"("date");
 CREATE INDEX IF NOT EXISTS "pos_sales_clientId_idx" ON "pos_sales"("clientId");
 
 -- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_sales_shiftId_idx" ON "pos_sales"("shiftId");
+
+-- CreateIndex
 CREATE INDEX IF NOT EXISTS "pos_sales_tenant_id_idx" ON "pos_sales"("tenant_id");
 
 -- CreateIndex
@@ -649,6 +708,27 @@ CREATE INDEX IF NOT EXISTS "pos_purchases_supplierId_idx" ON "pos_purchases"("su
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "pos_purchases_tenant_id_idx" ON "pos_purchases"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_supplier_payments_date_idx" ON "pos_supplier_payments"("date");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_supplier_payments_purchaseId_idx" ON "pos_supplier_payments"("purchaseId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_supplier_payments_supplierId_idx" ON "pos_supplier_payments"("supplierId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_supplier_payments_tenant_id_idx" ON "pos_supplier_payments"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_cash_shifts_tenant_id_idx" ON "pos_cash_shifts"("tenant_id");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_cash_shifts_userId_idx" ON "pos_cash_shifts"("userId");
+
+-- CreateIndex
+CREATE INDEX IF NOT EXISTS "pos_cash_shifts_status_idx" ON "pos_cash_shifts"("status");
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "pos_combo_items_tenant_id_idx" ON "pos_combo_items"("tenant_id");

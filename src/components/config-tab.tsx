@@ -441,6 +441,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [bcvSource, setBcvSource] = useState((settings as any).bcvSource || "manual");
   const [bcvUpdatedAt, setBcvUpdatedAt] = useState<string>((settings as any).bcvUpdatedAt || "");
   const [bcvFetching, setBcvFetching] = useState(false);
+  const [loyaltyEnabled, setLoyaltyEnabled] = useState((settings as any).loyaltyEnabled === true);
+  const [loyaltyPointsPerUsd, setLoyaltyPointsPerUsd] = useState(((settings as any).loyaltyPointsPerUsd ?? 100).toString());
 
   const fetchBcvNow = async () => {
     setBcvFetching(true);
@@ -506,6 +508,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     setBcvAutoUpdate((settings as any).bcvAutoUpdate === true);
     setBcvSource((settings as any).bcvSource || "manual");
     setBcvUpdatedAt((settings as any).bcvUpdatedAt || "");
+    setLoyaltyEnabled((settings as any).loyaltyEnabled === true);
+    setLoyaltyPointsPerUsd(String((settings as any).loyaltyPointsPerUsd ?? 100));
   }, [settings.theme, settings.themeMode, settings.euroUsdtRate]);
 
   // Auto-clamp fontSize when paper width changes
@@ -653,6 +657,8 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         bcvRate: parseFloat(bcvRate),
         euroUsdtRate: parseFloat(euroUsdtRate) || 0,
         bcvAutoUpdate,
+        loyaltyEnabled,
+        loyaltyPointsPerUsd: parseFloat(loyaltyPointsPerUsd) || 100,
         taxRate: parseFloat(taxRate || "0"),
         currency,
         storeAddress,
@@ -1061,6 +1067,37 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
               </p>
             </div>
           </div>
+
+          {/* ====== Puntos de Fidelidad ====== */}
+          <Card className="border-amber-200 dark:border-amber-800">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <span className="text-lg">⭐</span> Puntos de Fidelidad
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input type="checkbox" checked={loyaltyEnabled} onChange={(e) => setLoyaltyEnabled(e.target.checked)} className="w-4 h-4" />
+                Activar puntos de fidelidad para clientes
+              </label>
+              {loyaltyEnabled && (
+                <div>
+                  <Label>Puntos necesarios para $1 de descuento</Label>
+                  <Input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={loyaltyPointsPerUsd}
+                    onChange={(e) => setLoyaltyPointsPerUsd(e.target.value)}
+                    placeholder="100"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Los puntos que gana cada venta se configuran por producto (en Productos). Al pagar, el cajero puede canjear los puntos acumulados del cliente como descuento.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* ====== Configuracion de IVA ====== */}
           <Card className="border-blue-200 dark:border-blue-800">

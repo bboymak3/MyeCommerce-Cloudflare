@@ -8,7 +8,15 @@ import { CartItemRow } from "./cart-item";
 import { PaymentSection } from "./payment-section";
 import { ShortcutsBar } from "../shortcuts-bar";
 
-interface CartPanelProps {
+interface CartPanelProps_LoyaltyExtra {
+  loyaltyEnabled?: boolean;
+  clientLoyaltyPoints?: number;
+  pointsToRedeem?: string;
+  setPointsToRedeem?: (v: string) => void;
+  pointsDiscountUsd?: number;
+}
+
+interface CartPanelProps extends CartPanelProps_LoyaltyExtra {
   // Cart data
   cart: CartItem[];
   products: Product[];
@@ -103,6 +111,7 @@ export function CartPanel({
   isUsdMethod, vuelto, vueltoUsd,
   cashInputRef, cashUsdInputRef, onCompleteSale,
   onSearchFocus, onToggleCredit, onSetCashUsd, onSetCashBs, onSetPagoMovil, onCharge, onHoldSale,
+  loyaltyEnabled = false, clientLoyaltyPoints = 0, pointsToRedeem = "", setPointsToRedeem, pointsDiscountUsd = 0,
 }: CartPanelProps) {
   return (
     <Card className="order-2 md:order-none md:col-span-3 flex flex-col h-full border-2 border-primary/30 shadow-lg">
@@ -153,6 +162,20 @@ export function CartPanel({
               Cambiar
             </Button>
           </div>
+          {loyaltyEnabled && selectedClient && clientLoyaltyPoints > 0 && setPointsToRedeem && (
+            <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-amber-700 font-medium">⭐ {clientLoyaltyPoints} pts disponibles</span>
+              <input
+                type="number" min="0" max={clientLoyaltyPoints} value={pointsToRedeem}
+                onChange={(e) => setPointsToRedeem(e.target.value)}
+                placeholder="Canjear puntos"
+                className="w-28 h-7 text-xs rounded-md border border-input bg-background px-2"
+              />
+              {pointsDiscountUsd > 0 && (
+                <span className="text-xs text-green-700 font-medium">= -{currency} {pointsDiscountUsd.toFixed(2)}</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cart items */}

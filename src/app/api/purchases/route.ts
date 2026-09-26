@@ -75,6 +75,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Build batch write operations
+    const isCredit = body.isCredit === true && !!body.supplierId;
+    const dueDate = isCredit ? (() => { const d = new Date(); d.setDate(d.getDate() + (parseInt(body.creditDays) || 30)); return d; })() : null;
+
     const ops: any[] = [];
 
     // Create purchase (op index 0)
@@ -87,6 +90,8 @@ export async function POST(req: NextRequest) {
         totalBs: parseFloat((itemsTotal * exchangeRate).toFixed(2)),
         exchangeRate,
         notes: body.notes || '',
+        isCredit,
+        dueDate,
         items: {
           create: body.items.map((item: any) => {
             if (item.isBox) {
@@ -182,6 +187,14 @@ export async function POST(req: NextRequest) {
     for (const kd of kardexData) {
       ops.push(db.inventoryMovement.create({
         data: { productId: kd.productId, date: pDate, movementType: 'compra', concept: `Compra ${body.number || ''}`, quantity: kd.qty, absQuantity: kd.qty, unitCost: kd.unitCost, totalCost: kd.entryTotalCost, balanceQty: kd.balQty, balanceTotalCost: kd.balTC, balanceAvgCost: kd.balAvg, userId: String(pUserId), userName: pUser, userRole: pRole, referenceId: '' },
+      }));
+    }
+
+    // Compra a credito: aumenta la deuda con el proveedor
+    if (isCredit && body.supplierId) {
+      ops.push(db.supplier.update({
+        where: { id: body.supplierId },
+        data: { payableBalance: { increment: parseFloat(itemsTotal.toFixed(2)) } },
       }));
     }
 

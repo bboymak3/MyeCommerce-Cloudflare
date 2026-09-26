@@ -99,6 +99,9 @@ model Client {
   isFinalClient  Boolean  @default(false)
   creditBalance  Float    @default(0)
   creditLimit    Float    @default(0)
+  loyaltyPoints  Int      @default(0)
+  notes          String   @default("")
+  tag            String   @default("")
   isActive       Boolean  @default(true)
   sales          Sale[]
   creditPayments CreditPayment[]
@@ -146,10 +149,15 @@ model Sale {
   creditPayments    CreditPayment[]
   clientId          String?
   client            Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  shiftId           String?
+  shift             CashShift?   @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  pointsEarned      Int          @default(0)
+  pointsRedeemed    Int          @default(0)
   createdAt         DateTime     @default(now())
 
   @@index([date])
   @@index([clientId])
+  @@index([shiftId])
   @@index([tenant_id])
   @@unique([tenant_id, invoiceNumber])
   @@map("pos_sales")
@@ -220,6 +228,9 @@ model Settings {
   bcvAutoUpdate        Boolean @default(false)
   bcvSource            String  @default("manual")
   bcvUpdatedAt         DateTime?
+  // Puntos de fidelidad
+  loyaltyEnabled       Boolean @default(false)
+  loyaltyPointsPerUsd  Float   @default(100)
   updatedAt       DateTime @updatedAt
   @@index([tenant_id])
   @@map("pos_settings")
@@ -376,8 +387,10 @@ model Supplier {
   address    String     @default("")
   contact    String     @default("")
   notes      String     @default("")
+  payableBalance Float  @default(0)
   isActive   Boolean    @default(true)
   purchases  Purchase[]
+  payments   SupplierPayment[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
@@ -397,7 +410,11 @@ model Purchase {
   totalBs      Float          @default(0)
   exchangeRate Float          @default(0)
   notes        String         @default("")
+  isCredit     Boolean        @default(false)
+  paidAmount   Float          @default(0)
+  dueDate      DateTime?
   items        PurchaseItem[]
+  payments     SupplierPayment[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -405,6 +422,59 @@ model Purchase {
   @@index([supplierId])
   @@index([tenant_id])
   @@map("pos_purchases")
+}
+
+model SupplierPayment {
+  id           String    @id @default(cuid())
+  tenant_id String @default("default")
+  purchaseId   String
+  purchase     Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  supplierId   String?
+  supplier     Supplier? @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  date         DateTime  @default(now())
+  amount       Float
+  exchangeRate Float     @default(0)
+  amountBs     Float     @default(0)
+  method       String    @default("efectivo")
+  reference    String    @default("")
+  notes        String    @default("")
+  createdBy    String    @default("")
+  createdAt    DateTime  @default(now())
+
+  @@index([date])
+  @@index([purchaseId])
+  @@index([supplierId])
+  @@index([tenant_id])
+  @@map("pos_supplier_payments")
+}
+
+model CashShift {
+  id              String    @id @default(cuid())
+  tenant_id String @default("default")
+  userId          String
+  userName        String    @default("")
+  userRole        String    @default("")
+  openedAt        DateTime  @default(now())
+  closedAt        DateTime?
+  openingCashUsd  Float     @default(0)
+  openingCashBs   Float     @default(0)
+  closingCashUsd  Float?
+  closingCashBs   Float?
+  expectedCashUsd Float     @default(0)
+  expectedCashBs  Float     @default(0)
+  diffUsd         Float     @default(0)
+  diffBs          Float     @default(0)
+  salesCount      Int       @default(0)
+  totalUsd        Float     @default(0)
+  totalBs         Float     @default(0)
+  status          String    @default("open")
+  notes           String    @default("")
+  sales           Sale[]
+
+  @@index([tenant_id])
+  @@index([userId])
+  @@index([status])
+  @@map("pos_cash_shifts")
 }
 
 model ComboItem {

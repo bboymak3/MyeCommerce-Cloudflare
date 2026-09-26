@@ -43,6 +43,7 @@ export interface ClientData {
   isFinalClient: boolean;
   creditBalance?: number;
   creditLimit?: number;
+  loyaltyPoints?: number;
 }
 
 // ─── Held / Suspended Sale ────────────────────────────────────────
@@ -123,6 +124,8 @@ export interface PosTabProps {
   initialNotes?: string;
   initialDiscount?: number;
   initialPaymentMethod?: string;
+  loyaltyEnabled?: boolean;
+  loyaltyPointsPerUsd?: number;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────

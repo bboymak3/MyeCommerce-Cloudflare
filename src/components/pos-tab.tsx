@@ -49,6 +49,7 @@ export default function PosTab(props: PosTabProps) {
     ticketCurrencyMode = "dual", storeLogo = "", businessType = "general",
     taxMode = "included", onSaleComplete, onHoldSale,
     initialCart, initialClient, initialNotes, initialDiscount, initialPaymentMethod,
+    loyaltyEnabled = false, loyaltyPointsPerUsd = 100,
   } = props;
 
   // ─── Custom hooks ─────────────────────────────────────────────
@@ -159,9 +160,32 @@ export default function PosTab(props: PosTabProps) {
   }, [initialCart]);
 
   // ─── Calculations ────────────────────────────────────────────
-  const { taxAmount, effectiveDiscount, total, totalBs } = usePosCalculations({
+  const { taxAmount, effectiveDiscount, total: rawTotal, totalBs: rawTotalBs } = usePosCalculations({
     cart, taxRate, taxMode, discount, bcvRate, maxDiscountPct, subtotal,
   });
+
+  // ─── Puntos de fidelidad: canje como descuento adicional ──────
+  const [pointsToRedeem, setPointsToRedeem] = useState("");
+  const clientLoyaltyPoints = loyaltyEnabled && selectedClient && !selectedClient.isFinalClient
+    ? Math.round(selectedClient.loyaltyPoints || 0) : 0;
+  const pointsDiscountUsd = useMemo(() => {
+    if (!loyaltyEnabled || clientLoyaltyPoints <= 0) return 0;
+    const requested = Math.max(0, Math.round(parseFloat(pointsToRedeem) || 0));
+    const capped = Math.min(requested, clientLoyaltyPoints);
+    const perUsd = loyaltyPointsPerUsd || 100;
+    return Math.min(capped / perUsd, rawTotal);
+  }, [loyaltyEnabled, clientLoyaltyPoints, pointsToRedeem, loyaltyPointsPerUsd, rawTotal]);
+  const pointsRedeemedFinal = useMemo(
+    () => Math.round(pointsDiscountUsd * (loyaltyPointsPerUsd || 100)),
+    [pointsDiscountUsd, loyaltyPointsPerUsd],
+  );
+  const total = Math.max(0, rawTotal - pointsDiscountUsd);
+  const totalBs = total * bcvRate;
+  void rawTotalBs;
+
+  useEffect(() => {
+    if (!selectedClient && !isCredit) setPointsToRedeem("");
+  }, [selectedClient, isCredit]);
 
   const isUsdMethod = USD_METHODS.includes(paymentMethod as any);
   const vuelto = !isCredit && paymentMethod === "efectivo" ? parseFloat(cashReceived || "0") - totalBs : 0;
@@ -305,6 +329,7 @@ export default function PosTab(props: PosTabProps) {
           subtotal, taxAmount, discount: effectiveDiscount, total, totalBs,
           exchangeRate: bcvRate, paymentMethod, referenceNumber: saleRef, mixedPaymentJson: mixedJson,
           sellerName, sellerRole, notes,
+          pointsRedeemed: !isCredit ? pointsRedeemedFinal : 0,
           isCredit,
           creditPaid: isCredit ? 0 : undefined,
           creditDays: isCredit ? creditDays : undefined,
@@ -337,6 +362,7 @@ export default function PosTab(props: PosTabProps) {
         toast.success("Venta registrada exitosamente");
       }
       clearCart();
+      setPointsToRedeem("");
       if (onSaleComplete) onSaleComplete();
     } catch (error: any) { toast.error(error.message || "Error al registrar venta"); }
     finally { isSubmittingRef.current = false; }
@@ -345,7 +371,7 @@ export default function PosTab(props: PosTabProps) {
     creditClientDebt, paymentMethod, cashReceived, cashReceivedUsd, showRefField,
     referenceNumber, mixedPayments, isMixedValid, mixedRemaining, allowZeroStock, products,
     taxAmount, sellerName, sellerRole, notes, selectedClient, creditClientName, creditDays,
-    bcvRate, totalBs, vuelto, vueltoUsd, clearCart, onSaleComplete,
+    bcvRate, totalBs, vuelto, vueltoUsd, clearCart, onSaleComplete, pointsRedeemedFinal,
   ]);
 
   // ─── Print ticket ────────────────────────────────────────────
@@ -411,6 +437,9 @@ export default function PosTab(props: PosTabProps) {
         onSetPagoMovil={() => setPaymentMethod("pago-movil")}
         onCharge={() => completeSale()}
         onHoldSale={() => holdCurrentSale()}
+        loyaltyEnabled={loyaltyEnabled} clientLoyaltyPoints={clientLoyaltyPoints}
+        pointsToRedeem={pointsToRedeem} setPointsToRedeem={setPointsToRedeem}
+        pointsDiscountUsd={pointsDiscountUsd}
       />
 
       {/* Products (2/5) */}
