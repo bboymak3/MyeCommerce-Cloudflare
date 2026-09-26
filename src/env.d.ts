@@ -8,6 +8,7 @@ declare module '@cloudflare/next-on-pages' {
     // Secretos (npx wrangler pages secret put ...), nunca en wrangler.toml
     JWT_SECRET: string;
     NEXUS_SSO_SECRET: string;
+    LEGACY_TENANT_SLUG?: string;
   }
 }
 
@@ -18,5 +19,6 @@ declare global {
     NODE_ENV: string;
     JWT_SECRET: string;
     NEXUS_SSO_SECRET: string;
+    LEGACY_TENANT_SLUG?: string;
   }
 }

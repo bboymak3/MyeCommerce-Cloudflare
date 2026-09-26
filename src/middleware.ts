@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getRequestContext } from '@cloudflare/next-on-pages';
 import { verifySessionToken } from './lib/session';
+import { ensureSchema } from './lib/schema-migrate';
 
 // Rutas API que NO requieren autenticacion (metodos permitidos sin sesion)
 const PUBLIC_ROUTES: Record<string, string[] | '*'> = {
@@ -45,6 +47,13 @@ export async function middleware(request: NextRequest) {
 
   if (!pathname.startsWith('/api/')) {
     return NextResponse.next();
+  }
+
+  // Migracion automatica de la D1 (una vez por instancia; no borra datos)
+  try {
+    await ensureSchema((getRequestContext().env as any).DB);
+  } catch (error) {
+    console.error('[schema] Error en migracion automatica:', error);
   }
 
   const requestHeaders = new Headers(request.headers);

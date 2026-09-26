@@ -3,8 +3,11 @@ import { SignJWT, jwtVerify } from 'jose';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 
 const JWT_EXPIRES_IN = '24h';
-// Solo para desarrollo local (next dev); en produccion JWT_SECRET es obligatorio.
-const DEV_ONLY_SECRET = 'myecommerce-dev-only-secret';
+// Clave usada hasta ahora (estaba publicada en el repo). Se mantiene SOLO como
+// respaldo para no cortar el servicio mientras se configura el secreto JWT_SECRET
+// en Cloudflare; en cuanto exista el secreto, se usa el secreto.
+const LEGACY_SECRET = 'myecommerce-pos-jwt-secret-v2.9.34-change-in-production';
+let warnedLegacy = false;
 
 export interface SessionPayload {
   userId: string;
@@ -39,8 +42,11 @@ function readEnv(name: string): string | undefined {
 function getSecretKey(): Uint8Array {
   const secret = readEnv('JWT_SECRET');
   if (secret) return new TextEncoder().encode(secret);
-  if (process.env.NODE_ENV !== 'production') return new TextEncoder().encode(DEV_ONLY_SECRET);
-  throw new Error('JWT_SECRET no configurado. Ejecute: npx wrangler pages secret put JWT_SECRET');
+  if (!warnedLegacy) {
+    warnedLegacy = true;
+    console.warn('[session] JWT_SECRET no configurado: usando la clave anterior. Configure: npx wrangler pages secret put JWT_SECRET');
+  }
+  return new TextEncoder().encode(LEGACY_SECRET);
 }
 
 /**

@@ -6,7 +6,7 @@
 // usuario dentro del negocio y se redirige a /#sso=<token de sesion del POS>.
 export const runtime = 'edge';
 import { getRequestContext } from '@cloudflare/next-on-pages';
-import { createDbFromEnv } from '@/lib/db';
+import { createDbFromEnv, DEFAULT_TENANT_ID } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { createSessionToken, verifyNexusSsoToken } from '@/lib/session';
 import { NextRequest, NextResponse } from 'next/server';
@@ -26,7 +26,11 @@ export async function GET(req: NextRequest) {
     }
 
     const { env } = getRequestContext();
-    const db = createDbFromEnv(env as any, sso.tenantId);
+    // Los datos anteriores al modo multi-negocio estan en tenant_id 'default' y
+    // pertenecen al negocio LEGACY_TENANT_SLUG (wrangler.toml): se usan tal cual.
+    const legacySlug = (env as any).LEGACY_TENANT_SLUG || process.env.LEGACY_TENANT_SLUG;
+    const tenantId = legacySlug && sso.tenantSlug === legacySlug ? DEFAULT_TENANT_ID : sso.tenantId;
+    const db = createDbFromEnv(env as any, tenantId);
     const role = sso.role && POS_ROLES.has(sso.role) ? sso.role : 'cajero';
 
     // nexus-one es la fuente de verdad para los usuarios que entran por SSO:
@@ -57,7 +61,7 @@ export async function GET(req: NextRequest) {
       id: user.id,
       username: user.username,
       role: user.role,
-      tenantId: sso.tenantId,
+      tenantId,
     });
 
     // El token va en el fragmento (#): no se envia al servidor ni queda en logs.
@@ -66,7 +70,7 @@ export async function GET(req: NextRequest) {
       path: '/', maxAge: 86400, httpOnly: true, secure: true, sameSite: 'lax',
     });
     // Cookies informativas (no dan acceso): seleccionan el negocio en el login local.
-    response.cookies.set('tenant_id', sso.tenantId, {
+    response.cookies.set('tenant_id', tenantId, {
       path: '/', maxAge: 60 * 60 * 24 * 365, httpOnly: false, secure: true, sameSite: 'lax',
     });
     response.cookies.set('tenant_slug', sso.tenantSlug, {
