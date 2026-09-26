@@ -81,8 +81,11 @@ export async function POST(req: NextRequest) {
         orderBy: { date: 'desc' },
       });
 
-      const prevBalanceQty = lastMovement ? lastMovement.balanceQty : 0;
-      const prevBalanceTotalCost = lastMovement ? lastMovement.balanceTotalCost : 0;
+      // Saldo anterior = stock real (antes solo se usaba el ultimo movimiento, o 0 si no habia)
+      const prevBalanceQty = sf(product.stock);
+      const prevBalanceTotalCost = lastMovement && lastMovement.balanceQty > 0
+        ? (lastMovement.balanceTotalCost / lastMovement.balanceQty) * prevBalanceQty
+        : prevBalanceQty * sf(product.cost);
       const avgCost = prevBalanceQty > 0 ? prevBalanceTotalCost / prevBalanceQty : sf(product.cost);
 
       const unitCost = avgCost;

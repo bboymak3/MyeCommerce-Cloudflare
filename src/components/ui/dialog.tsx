@@ -30,9 +30,9 @@ function DialogContent({ className, children, ...props }: any) {
   const { open, setOpen } = useContext(DialogContext);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4" onClick={() => setOpen(false)}>
       <div className="fixed inset-0 bg-black/80" />
-      <div className={cn("relative z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg border bg-background p-6 shadow-lg", className)} onClick={(e) => e.stopPropagation()} {...props}>
+      <div role="dialog" aria-modal="true" className={cn("relative z-50 w-full max-w-lg max-h-[92vh] overflow-y-auto overscroll-contain rounded-lg border bg-background p-4 sm:p-6 shadow-lg", className)} onClick={(e) => e.stopPropagation()} {...props}>
         {children}
         <button className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100" onClick={() => setOpen(false)}>✕</button>
       </div>

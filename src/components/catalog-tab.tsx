@@ -508,9 +508,9 @@ export default function CatalogTab({
                   <span className="text-2xl text-muted-foreground/50">📷</span>
                 )}
               </div>
-              <div className="flex-1 space-y-2">
-                <div className="flex gap-2">
-                  <input type="text" value={coverLogoUrl} onChange={(e) => setCoverLogoUrl(e.target.value)} placeholder="URL del logo" className="flex-1 px-3 py-1.5 text-xs border rounded-lg bg-background" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <input type="text" value={coverLogoUrl} onChange={(e) => setCoverLogoUrl(e.target.value)} placeholder="URL del logo" className="flex-1 min-w-0 px-3 py-1.5 text-xs border rounded-lg bg-background" />
                   <button onClick={() => coverLogoInputRef.current?.click()} className="px-3 py-1.5 text-xs rounded-lg border bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium" title="Subir logo desde tu equipo">Subir</button>
                   <button onClick={() => setCoverLogoUrl(storeLogo || "")} className="px-3 py-1.5 text-xs rounded-lg border bg-muted hover:bg-accent transition-colors" title="Usar logo de la tienda">Tienda</button>
                   <input ref={coverLogoInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp" onChange={handleCoverLogoUpload} className="hidden" />

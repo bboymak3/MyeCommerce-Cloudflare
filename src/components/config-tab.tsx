@@ -437,6 +437,27 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
   const [storeRif, setStoreRif] = useState(settings.storeRif || "");
   const [bcvRate, setBcvRate] = useState((settings.bcvRate ?? 36.5).toString());
   const [euroUsdtRate, setEuroUsdtRate] = useState((settings.euroUsdtRate ?? 0).toString());
+  const [bcvAutoUpdate, setBcvAutoUpdate] = useState((settings as any).bcvAutoUpdate === true);
+  const [bcvSource, setBcvSource] = useState((settings as any).bcvSource || "manual");
+  const [bcvUpdatedAt, setBcvUpdatedAt] = useState<string>((settings as any).bcvUpdatedAt || "");
+  const [bcvFetching, setBcvFetching] = useState(false);
+
+  const fetchBcvNow = async () => {
+    setBcvFetching(true);
+    try {
+      const res = await authFetch("/api/exchange-rate/bcv", { method: "POST" });
+      const d = await res.json() as any;
+      if (!res.ok) throw new Error(d.error || "No se pudo consultar la tasa BCV");
+      setBcvRate(String(d.bcvRate));
+      setBcvSource("bcv-auto");
+      setBcvUpdatedAt(d.settings?.bcvUpdatedAt || new Date().toISOString());
+      toast.success(`Tasa BCV actualizada: ${d.bcvRate} Bs (${d.fecha})`);
+    } catch (e: any) {
+      toast.error(e.message || "Error al consultar la tasa BCV");
+    } finally {
+      setBcvFetching(false);
+    }
+  };
   const [taxRate, setTaxRate] = useState(settings.taxRate.toString());
   const [currency, setCurrency] = useState(settings.currency);
   const [allowZeroStock, setAllowZeroStock] = useState(settings.allowZeroStock || false);
@@ -482,6 +503,9 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     setTheme(settings.theme || 'blue');
     setThemeMode(settings.themeMode || 'light');
     setEuroUsdtRate(String(settings.euroUsdtRate ?? 0));
+    setBcvAutoUpdate((settings as any).bcvAutoUpdate === true);
+    setBcvSource((settings as any).bcvSource || "manual");
+    setBcvUpdatedAt((settings as any).bcvUpdatedAt || "");
   }, [settings.theme, settings.themeMode, settings.euroUsdtRate]);
 
   // Auto-clamp fontSize when paper width changes
@@ -628,6 +652,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         storeName,
         bcvRate: parseFloat(bcvRate),
         euroUsdtRate: parseFloat(euroUsdtRate) || 0,
+        bcvAutoUpdate,
         taxRate: parseFloat(taxRate || "0"),
         currency,
         storeAddress,
@@ -979,17 +1004,30 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>Tasa BCV (1 USD = ? Bs)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={bcvRate}
-                onChange={(e) => setBcvRate(e.target.value)}
-                placeholder="36.50"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Tasa actualizada del Banco Central de Venezuela
-              </p>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={bcvRate}
+                  onChange={(e) => setBcvRate(e.target.value)}
+                  placeholder="36.50"
+                />
+                <Button type="button" variant="outline" size="sm" className="shrink-0 whitespace-nowrap" onClick={fetchBcvNow} disabled={bcvFetching}>
+                  {bcvFetching ? "..." : "🔄 BCV"}
+                </Button>
+              </div>
+              <div className="flex items-center justify-between mt-1 gap-2 flex-wrap">
+                <p className="text-xs text-muted-foreground">
+                  {bcvSource === "bcv-auto" && bcvUpdatedAt
+                    ? `Actualizada automaticamente: ${new Date(bcvUpdatedAt).toLocaleString("es-VE")}`
+                    : "Tasa oficial del Banco Central de Venezuela"}
+                </p>
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                  <input type="checkbox" checked={bcvAutoUpdate} onChange={(e) => setBcvAutoUpdate(e.target.checked)} className="w-3.5 h-3.5" />
+                  Actualizar cada dia automaticamente
+                </label>
+              </div>
             </div>
             <div>
               <Label>Tasa Euro/USDT (1 USD = ? Bs)</Label>

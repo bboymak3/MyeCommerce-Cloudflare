@@ -172,6 +172,9 @@ CREATE TABLE IF NOT EXISTS "pos_settings" (
     "promoOldPrice" REAL NOT NULL DEFAULT 280,
     "promoCurrentPrice" REAL NOT NULL DEFAULT 180,
     "promoExpiryDate" TEXT NOT NULL DEFAULT '',
+    "bcvAutoUpdate" BOOLEAN NOT NULL DEFAULT false,
+    "bcvSource" TEXT NOT NULL DEFAULT 'manual',
+    "bcvUpdatedAt" DATETIME,
     "updatedAt" DATETIME NOT NULL
 );
 

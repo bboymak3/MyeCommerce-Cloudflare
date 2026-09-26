@@ -1,5 +1,6 @@
 export const runtime = 'edge';
 import { createDbFromEnv, getTenantId, DEFAULT_TENANT_ID } from '@/lib/db'
+import { isNexusDeployment } from '@/lib/nexus-tenant';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAppVersion } from '@/lib/version';
@@ -294,7 +295,7 @@ export async function POST(req: NextRequest) {
     // Garantizar que exista el usuario admin (solo instalacion base; los negocios
     // de nexus-one entran por SSO y no deben quedar con admin/admin)
     const adminExists = await db.user.findFirst({ where: { username: 'admin' } });
-    if (!adminExists && tenantId === DEFAULT_TENANT_ID) {
+    if (!adminExists && tenantId === DEFAULT_TENANT_ID && !(await isNexusDeployment((env as any).DB))) {
       const { hashPassword } = await import('@/lib/auth');
       await db.user.create({
         data: {

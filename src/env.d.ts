@@ -9,6 +9,7 @@ declare module '@cloudflare/next-on-pages' {
     JWT_SECRET: string;
     NEXUS_SSO_SECRET: string;
     LEGACY_TENANT_SLUG?: string;
+    CRON_SECRET?: string;
   }
 }
 
@@ -20,5 +21,6 @@ declare global {
     JWT_SECRET: string;
     NEXUS_SSO_SECRET: string;
     LEGACY_TENANT_SLUG?: string;
+    CRON_SECRET?: string;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,12 @@ interface LoginScreenProps {
 
 export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: LoginScreenProps) {
   const [username, setUsername] = useState("");
+  // Negocio (slug de Nexus One). Se recuerda en la cookie tenant_slug tras entrar.
+  const [tenantSlug, setTenantSlug] = useState("");
+  useEffect(() => {
+    const m = document.cookie.match(/(?:^|;\s*)tenant_slug=([^;]*)/);
+    if (m) setTenantSlug(decodeURIComponent(m[1]));
+  }, []);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -67,7 +73,7 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), password, tenantSlug: tenantSlug.trim().toLowerCase() || undefined }),
       });
 
       const data = await res.json();
@@ -265,6 +271,21 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
           <CardContent className="p-6">
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="tenantSlug" className="text-slate-300 text-sm">
+                  Negocio <span className="text-slate-500 text-xs">(codigo de su negocio en Nexus One, opcional)</span>
+                </Label>
+                <Input
+                  id="tenantSlug"
+                  type="text"
+                  placeholder="ej: mi-ferreteria"
+                  value={tenantSlug}
+                  onChange={(e) => setTenantSlug(e.target.value)}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  className="bg-slate-900 border-slate-600 text-white placeholder:text-slate-500 focus:ring-primary focus:border-primary"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="username" className="text-slate-300 text-sm">
                   Usuario
                 </Label>
@@ -274,7 +295,7 @@ export default function LoginScreen({ onLogin, storeName = "MyeCommerce" }: Logi
                   placeholder="Ingrese su usuario"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  autoFocus
+                  autoCapitalize="none"
                   autoComplete="username"
                   className="bg-slate-900 border-slate-600 text-white placeholder:text-slate-500 focus:ring-primary focus:border-primary"
                 />

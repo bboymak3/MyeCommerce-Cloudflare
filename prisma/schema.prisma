@@ -216,6 +216,10 @@ model Settings {
   promoOldPrice        Float   @default(280)
   promoCurrentPrice    Float   @default(180)
   promoExpiryDate      String  @default("")
+  // Tasa BCV: origen y actualizacion automatica diaria
+  bcvAutoUpdate        Boolean @default(false)
+  bcvSource            String  @default("manual")
+  bcvUpdatedAt         DateTime?
   updatedAt       DateTime @updatedAt
   @@index([tenant_id])
   @@map("pos_settings")

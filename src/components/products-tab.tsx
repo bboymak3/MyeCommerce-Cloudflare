@@ -955,7 +955,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
             </Block>
 
             {/* BLOCK 4: FOTO + CODIGOS */}
-            <Block title="Foto y Codigos de Barras" icon="📸" defaultOpen={false}>
+            <Block title="Foto y Codigos de Barras" icon="📸" defaultOpen={true}>
               <div className="flex items-start gap-3">
                 <div className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 flex-shrink-0">
                   {formData.image ? <img src={formData.image} alt="Producto" crossOrigin="anonymous" className="w-full h-full object-cover" /> : <span className="text-2xl text-gray-300">📷</span>}
@@ -1052,8 +1052,8 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
               {formData.isCombo && !editingProduct && <p className="text-[10px] text-orange-600 bg-orange-50 rounded p-2 mt-2">Guarde el producto primero para agregar ingredientes al combo.</p>}
             </Block>
 
-            {/* SAVE */}
-            <div className="flex gap-2 pt-2">
+            {/* SAVE (fijo abajo: siempre visible en celular) */}
+            <div className="sticky bottom-0 z-20 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 px-4 sm:px-6 py-3 flex gap-2 bg-background border-t">
               <Button variant="outline" className="flex-1" onClick={() => setShowProductDialog(false)}>Cancelar</Button>
               <Button className="flex-1" onClick={saveProduct}>{editingProduct ? "Actualizar" : "Crear"} Producto</Button>
             </div>
