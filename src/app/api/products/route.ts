@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { D1Batch } from '@/lib/d1-batch';
 
 function safeFloat(v: any, fallback: number = 0): number {
   const n = parseFloat(v);
@@ -200,9 +201,10 @@ export async function PATCH(req: NextRequest) {
       return { id: p.id, data };
     }).filter(u => Object.keys(u.data).length > 0);
 
-    const result = await db.$transaction(
-      updates.map(u => db.product.update({ where: { id: u.id }, data: u.data }))
-    );
+    // Todos los precios en un lote atomico de D1: o se ajustan todos o ninguno
+    const batch = new D1Batch((env as any).DB, tenantId);
+    for (const u of updates) batch.update('pos_products', u.id, u.data);
+    await batch.commit();
 
     return NextResponse.json({
       success: true,

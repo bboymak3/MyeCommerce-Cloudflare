@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { D1Batch } from '@/lib/d1-batch';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 export async function GET(req: NextRequest) {
@@ -97,38 +98,33 @@ export async function POST(req: NextRequest) {
       return sum + (qty * unitPrice);
     }, 0);
 
-    // D1 BATCH TRANSACTION: all writes as a batch (no reads needed inside tx)
-    const ops: any[] = [];
-
-    // Create devolution (op index 0)
-    ops.push(db.devolution.create({
-      data: {
-        saleId: body.saleId,
-        reason: body.reason || 'Devolucion',
-        totalUsd,
-        totalBs: totalUsd * rate,
-        exchangeRate: rate,
-        status: body.status || 'completada',
-        items: {
-      // Calcular total server-side por cada item (no confiar en el cliente)
-          create: body.items.map((item: any) => {
-            const qty = parseFloat(item.quantity) || 0;
-            const unitPrice = parseFloat(item.unitPrice) || 0;
-            return {
-              productId: item.productId,
-              productName: item.productName || sale.items.find((si: any) => si.productId === item.productId)?.product?.name || '',
-              quantity: qty,
-              unitPrice,
-              total: qty * unitPrice,
-            };
-          }),
-        },
-      },
-      include: { items: true, sale: true },
-    }));
+    // Escrituras en un lote atomico de D1: devolucion, items, stock y kardex
+    const batch = new D1Batch((env as any).DB, tenantId);
+    const now = new Date();
+    const devolutionId = batch.insert('pos_devolutions', {
+      saleId: body.saleId,
+      date: now,
+      reason: body.reason || 'Devolucion',
+      totalUsd,
+      totalBs: totalUsd * rate,
+      exchangeRate: rate,
+      status: body.status || 'completada',
+    });
+    // Calcular total server-side por cada item (no confiar en el cliente)
+    for (const item of body.items) {
+      const qty = parseFloat(item.quantity) || 0;
+      const unitPrice = parseFloat(item.unitPrice) || 0;
+      batch.insert('pos_devolution_items', {
+        devolutionId,
+        productId: item.productId,
+        productName: item.productName || sale.items.find((si: any) => si.productId === item.productId)?.product?.name || '',
+        quantity: qty,
+        unitPrice,
+        total: qty * unitPrice,
+      });
+    }
 
     // Restaurar stock y registrar la entrada en el kardex
-    const now = new Date();
     for (const item of body.items) {
       const qty = parseFloat(item.quantity);
       const product = await db.product.findUnique({ where: { id: item.productId } });
@@ -138,25 +134,19 @@ export async function POST(req: NextRequest) {
       const prevTC = lastMove && lastMove.balanceQty > 0 ? (lastMove.balanceTotalCost / lastMove.balanceQty) * prevQty : prevQty * unitCost;
       const balQty = prevQty + qty;
       const balTC = prevTC + qty * unitCost;
-      ops.push(db.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: qty } },
-      }));
-      ops.push(db.inventoryMovement.create({
-        data: {
-          productId: item.productId, date: now, movementType: 'devolucion',
-          concept: `Devolucion venta ${sale.invoiceNumber || ''}`.trim(),
-          quantity: qty, absQuantity: qty, unitCost, totalCost: qty * unitCost,
-          balanceQty: balQty, balanceTotalCost: balTC, balanceAvgCost: balQty > 0 ? balTC / balQty : 0,
-          userId: req.headers.get('x-user-id') || '', userName: req.headers.get('x-username') || '',
-          userRole: req.headers.get('x-user-role') || '', referenceId: body.saleId,
-        },
-      }));
+      batch.update('pos_products', item.productId, { stock: { increment: qty } });
+      batch.insert('pos_inventory_movements', {
+        productId: item.productId, date: now, movementType: 'devolucion',
+        concept: `Devolucion venta ${sale.invoiceNumber || ''}`.trim(),
+        quantity: qty, absQuantity: qty, unitCost, totalCost: qty * unitCost,
+        balanceQty: balQty, balanceTotalCost: balTC, balanceAvgCost: balQty > 0 ? balTC / balQty : 0,
+        userId: req.headers.get('x-user-id') || '', userName: req.headers.get('x-username') || '',
+        userRole: req.headers.get('x-user-role') || '', referenceId: body.saleId,
+      });
     }
 
-    // Execute batch transaction
-    const results = await db.$transaction(ops);
-    const devolution = results[0];
+    await batch.commit();
+    const devolution = await db.devolution.findUnique({ where: { id: devolutionId }, include: { items: true, sale: true } });
 
     return NextResponse.json(devolution);
   } catch (error) {

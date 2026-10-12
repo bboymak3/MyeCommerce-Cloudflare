@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { D1Batch } from '@/lib/d1-batch';
 
 // GET /api/credit - List credit accounts (clients with debt)
 export async function GET(req: NextRequest) {
@@ -194,43 +195,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build batch write operations
-    const ops: any[] = [];
-
-    // Create payment record (op index 0) — usar SIEMPRE el clientId de la venta, no del body
-    ops.push(db.creditPayment.create({
-      data: {
-        saleId: body.saleId,
-        clientId: sale.clientId || null, // Siempre usar el de la venta, nunca el del body
-        date: new Date(),
-        amount: txAmount,
-        exchangeRate,
-        amountBs: Number((txAmount * exchangeRate).toFixed(2)),
-        method: body.method || 'efectivo',
-        reference: body.reference || '',
-        notes: body.notes || '',
-        createdBy: body.createdBy || '',
-      },
-    }));
-
-    // Update sale creditPaid
-    ops.push(db.sale.update({
-      where: { id: body.saleId },
-      data: { creditPaid: Number((Number(freshSale.creditPaid || 0) + txAmount).toFixed(2)) },
-    }));
-
-    // Update client credit balance
+    // Escrituras en un lote atomico de D1. Los saldos se calculan en la base de datos
+    // para que dos abonos simultaneos no se pisen.
+    const batch = new D1Batch((env as any).DB, tenantId);
+    // Usar SIEMPRE el clientId de la venta, nunca el del body
+    const paymentId = batch.insert('pos_credit_payments', {
+      saleId: body.saleId,
+      clientId: sale.clientId || null,
+      date: new Date(),
+      amount: txAmount,
+      exchangeRate,
+      amountBs: Number((txAmount * exchangeRate).toFixed(2)),
+      method: body.method || 'efectivo',
+      reference: body.reference || '',
+      notes: body.notes || '',
+      createdBy: body.createdBy || '',
+    });
+    batch.raw('UPDATE "pos_sales" SET "creditPaid" = ROUND("creditPaid" + ?, 2) WHERE "id" = ? AND "tenant_id" = ?', txAmount, body.saleId);
     if (sale.clientId && clientCreditBalance !== null) {
-      const newBalance = Math.max(0, clientCreditBalance - txAmount);
-      ops.push(db.client.update({
-        where: { id: sale.clientId },
-        data: { creditBalance: Number(newBalance.toFixed(2)) },
-      }));
+      batch.raw('UPDATE "pos_clients" SET "creditBalance" = MAX(0, ROUND("creditBalance" - ?, 2)), "updatedAt" = ? WHERE "id" = ? AND "tenant_id" = ?', txAmount, new Date(), sale.clientId);
     }
-
-    // Execute batch transaction
-    const results = await db.$transaction(ops);
-    const payment = results[0];
+    await batch.commit();
+    const payment = await db.creditPayment.findUnique({ where: { id: paymentId } });
 
     return NextResponse.json(payment);
   } catch (error: any) {

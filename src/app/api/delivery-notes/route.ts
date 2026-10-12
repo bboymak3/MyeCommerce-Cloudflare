@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { D1Batch } from '@/lib/d1-batch';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n) ? fb : n; };
@@ -105,67 +106,52 @@ export async function POST(req: NextRequest) {
 
     const totalBs = parseFloat((totalUsd * exchangeRate).toFixed(2));
 
-    // Build batch write operations
-    const ops: any[] = [];
-
-    // Create delivery note with nested items and correct totals (op index 0)
-    ops.push(db.deliveryNote.create({
-      data: {
-        number: nextNumber,
+    // Escrituras en un lote atomico de D1: nota, items, stock y kardex
+    const batch = new D1Batch((env as any).DB, tenantId);
+    const noteId = batch.insert('pos_delivery_notes', {
+      number: nextNumber,
+      userId,
+      userName,
+      recipientName: body.recipientName || '',
+      recipientDoc: body.recipientDoc || '',
+      recipientAddr: body.recipientAddr || '',
+      reason: body.reason || '',
+      notes: body.notes || '',
+      totalUsd: parseFloat(totalUsd.toFixed(2)),
+      totalBs,
+      exchangeRate,
+      status: 'emitida',
+    });
+    for (const d of itemData) {
+      batch.insert('pos_delivery_note_items', {
+        deliveryNoteId: noteId,
+        productId: d.productId,
+        productName: d.productName,
+        quantity: d.quantity,
+        unitCost: parseFloat(d.unitCost.toFixed(4)),
+        totalCost: d.totalCost,
+      });
+      // Descuento calculado en la base de datos (no pisa ventas simultaneas)
+      batch.update('pos_products', d.productId, { stock: { decrement: d.quantity } });
+      batch.insert('pos_inventory_movements', {
+        productId: d.productId,
+        movementType: 'nota_entrega',
+        concept: `Nota de entrega #${nextNumber}`,
+        quantity: -d.quantity,
+        absQuantity: d.quantity,
+        unitCost: parseFloat(d.unitCost.toFixed(4)),
+        totalCost: d.totalCost,
+        balanceQty: d.newBalanceQty,
+        balanceTotalCost: d.newBalanceTotalCost,
+        balanceAvgCost: d.newAvgCost,
         userId,
         userName,
-        recipientName: body.recipientName || '',
-        recipientDoc: body.recipientDoc || '',
-        recipientAddr: body.recipientAddr || '',
-        reason: body.reason || '',
-        notes: body.notes || '',
-        totalUsd: parseFloat(totalUsd.toFixed(2)),
-        totalBs,
-        exchangeRate,
-        status: 'emitida',
-        items: {
-          create: itemData.map(d => ({
-            productId: d.productId,
-            productName: d.productName,
-            quantity: d.quantity,
-            unitCost: parseFloat(d.unitCost.toFixed(4)),
-            totalCost: d.totalCost,
-          })),
-        },
-      },
-      include: { items: true },
-    }));
-
-    // Update product stock and create inventory movements for each item
-    for (const d of itemData) {
-      ops.push(db.product.update({
-        where: { id: d.productId },
-        data: { stock: d.newStock },
-      }));
-
-      ops.push(db.inventoryMovement.create({
-        data: {
-          productId: d.productId,
-          movementType: 'nota_entrega',
-          concept: `Nota de entrega #${nextNumber}`,
-          quantity: -d.quantity,
-          absQuantity: d.quantity,
-          unitCost: parseFloat(d.unitCost.toFixed(4)),
-          totalCost: d.totalCost,
-          balanceQty: d.newBalanceQty,
-          balanceTotalCost: d.newBalanceTotalCost,
-          balanceAvgCost: d.newAvgCost,
-          userId,
-          userName,
-          userRole,
-          referenceId: '', // Note ID not available in batch mode
-        },
-      }));
+        userRole,
+        referenceId: noteId,
+      });
     }
-
-    // Execute batch transaction
-    const results = await db.$transaction(ops);
-    const deliveryNote = results[0];
+    await batch.commit();
+    const deliveryNote = await db.deliveryNote.findUnique({ where: { id: noteId }, include: { items: true } });
 
     return NextResponse.json(deliveryNote, { status: 201 });
   } catch (error: any) {
@@ -240,41 +226,29 @@ export async function PUT(req: NextRequest) {
         anularData.push({ productId: item.productId, quantity, newStock, unitCost, totalCost, newBalanceQty, newBalanceTotalCost, newAvgCost });
       }
 
-      // Build batch write operations
-      const ops: any[] = [];
+      // Escrituras en un lote atomico de D1: stock, kardex y estado de la nota
+      const batch = new D1Batch((env as any).DB, tenantId);
       for (const d of anularData) {
-        ops.push(db.product.update({
-          where: { id: d.productId },
-          data: { stock: d.newStock },
-        }));
-
-        ops.push(db.inventoryMovement.create({
-          data: {
-            productId: d.productId,
-            movementType: 'ajuste_entrada',
-            concept: `Anulacion nota de entrega #${existing.number}`,
-            quantity: d.quantity,
-            absQuantity: d.quantity,
-            unitCost: parseFloat(d.unitCost.toFixed(4)),
-            totalCost: d.totalCost,
-            balanceQty: d.newBalanceQty,
-            balanceTotalCost: d.newBalanceTotalCost,
-            balanceAvgCost: d.newAvgCost,
-            userId,
-            userName,
-            userRole,
-            referenceId: existing.id,
-          },
-        }));
+        batch.update('pos_products', d.productId, { stock: { increment: d.quantity } });
+        batch.insert('pos_inventory_movements', {
+          productId: d.productId,
+          movementType: 'ajuste_entrada',
+          concept: `Anulacion nota de entrega #${existing.number}`,
+          quantity: d.quantity,
+          absQuantity: d.quantity,
+          unitCost: parseFloat(d.unitCost.toFixed(4)),
+          totalCost: d.totalCost,
+          balanceQty: d.newBalanceQty,
+          balanceTotalCost: d.newBalanceTotalCost,
+          balanceAvgCost: d.newAvgCost,
+          userId,
+          userName,
+          userRole,
+          referenceId: existing.id,
+        });
       }
-
-      // Update delivery note status
-      ops.push(db.deliveryNote.update({
-        where: { id: body.id },
-        data: { status: 'anulada' },
-      }));
-
-      await db.$transaction(ops);
+      batch.update('pos_delivery_notes', body.id, { status: 'anulada' });
+      await batch.commit();
 
       return NextResponse.json({ success: true, status: 'anulada' });
     }
