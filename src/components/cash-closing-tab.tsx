@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { veDateKey } from "@/lib/ve-time";
 import { authFetch } from "@/lib/auth-fetch";
 
 interface CashClosing {
@@ -120,15 +121,17 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
     loadClosings();
   }, [loadClosings]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  // Dia de hoy en Venezuela (toISOString da la fecha UTC: despues de las 8 pm ya seria manana)
+  const today = veDateKey();
 
   // Pre-cierres del dia de hoy
   const todayPreClosings = closings.filter(
-    (c) => new Date(c.date).toISOString().slice(0, 10) === today && c.closingType === 'pre'
+    (c) => veDateKey(c.createdAt) === today && c.closingType === 'pre'
   );
 
   // Cierre final del dia de hoy
   const todayFinalClosing = closings.find(
+    // date = inicio del dia del cierre: su fecha UTC es ese dia (cierres nuevos y anteriores)
     (c) => new Date(c.date).toISOString().slice(0, 10) === today && c.closingType === 'final'
   );
 

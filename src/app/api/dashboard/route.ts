@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDateKey, veDayStart, veDayEnd } from '@/lib/ve-time';
 
 // Helper: desglosa venta en porciones netas (no-cashea) y cashea.
 // Para pago mixto, solo suma la porcion correspondiente a cada bucket.
@@ -27,14 +28,14 @@ export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
   const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
-    const today = new Date();
-    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    // Dias en hora de Venezuela (el servidor corre en UTC)
+    const dayKey = (daysAgo: number) => veDateKey(Date.now() - daysAgo * 86400000);
+    const todayKey = dayKey(0);
+    const startOfDay = veDayStart(todayKey);
+    const endOfDay = veDayEnd(todayKey);
 
-    // Rango de los ultimos 8 dias (hoy + 7 dias atras para grafica semanal y ayer)
-    const weekStart = new Date(today);
-    weekStart.setDate(weekStart.getDate() - 6);
-    weekStart.setHours(0, 0, 0, 0);
+    // Rango de los ultimos 7 dias (hoy + 6 dias atras, para grafica semanal y ayer)
+    const weekStart = veDayStart(dayKey(6));
 
     // ===== UNA SOLA CONSULTA: todas las ventas de los ultimos 7 dias =====
     const recentSales = await db.sale.findMany({
@@ -44,10 +45,8 @@ export async function GET(req: NextRequest) {
     });
 
     // Separar: ventas de hoy vs semana vs ayer
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStart = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
-    const yesterdayEnd = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59, 999);
+    const yesterdayStart = veDayStart(dayKey(1));
+    const yesterdayEnd = veDayEnd(dayKey(1));
 
     const todaySales = recentSales.filter(s => s.date >= startOfDay && s.date <= endOfDay);
     const yesterdaySales = recentSales.filter(s => s.date >= yesterdayStart && s.date <= yesterdayEnd);
@@ -96,14 +95,12 @@ export async function GET(req: NextRequest) {
     // ===== SEMANA (ultimos 7 dias) - agrupado en memoria =====
     const dayNames = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
     const weekMap: Record<string, { total: number; count: number; cashea: number; casheaCount: number }> = {};
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart);
-      d.setDate(d.getDate() + i);
-      const key = d.toISOString().slice(0, 10);
+    for (let i = 6; i >= 0; i--) {
+      const key = dayKey(i);
       weekMap[key] = { total: 0, count: 0, cashea: 0, casheaCount: 0 };
     }
     for (const s of recentSales) {
-      const key = s.date.toISOString().slice(0, 10);
+      const key = veDateKey(s.date);
       if (weekMap[key]) {
         const d = desglosaVenta(s);
         // Total = entradas netas (excluye cashea, excluye credito)
@@ -159,7 +156,7 @@ export async function GET(req: NextRequest) {
     // ===== ULTIMAS 5 VENTAS =====
     const recentSalesList = todaySales.slice(0, 5).map(s => ({
       id: s.id,
-      time: s.date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }),
+      time: s.date.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Caracas' }),
       customer: s.customerName || 'Cliente Final',
       total: s.total,
       totalBs: s.totalBs,

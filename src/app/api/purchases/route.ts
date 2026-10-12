@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     const purchases = await db.purchase.findMany({
       where: {
-        ...(startDate && endDate ? { date: { gte: new Date(startDate), lte: new Date(endDate + 'T23:59:59') } } : {}),
+        ...(startDate && endDate ? { date: { gte: veDayStart(startDate), lte: veDayEnd(endDate) } } : {}),
         ...(supplierId ? { supplierId } : {}),
       },
       include: {
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     // Read product data and last inventory movements for kardex — READS FIRST
     const pDate = body.date ? new Date(body.date) : new Date();
-    const pUser = req.headers.get('x-user-name') || '';
+    const pUser = req.headers.get('x-username') || '';
     const pRole = req.headers.get('x-user-role') || '';
     const pUserId = req.headers.get('x-user-id') || '';
     const kardexData: { productId: string; qty: number; unitCost: number; entryTotalCost: number; balQty: number; balTC: number; balAvg: number }[] = [];

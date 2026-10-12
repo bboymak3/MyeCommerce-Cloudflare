@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { authFetch } from "@/lib/auth-fetch";
+import { veDateKey } from "@/lib/ve-time";
 import {
   Search,
   Download,
@@ -127,12 +128,9 @@ function formatDateTime(dateStr: string): string {
 // ─── Helper: default date range ─────────────────────────────────────────────
 
 function getDefaultDates(): { startDate: string; endDate: string } {
-  const today = new Date();
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(today.getDate() - 30);
   return {
-    startDate: thirtyDaysAgo.toISOString().split("T")[0],
-    endDate: today.toISOString().split("T")[0],
+    startDate: veDateKey(Date.now() - 30 * 86400000),
+    endDate: veDateKey(),
   };
 }
 

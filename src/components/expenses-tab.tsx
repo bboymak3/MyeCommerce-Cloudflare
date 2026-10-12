@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { veDateKey } from "@/lib/ve-time";
 import {
   Receipt, Plus, Trash2, Search, Edit2, TrendingUp, TrendingDown,
   DollarSign, Calendar, Filter, PieChart, BarChart3, Wallet,
@@ -86,12 +87,11 @@ const DEFAULT_CATEGORIES = [
 ];
 
 function getToday() {
-  return new Date().toISOString().split("T")[0];
+  return veDateKey();
 }
 
 function getFirstOfMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  return `${veDateKey().slice(0, 8)}01`;
 }
 
 function fmt(n: number, decimals = 2) {

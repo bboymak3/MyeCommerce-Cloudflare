@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
@@ -17,8 +18,8 @@ export async function GET(req: NextRequest) {
         ...(startDate && endDate
           ? {
               date: {
-                gte: new Date(startDate),
-                lte: new Date(endDate + 'T23:59:59'),
+                gte: veDayStart(startDate),
+                lte: veDayEnd(endDate),
               },
             }
           : {}),
@@ -52,7 +53,8 @@ export async function POST(req: NextRequest) {
     // Validar que la venta existe
     const sale = await db.sale.findUnique({
       where: { id: body.saleId },
-      include: { items: true, devolutions: true },
+      // Las devoluciones previas con sus items: sin ellos no se puede saber cuanto ya se devolvio
+      include: { items: { include: { product: { select: { name: true } } } }, devolutions: { include: { items: true } } },
     });
 
     if (!sale) {
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
     // Verificar cantidades devueltas no excedan lo vendido
     for (const item of body.items) {
       const qty = parseFloat(item.quantity);
-      if (isNaN(qty) || qty < 1) {
+      if (isNaN(qty) || qty <= 0) {
         return NextResponse.json({ error: `Cantidad invalida para "${item.productName || item.productId}"` }, { status: 400 });
       }
       const saleItem = sale.items.find((si: any) => si.productId === item.productId);
@@ -114,7 +116,7 @@ export async function POST(req: NextRequest) {
             const unitPrice = parseFloat(item.unitPrice) || 0;
             return {
               productId: item.productId,
-              productName: item.productName,
+              productName: item.productName || sale.items.find((si: any) => si.productId === item.productId)?.product?.name || '',
               quantity: qty,
               unitPrice,
               total: qty * unitPrice,

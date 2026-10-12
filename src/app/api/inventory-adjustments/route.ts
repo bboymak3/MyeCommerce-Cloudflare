@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get user info from headers
-    const userName = req.headers.get('x-user-name') || 'Sistema';
+    const userName = req.headers.get('x-username') || 'Sistema';
     const userRole = req.headers.get('x-user-role') || '';
     const userId = req.headers.get('x-user-id') || '';
 

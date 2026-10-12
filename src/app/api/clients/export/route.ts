@@ -76,7 +76,7 @@ END:VCARD`;
       'Tipo': c.isFinalClient ? 'Consumidor Final' : 'Cliente Registrado',
       'Credito Disponible': c.creditLimit ? (c.creditLimit - (c.creditBalance || 0)).toFixed(2) : 'N/A',
       'Saldo Deuda': c.creditBalance ? c.creditBalance.toFixed(2) : '0.00',
-      'Fecha Registro': c.createdAt ? new Date(c.createdAt).toLocaleDateString('es-VE') : '',
+      'Fecha Registro': c.createdAt ? new Date(c.createdAt).toLocaleDateString('es-VE', { timeZone: 'America/Caracas' }) : '',
     }));
 
     const wb = XLSX.utils.book_new();

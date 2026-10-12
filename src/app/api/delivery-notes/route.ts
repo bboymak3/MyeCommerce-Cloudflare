@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n) ? fb : n; };
 
@@ -20,13 +21,13 @@ export async function GET(req: NextRequest) {
     if (userId) where.userId = userId;
     if (startDate && endDate) {
       where.createdAt = {
-        gte: new Date(startDate),
-        lte: new Date(endDate + 'T23:59:59'),
+        gte: veDayStart(startDate),
+        lte: veDayEnd(endDate),
       };
     } else if (startDate) {
-      where.createdAt = { gte: new Date(startDate) };
+      where.createdAt = { gte: veDayStart(startDate) };
     } else if (endDate) {
-      where.createdAt = { lte: new Date(endDate + 'T23:59:59') };
+      where.createdAt = { lte: veDayEnd(endDate) };
     }
 
     const deliveryNotes = await db.deliveryNote.findMany({

@@ -2,15 +2,12 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd, veWallNow, fromVeWall } from '@/lib/ve-time';
 
-function getVenezuelaNow(): Date {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  return new Date(utc - 4 * 3600000);
-}
-
-function getPeriodDates(period: string): { start: Date; end: Date; label: string } {
-  const now = getVenezuelaNow();
+// Rango del periodo en hora de Venezuela (las fechas se arman "de pared" y se
+// convierten al instante real en getPeriodDates).
+function getPeriodWallDates(period: string): { start: Date; end: Date; label: string } {
+  const now = veWallNow();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
@@ -154,6 +151,11 @@ function getPeriodDates(period: string): { start: Date; end: Date; label: string
   }
 }
 
+function getPeriodDates(period: string): { start: Date; end: Date; label: string } {
+  const r = getPeriodWallDates(period);
+  return { start: fromVeWall(r.start), end: fromVeWall(r.end), label: r.label };
+}
+
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
   const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
@@ -171,14 +173,14 @@ export async function GET(req: NextRequest) {
     let periodLabel: string;
 
     if (period === 'custom' && customStart && customEnd) {
-      start = new Date(customStart);
-      end = new Date(customEnd + 'T23:59:59.999');
-      const fmt = (d: Date) => d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      start = veDayStart(customStart);
+      end = veDayEnd(customEnd);
+      const fmt = (d: Date) => d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Caracas' });
       periodLabel = `${fmt(start)} al ${fmt(end)}`;
     } else if (customStart && customEnd) {
-      start = new Date(customStart);
-      end = new Date(customEnd + 'T23:59:59.999');
-      const fmt = (d: Date) => d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      start = veDayStart(customStart);
+      end = veDayEnd(customEnd);
+      const fmt = (d: Date) => d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Caracas' });
       periodLabel = `${fmt(start)} al ${fmt(end)}`;
     } else {
       const periodInfo = getPeriodDates(period);
@@ -320,7 +322,7 @@ export async function GET(req: NextRequest) {
 
     sales.forEach((s) => {
       const saleDate = new Date(s.date).toLocaleString("es-VE", {
-        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Caracas"
       });
       const refMethods = ['transferencia', 'pago-movil', 'zelle', 'usdt'];
       const refLabels: Record<string, string> = { transferencia: 'Transferencia', 'pago-movil': 'Pago Movil', zelle: 'Zelle', usdt: 'USDT' };

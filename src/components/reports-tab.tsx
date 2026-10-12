@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { veDateKey } from "@/lib/ve-time";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -700,7 +701,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
   };
 
   // Today for default date inputs
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = veDateKey();
 
   return (
     <div className="space-y-4">
