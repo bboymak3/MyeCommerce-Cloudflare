@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Banknote, DollarSign, Smartphone, CreditCard, QrCode, Building, Landmark, ArrowLeftRight } from 'lucide-react';
+import { Banknote, DollarSign, Smartphone, CreditCard, QrCode, Building, Landmark, ArrowLeftRight, Fingerprint } from 'lucide-react';
 import type { ClientData, MixedEntry } from "../types";
 import { USD_METHODS, REF_REQUIRED_METHODS, getRefLabel, getRefPlaceholder } from "../types";
 
@@ -69,6 +69,7 @@ const PAYMENT_METHODS: { value: string; label: string; shortLabel: string; icon:
   { value: "transferencia", label: "Transferencia", shortLabel: "Transf", icon: <Building className="w-3.5 h-3.5" />, color: "bg-blue-600 hover:bg-blue-700 shadow-blue-600/20 text-white" },
   { value: "pago-movil", label: "Pago Movil", shortLabel: "PMovil", icon: <Smartphone className="w-3.5 h-3.5" />, color: "bg-violet-600 hover:bg-violet-700 shadow-violet-600/20 text-white" },
   { value: "punto-de-venta", label: "Punto de Venta", shortLabel: "POS", icon: <CreditCard className="w-3.5 h-3.5" />, color: "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20 text-white" },
+  { value: "biopago", label: "Biopago", shortLabel: "Biopago", icon: <Fingerprint className="w-3.5 h-3.5" />, color: "bg-rose-600 hover:bg-rose-700 shadow-rose-600/20 text-white" },
   { value: "zelle", label: "Zelle ($)", shortLabel: "Zelle", icon: <Landmark className="w-3.5 h-3.5" />, color: "bg-cyan-600 hover:bg-cyan-700 shadow-cyan-600/20 text-white" },
   { value: "usdt", label: "USDT ($)", shortLabel: "USDT", icon: <QrCode className="w-3.5 h-3.5" />, color: "bg-orange-600 hover:bg-orange-700 shadow-orange-600/20 text-white" },
   { value: "mixto", label: "Mixto", shortLabel: "Mixto", icon: <ArrowLeftRight className="w-3.5 h-3.5" />, color: "bg-pink-600 hover:bg-pink-700 shadow-pink-600/20 text-white" },
@@ -102,6 +103,7 @@ export function PaymentSection({
               onClick={() => { setPaymentMethod(m.value); setReferenceNumber(""); }}
               className={`
                 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg text-[11px] font-bold
+                ${m.value === 'mixto' ? 'col-span-3' : ''}
                 transition-all duration-150 active:scale-[0.96] shadow-sm
                 ${paymentMethod === m.value
                   ? m.color + ' ring-2 ring-offset-1 ring-current/30 scale-[1.02]'
@@ -177,6 +179,7 @@ export function PaymentSection({
                 <option value="transferencia">Transferencia</option>
                 <option value="pago-movil">Pago Movil</option>
                 <option value="punto-de-venta">Punto de Venta</option>
+                <option value="biopago">Biopago</option>
                 <option value="zelle">Zelle ($)</option>
                 <option value="usdt">USDT ($)</option>
               </select>

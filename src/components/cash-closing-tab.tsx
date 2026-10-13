@@ -49,6 +49,8 @@ interface CashClosing {
   zelleBs: number;
   usdtUsd: number;
   usdtBs: number;
+  biopagoUsd?: number;
+  biopagoBs?: number;
   breakdownJson: string;
   exchangeRate: number;
   observations: string;
@@ -97,7 +99,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
     roleBreakdown: { role: string; label: string; salesCount: number; totalUsd: number; totalBs: number }[];
     groups?: {
       efectivoFisico: { bs: number; usd: number; subtotalBs: number; subtotalUsd: number; efectivoBs: { bs: number; usd: number }; efectivoUsd: { bs: number; usd: number } };
-      bsElectronicos: { bs: number; usd: number; puntoVenta: { bs: number; usd: number }; transferencia: { bs: number; usd: number }; pagoMovil: { bs: number; usd: number } };
+      bsElectronicos: { bs: number; usd: number; puntoVenta: { bs: number; usd: number }; biopago?: { bs: number; usd: number }; transferencia: { bs: number; usd: number }; pagoMovil: { bs: number; usd: number } };
       divisasDigitales: { bs: number; usd: number; zelle: { bs: number; usd: number }; usdt: { bs: number; usd: number } };
     } | null;
   } | null>(null);
@@ -327,6 +329,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
           ${c.transferBs > 0 ? `<tr><td>Transferencia</td><td>$ ${c.transferUsd.toFixed(2)}</td><td>Bs ${c.transferBs.toFixed(2)}</td></tr>` : ''}
           ${c.mobileBs > 0 ? `<tr><td>Pago Movil</td><td>$ ${c.mobileUsd.toFixed(2)}</td><td>Bs ${c.mobileBs.toFixed(2)}</td></tr>` : ''}
           ${c.cardBs > 0 ? `<tr><td>Punto de Venta</td><td>$ ${c.cardUsd.toFixed(2)}</td><td>Bs ${c.cardBs.toFixed(2)}</td></tr>` : ''}
+          ${(c.biopagoBs || 0) > 0 ? `<tr><td>Biopago</td><td>$ ${(c.biopagoUsd || 0).toFixed(2)}</td><td>Bs ${(c.biopagoBs || 0).toFixed(2)}</td></tr>` : ''}
           ${c.zelleBs > 0 ? `<tr><td>Zelle ($)</td><td style="text-align:right">$ ${c.zelleUsd.toFixed(2)}</td><td style="text-align:right">Bs ${c.zelleBs.toFixed(2)}</td></tr>` : ''}
           ${c.usdtBs > 0 ? `<tr><td>USDT ($)</td><td style="text-align:right">$ ${c.usdtUsd.toFixed(2)}</td><td style="text-align:right">Bs ${c.usdtBs.toFixed(2)}</td></tr>` : ''}
           ${c.creditSalesBs > 0 ? `<tr><td>Crédito</td><td>$ ${c.creditSalesUsd.toFixed(2)}</td><td>Bs ${c.creditSalesBs.toFixed(2)}</td></tr>` : ''}
@@ -347,9 +350,9 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
           <div>$ ${(c.efectivoUsdUsd || 0).toFixed(2)} (Bs ${(c.efectivoUsdBs || 0).toFixed(2)})</div>
         </div>` : ''}
         <div style="border-left:3px solid #3b82f6;padding-left:6px;margin-bottom:4px;background:#eff6ff;border-radius:0 4px 4px 0">
-          <div style="font-weight:bold;color:#1d4ed8">Bs ELECTRONICOS (Punto Venta + Transferencia + Pago Movil)</div>
-          <div>Pto.Venta: Bs ${(c.cardBs || 0).toFixed(2)} | Transf: Bs ${(c.transferBs || 0).toFixed(2)} | PM: Bs ${(c.mobileBs || 0).toFixed(2)}</div>
-          <div style="font-weight:bold">Subtotal: Bs ${((c.cardBs || 0) + (c.transferBs || 0) + (c.mobileBs || 0)).toFixed(2)}</div>
+          <div style="font-weight:bold;color:#1d4ed8">Bs ELECTRONICOS (Punto Venta + Biopago + Transferencia + Pago Movil)</div>
+          <div>Pto.Venta: Bs ${(c.cardBs || 0).toFixed(2)} | Biopago: Bs ${(c.biopagoBs || 0).toFixed(2)} | Transf: Bs ${(c.transferBs || 0).toFixed(2)} | PM: Bs ${(c.mobileBs || 0).toFixed(2)}</div>
+          <div style="font-weight:bold">Subtotal: Bs ${((c.cardBs || 0) + (c.biopagoBs || 0) + (c.transferBs || 0) + (c.mobileBs || 0)).toFixed(2)}</div>
         </div>
         <div style="border-left:3px solid #a855f7;padding-left:6px;margin-bottom:4px;background:#faf5ff;border-radius:0 4px 4px 0">
           <div style="font-weight:bold;color:#7e22ce">DIVISAS DIGITALES (Zelle + USDT)</div>
@@ -364,7 +367,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
           </div>
           <div style="display:flex;justify-content:space-between">
             <span style="color:#1d4ed8">Bolivares (Bs electronicos + Efectivo Bs):</span>
-            <span style="font-weight:bold">Bs ${((c.cardBs || 0) + (c.transferBs || 0) + (c.mobileBs || 0) + c.cashBs).toFixed(2)}</span>
+            <span style="font-weight:bold">Bs ${((c.cardBs || 0) + (c.biopagoBs || 0) + (c.transferBs || 0) + (c.mobileBs || 0) + c.cashBs).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -919,6 +922,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                 <h4 className="font-semibold mb-2">Desglose por Metodo de Pago</h4>
                 {formatPaymentRow("Efectivo", selectedClosing.cashUsd, selectedClosing.cashBs)}
                 {formatPaymentRow("Punto de Venta", selectedClosing.cardUsd, selectedClosing.cardBs)}
+                {formatPaymentRow("Biopago", selectedClosing.biopagoUsd || 0, selectedClosing.biopagoBs || 0)}
                 {formatPaymentRow("Cheque", selectedClosing.checkUsd, selectedClosing.checkBs)}
                 {formatPaymentRow("Transferencia", selectedClosing.transferUsd, selectedClosing.transferBs)}
                 {formatPaymentRow("Pago Movil", selectedClosing.mobileUsd, selectedClosing.mobileBs)}
@@ -935,9 +939,10 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                   const effBs = g?.efectivoFisico?.efectivoBs || { bs: selectedClosing.cashBs, usd: selectedClosing.cashUsd };
                   const effUsd = g?.efectivoFisico?.efectivoUsd || { bs: 0, usd: 0 };
                   const bse = g?.bsElectronicos || {
-                    bs: (selectedClosing.cardBs || 0) + (selectedClosing.transferBs || 0) + (selectedClosing.mobileBs || 0),
-                    usd: (selectedClosing.cardUsd || 0) + (selectedClosing.transferUsd || 0) + (selectedClosing.mobileUsd || 0),
+                    bs: (selectedClosing.cardBs || 0) + (selectedClosing.biopagoBs || 0) + (selectedClosing.transferBs || 0) + (selectedClosing.mobileBs || 0),
+                    usd: (selectedClosing.cardUsd || 0) + (selectedClosing.biopagoUsd || 0) + (selectedClosing.transferUsd || 0) + (selectedClosing.mobileUsd || 0),
                     puntoVenta: { bs: selectedClosing.cardBs || 0, usd: selectedClosing.cardUsd || 0 },
+                    biopago: { bs: selectedClosing.biopagoBs || 0, usd: selectedClosing.biopagoUsd || 0 },
                     transferencia: { bs: selectedClosing.transferBs || 0, usd: selectedClosing.transferUsd || 0 },
                     pagoMovil: { bs: selectedClosing.mobileBs || 0, usd: selectedClosing.mobileUsd || 0 },
                   };
@@ -967,7 +972,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                     {/* Bs ELECTRÓNICOS */}
                     <div className="border-l-4 border-blue-500 pl-2 bg-blue-50 rounded-r">
                       <div className="font-semibold text-xs text-blue-700">🔵 Bs ELECTRÓNICOS</div>
-                      <div className="text-xs">Pto.Venta: Bs {bse.puntoVenta.bs.toFixed(2)} | Transf: Bs {bse.transferencia.bs.toFixed(2)} | PM: Bs {bse.pagoMovil.bs.toFixed(2)}</div>
+                      <div className="text-xs">Pto.Venta: Bs {bse.puntoVenta.bs.toFixed(2)} | Biopago: Bs {(bse.biopago?.bs || 0).toFixed(2)} | Transf: Bs {bse.transferencia.bs.toFixed(2)} | PM: Bs {bse.pagoMovil.bs.toFixed(2)}</div>
                       <div className="text-xs font-medium">Subtotal: Bs {bse.bs.toFixed(2)} (${bse.usd.toFixed(2)})</div>
                     </div>
                     {/* DIVISAS DIGITALES */}
@@ -996,6 +1001,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                         <p className="text-[9px] font-bold text-blue-800 uppercase tracking-wide">Bolivares (Bs electronicos + Efectivo Bs):</p>
                         <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Efectivo Bs (contar):</span><span className="text-right font-semibold">Bs {effBs.bs.toFixed(2)}</span></div>
                         {bse.puntoVenta.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Punto Venta (ver terminal):</span><span className="text-right font-semibold">Bs {bse.puntoVenta.bs.toFixed(2)}</span></div>}
+                        {(bse.biopago?.bs || 0) > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Biopago (ver terminal):</span><span className="text-right font-semibold">Bs {(bse.biopago?.bs || 0).toFixed(2)}</span></div>}
                         {bse.transferencia.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Transferencia (ver banco):</span><span className="text-right font-semibold">Bs {bse.transferencia.bs.toFixed(2)}</span></div>}
                         {bse.pagoMovil.bs > 0 && <div className="grid grid-cols-2 gap-1 text-[9px]"><span className="text-muted-foreground">Pago Movil (ver banco):</span><span className="text-right font-semibold">Bs {bse.pagoMovil.bs.toFixed(2)}</span></div>}
                         <div className="flex justify-between text-[10px] bg-blue-100/60 rounded px-1.5 py-0.5">

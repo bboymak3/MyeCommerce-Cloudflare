@@ -11,6 +11,7 @@ const METHOD_LABELS: Record<string, string> = {
   transferencia: 'Transferencia',
   'pago-movil': 'Pago Movil',
   'punto-de-venta': 'Punto de Venta',
+  biopago: 'Biopago',
   cashea: 'Cashea',
   cheque: 'Cheque',
   zelle: 'Zelle',
@@ -66,7 +67,7 @@ function extractReferences(sales: any[]): Array<{ saleId: string; method: string
       day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Caracas"
     });
     const customerName = s.customerName || 'Cliente Final';
-    const refMethods = ['zelle', 'usdt', 'transferencia', 'pago-movil', 'punto-de-venta'];
+    const refMethods = ['zelle', 'usdt', 'transferencia', 'pago-movil', 'punto-de-venta', 'biopago'];
 
     if (refMethods.includes(s.paymentMethod.toLowerCase())) {
       refs.push({
@@ -116,6 +117,7 @@ function rebuildLegacyBreakdown(closing: any): Record<string, { usd: number; bs:
   if (closing.cashBs > 0 || closing.cashUsd > 0) b.efectivo = { usd: closing.cashUsd, bs: closing.cashBs, count: 0 };
   if ((closing as any).efectivoUsdBs > 0 || (closing as any).efectivoUsdUsd > 0) b['efectivo-usd'] = { usd: (closing as any).efectivoUsdUsd, bs: (closing as any).efectivoUsdBs, count: 0 };
   if (closing.cardBs > 0 || closing.cardUsd > 0) b['punto-de-venta'] = { usd: closing.cardUsd, bs: closing.cardBs, count: 0 };
+  if (closing.biopagoBs > 0 || closing.biopagoUsd > 0) b.biopago = { usd: closing.biopagoUsd, bs: closing.biopagoBs, count: 0 };
   if (closing.transferBs > 0 || closing.transferUsd > 0) b.transferencia = { usd: closing.transferUsd, bs: closing.transferBs, count: 0 };
   if (closing.mobileBs > 0 || closing.mobileUsd > 0) b['pago-movil'] = { usd: closing.mobileUsd, bs: closing.mobileBs, count: 0 };
   if (closing.checkBs > 0 || closing.checkUsd > 0) b.cheque = { usd: closing.checkUsd, bs: closing.checkBs, count: 0 };
@@ -139,9 +141,10 @@ function calcGroups(breakdown: Record<string, { usd: number; bs: number; count: 
       efectivoUsd: { bs: get('efectivo-usd').bs, usd: get('efectivo-usd').usd },
     },
     bsElectronicos: {
-      bs: get('punto-de-venta').bs + get('transferencia').bs + get('pago-movil').bs,
-      usd: get('punto-de-venta').usd + get('transferencia').usd + get('pago-movil').usd,
+      bs: get('punto-de-venta').bs + get('biopago').bs + get('transferencia').bs + get('pago-movil').bs,
+      usd: get('punto-de-venta').usd + get('biopago').usd + get('transferencia').usd + get('pago-movil').usd,
       puntoVenta: { bs: get('punto-de-venta').bs, usd: get('punto-de-venta').usd },
+      biopago: { bs: get('biopago').bs, usd: get('biopago').usd },
       transferencia: { bs: get('transferencia').bs, usd: get('transferencia').usd },
       pagoMovil: { bs: get('pago-movil').bs, usd: get('pago-movil').usd },
     },
@@ -317,6 +320,8 @@ export async function POST(req: NextRequest) {
           cashBs: get('efectivo').bs,
           cardUsd: get('punto-de-venta').usd,
           cardBs: get('punto-de-venta').bs,
+          biopagoUsd: get('biopago').usd,
+          biopagoBs: get('biopago').bs,
           transferUsd: get('transferencia').usd,
           transferBs: get('transferencia').bs,
           mobileUsd: get('pago-movil').usd,
@@ -375,6 +380,8 @@ export async function POST(req: NextRequest) {
         cashBs: get('efectivo').bs,
         cardUsd: get('punto-de-venta').usd,
         cardBs: get('punto-de-venta').bs,
+        biopagoUsd: get('biopago').usd,
+        biopagoBs: get('biopago').bs,
         transferUsd: get('transferencia').usd,
         transferBs: get('transferencia').bs,
         mobileUsd: get('pago-movil').usd,

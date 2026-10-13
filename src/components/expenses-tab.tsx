@@ -71,6 +71,7 @@ const PAYMENT_METHODS = [
   { value: "zelle", label: "Zelle" },
   { value: "usdt", label: "USDT" },
   { value: "punto", label: "Punto de Venta" },
+  { value: "biopago", label: "Biopago" },
   { value: "otro", label: "Otro" },
 ];
 

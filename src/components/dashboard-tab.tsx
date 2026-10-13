@@ -51,6 +51,7 @@ const METHOD_LABELS: Record<string, string> = {
   transferencia: "Transferencia",
   'pago-movil': "Pago Movil",
   'punto-de-venta': "Punto de Venta",
+  biopago: "Biopago",
   cheque: "Cheque",
   mixto: "Mixto",
 };
@@ -266,12 +267,13 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
                   const effBs = paymentBreakdown["efectivo"] || { count: 0, totalUsd: 0, totalBs: 0 };
                   const effUsd = paymentBreakdown["efectivo-usd"] || { count: 0, totalUsd: 0, totalBs: 0 };
                   const pdv = paymentBreakdown["punto-de-venta"] || { count: 0, totalUsd: 0, totalBs: 0 };
+                  const bio = paymentBreakdown["biopago"] || { count: 0, totalUsd: 0, totalBs: 0 };
                   const transf = paymentBreakdown["transferencia"] || { count: 0, totalUsd: 0, totalBs: 0 };
                   const pm = paymentBreakdown["pago-movil"] || { count: 0, totalUsd: 0, totalBs: 0 };
                   const zelle = paymentBreakdown["zelle"] || { count: 0, totalUsd: 0, totalBs: 0 };
                   const usdt = paymentBreakdown["usdt"] || { count: 0, totalUsd: 0, totalBs: 0 };
                   const totalUsdMethods = effUsd.totalUsd + zelle.totalUsd + usdt.totalUsd;
-                  const totalBsMethods = effBs.totalBs + pdv.totalBs + transf.totalBs + pm.totalBs;
+                  const totalBsMethods = effBs.totalBs + pdv.totalBs + bio.totalBs + transf.totalBs + pm.totalBs;
                   return (
                     <>
                       {Object.entries(paymentBreakdown)

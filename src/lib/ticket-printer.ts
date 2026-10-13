@@ -26,6 +26,7 @@ export const TICKET_PAYMENT_LABELS: Record<string, string> = {
   transferencia: 'Transferencia',
   'pago-movil': 'Pago Movil',
   'punto-de-venta': 'Punto de Venta',
+  biopago: 'Biopago',
   cashea: 'Cashea',
   zelle: 'Zelle ($)',
   usdt: 'USDT ($)',

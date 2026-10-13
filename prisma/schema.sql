@@ -279,6 +279,8 @@ CREATE TABLE IF NOT EXISTS "pos_cash_closings" (
     "zelleBs" REAL NOT NULL DEFAULT 0,
     "usdtUsd" REAL NOT NULL DEFAULT 0,
     "usdtBs" REAL NOT NULL DEFAULT 0,
+    "biopagoUsd" REAL NOT NULL DEFAULT 0,
+    "biopagoBs" REAL NOT NULL DEFAULT 0,
     "breakdownJson" TEXT NOT NULL DEFAULT '{}',
     "exchangeRate" REAL NOT NULL DEFAULT 0,
     "observations" TEXT NOT NULL DEFAULT '',

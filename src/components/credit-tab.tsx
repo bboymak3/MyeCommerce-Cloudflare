@@ -81,6 +81,7 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
     { value: "transferencia", label: "Transferencia" },
     { value: "pago-movil", label: "Pago Movil" },
     { value: "punto-de-venta", label: "Punto de Venta" },
+    { value: "biopago", label: "Biopago" },
     { value: "zelle", label: "Zelle ($)" },
     { value: "usdt", label: "USDT ($)" },
   ];
@@ -91,6 +92,7 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
     transferencia: "Transferencia",
     "pago-movil": "Pago Movil",
     "punto-de-venta": "Punto de Venta",
+    biopago: "Biopago",
     zelle: "Zelle ($)",
     usdt: "USDT ($)",
     // Legacy keys from older abonos
