@@ -327,7 +327,7 @@ export default function ClientsTab({ bcvRate, currency, storeRif, storeName, sto
     } catch { toast.error('Error al reimprimir'); }
   };
 
-  const PAYMENT_LABELS: any = { efectivo: "Efectivo", 'efectivo-usd': "Efectivo ($)", tarjeta: "Tarjeta", transferencia: "Transferencia", "pago-movil": "Pago Movil", "punto-de-venta": "Punto de Venta", mixto: "Mixto", credito: "Credito", cashea: "Cashea", cheque: "Cheque" };
+  const PAYMENT_LABELS: any = { efectivo: "Efectivo", 'efectivo-usd': "Efectivo ($)", tarjeta: "Tarjeta", transferencia: "Transferencia", "pago-movil": "Pago Movil", "punto-de-venta": "Punto de Venta", biopago: "Biopago", mixto: "Mixto", credito: "Credito", cashea: "Cashea", cheque: "Cheque" };
 
   const loadClients = async (searchTerm?: string) => {
     try {

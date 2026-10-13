@@ -89,6 +89,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   transferencia: "Transferencia",
   "pago-movil": "Pago Movil",
   "punto-de-venta": "Punto de Venta",
+  biopago: "Biopago",
   mixto: "Mixto",
   cheque: "Cheque",
   credito: "Credito",
@@ -1188,13 +1189,13 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
       {/* ====== ENTRADAS AGRUPADAS ====== */}
       {(() => {
         // USD methods (efectivo-usd, zelle, usdt): el totalUsd es el valor real, NO se recalcula con tasa actual
-        // Bs methods (efectivo, transferencia, pago-movil, punto-de-venta): totalBs es fijo, totalUsd se calcula con tasa al momento de la venta
+        // Bs methods (efectivo, transferencia, pago-movil, punto-de-venta, biopago): totalBs es fijo, totalUsd se calcula con tasa al momento de la venta
         const efectivoFisicoBs_totalBs = (paymentBreakdown["efectivo"]?.totalBs || 0);
         const efectivoFisicoBs_totalUsd = (paymentBreakdown["efectivo"]?.totalUsd || 0);
         const efectivoFisicoUsd_totalUsd = (paymentBreakdown["efectivo-usd"]?.totalUsd || 0);
         const efectivoFisicoUsd_totalBs = (paymentBreakdown["efectivo-usd"]?.totalBs || 0);
-        const bsElectronicos_totalBs = (paymentBreakdown["punto-de-venta"]?.totalBs || 0) + (paymentBreakdown["transferencia"]?.totalBs || 0) + (paymentBreakdown["pago-movil"]?.totalBs || 0);
-        const bsElectronicos_totalUsd = (paymentBreakdown["punto-de-venta"]?.totalUsd || 0) + (paymentBreakdown["transferencia"]?.totalUsd || 0) + (paymentBreakdown["pago-movil"]?.totalUsd || 0);
+        const bsElectronicos_totalBs = (paymentBreakdown["punto-de-venta"]?.totalBs || 0) + (paymentBreakdown["biopago"]?.totalBs || 0) + (paymentBreakdown["transferencia"]?.totalBs || 0) + (paymentBreakdown["pago-movil"]?.totalBs || 0);
+        const bsElectronicos_totalUsd = (paymentBreakdown["punto-de-venta"]?.totalUsd || 0) + (paymentBreakdown["biopago"]?.totalUsd || 0) + (paymentBreakdown["transferencia"]?.totalUsd || 0) + (paymentBreakdown["pago-movil"]?.totalUsd || 0);
         const divisasDigitales_totalUsd = (paymentBreakdown["zelle"]?.totalUsd || 0) + (paymentBreakdown["usdt"]?.totalUsd || 0);
         const divisasDigitales_totalBs = (paymentBreakdown["zelle"]?.totalBs || 0) + (paymentBreakdown["usdt"]?.totalBs || 0);
         const totalEntradasBs = efectivoFisicoBs_totalBs + efectivoFisicoUsd_totalBs + bsElectronicos_totalBs + divisasDigitales_totalBs;
@@ -1238,6 +1239,10 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                     <div className="flex justify-between bg-blue-50/50 rounded px-2 py-1">
                       <span className="text-muted-foreground">Punto de Venta</span>
                       <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["punto-de-venta"]?.totalBs || 0).toFixed(2)} <span className="text-muted-foreground">(${(paymentBreakdown["punto-de-venta"]?.totalUsd || 0).toFixed(2)})</span></span>
+                    </div>
+                    <div className="flex justify-between bg-blue-50/50 rounded px-2 py-1">
+                      <span className="text-muted-foreground">Biopago</span>
+                      <span className="font-semibold text-blue-700">Bs {(paymentBreakdown["biopago"]?.totalBs || 0).toFixed(2)} <span className="text-muted-foreground">(${(paymentBreakdown["biopago"]?.totalUsd || 0).toFixed(2)})</span></span>
                     </div>
                     <div className="flex justify-between bg-blue-50/50 rounded px-2 py-1">
                       <span className="text-muted-foreground">Transferencia</span>
@@ -1303,7 +1308,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                   <Separator className="my-1" />
                   {/* BOLIVARES: lo que el admin debe contar/cotejar en Bs */}
                   <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Bolivares (Efectivo Bs + Transferencia + Pago Movil + Punto de Venta):</p>
+                    <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">Bolivares (Efectivo Bs + Transferencia + Pago Movil + Punto de Venta + Biopago):</p>
                     <div className="grid grid-cols-3 gap-1 text-[10px]">
                       <span className="text-muted-foreground">Efectivo Bs:</span>
                       <span className="text-right font-semibold">Bs {efectivoFisicoBs_totalBs.toFixed(2)}</span>
@@ -1312,6 +1317,11 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                     <div className="grid grid-cols-3 gap-1 text-[10px]">
                       <span className="text-muted-foreground">Punto de Venta:</span>
                       <span className="text-right font-semibold">Bs {(paymentBreakdown["punto-de-venta"]?.totalBs || 0).toFixed(2)}</span>
+                      <span className="text-right text-muted-foreground">(ver terminal)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-[10px]">
+                      <span className="text-muted-foreground">Biopago:</span>
+                      <span className="text-right font-semibold">Bs {(paymentBreakdown["biopago"]?.totalBs || 0).toFixed(2)}</span>
                       <span className="text-right text-muted-foreground">(ver terminal)</span>
                     </div>
                     <div className="grid grid-cols-3 gap-1 text-[10px]">

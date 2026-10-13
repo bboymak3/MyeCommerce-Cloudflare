@@ -335,6 +335,8 @@ model CashClosing {
   zelleBs           Float    @default(0)
   usdtUsd           Float    @default(0)
   usdtBs            Float    @default(0)
+  biopagoUsd        Float    @default(0)
+  biopagoBs         Float    @default(0)
   breakdownJson     String   @default("{}")
   exchangeRate    Float    @default(0)
   observations    String   @default("")
