@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { D1Batch } from '@/lib/d1-batch';
 
 // GET /api/supplier-payments — cuentas por pagar (proveedores con deuda) o el detalle de una compra
 export async function GET(req: NextRequest) {
@@ -98,38 +99,26 @@ export async function POST(req: NextRequest) {
       if (supplier) supplierBalance = Number(supplier.payableBalance || 0);
     }
 
-    const ops: any[] = [];
-
-    ops.push(db.supplierPayment.create({
-      data: {
-        purchaseId: body.purchaseId,
-        supplierId: purchase.supplierId || null,
-        date: new Date(),
-        amount: finalAmount,
-        exchangeRate,
-        amountBs: Number((finalAmount * exchangeRate).toFixed(2)),
-        method: body.method || 'efectivo',
-        reference: body.reference || '',
-        notes: body.notes || '',
-        createdBy: req.headers.get('x-username') || body.createdBy || '',
-      },
-    }));
-
-    ops.push(db.purchase.update({
-      where: { id: body.purchaseId },
-      data: { paidAmount: Number((Number(purchase.paidAmount || 0) + finalAmount).toFixed(2)) },
-    }));
-
+    // Escrituras en un lote atomico de D1 (saldos calculados en la base de datos)
+    const batch = new D1Batch((env as any).DB, tenantId);
+    const paymentId = batch.insert('pos_supplier_payments', {
+      purchaseId: body.purchaseId,
+      supplierId: purchase.supplierId || null,
+      date: new Date(),
+      amount: finalAmount,
+      exchangeRate,
+      amountBs: Number((finalAmount * exchangeRate).toFixed(2)),
+      method: body.method || 'efectivo',
+      reference: body.reference || '',
+      notes: body.notes || '',
+      createdBy: req.headers.get('x-username') || body.createdBy || '',
+    });
+    batch.raw('UPDATE "pos_purchases" SET "paidAmount" = ROUND("paidAmount" + ?, 2), "updatedAt" = ? WHERE "id" = ? AND "tenant_id" = ?', finalAmount, new Date(), body.purchaseId);
     if (purchase.supplierId && supplierBalance !== null) {
-      const newBalance = Math.max(0, supplierBalance - finalAmount);
-      ops.push(db.supplier.update({
-        where: { id: purchase.supplierId },
-        data: { payableBalance: Number(newBalance.toFixed(2)) },
-      }));
+      batch.raw('UPDATE "pos_suppliers" SET "payableBalance" = MAX(0, ROUND("payableBalance" - ?, 2)), "updatedAt" = ? WHERE "id" = ? AND "tenant_id" = ?', finalAmount, new Date(), purchase.supplierId);
     }
-
-    const results = await db.$transaction(ops);
-    return NextResponse.json(results[0]);
+    await batch.commit();
+    return NextResponse.json(await db.supplierPayment.findUnique({ where: { id: paymentId } }));
   } catch (error: any) {
     console.error('Error registering supplier payment:', error);
     return NextResponse.json({ error: 'Error al registrar abono' }, { status: 500 });

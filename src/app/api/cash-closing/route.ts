@@ -2,13 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-
-// Obtiene la fecha/hora actual en Venezuela (UTC-4)
-function getVenezuelaNow(): Date {
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  return new Date(utc - 4 * 3600000); // UTC-4
-}
+import { veDateKey, veDayStart, veDayEnd } from '@/lib/ve-time';
 
 // ─── Labels de metodos de pago ─────────────────────────────────────
 const METHOD_LABELS: Record<string, string> = {
@@ -69,7 +63,7 @@ function extractReferences(sales: any[]): Array<{ saleId: string; method: string
   const refs: Array<any> = [];
   sales.forEach((s) => {
     const saleDate = new Date(s.date).toLocaleString("es-VE", {
-      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Caracas"
     });
     const customerName = s.customerName || 'Cliente Final';
     const refMethods = ['zelle', 'usdt', 'transferencia', 'pago-movil', 'punto-de-venta'];
@@ -172,11 +166,9 @@ export async function GET(req: NextRequest) {
 
     // Preview: obtener estimado del cierre sin crearlo
     if (preview === 'true') {
-      const previewDate = searchParams.get('date') || new Date().toISOString().slice(0, 10);
-      const pStart = new Date(previewDate);
-      pStart.setHours(0, 0, 0, 0);
-      const pEnd = new Date(previewDate);
-      pEnd.setHours(23, 59, 59, 999);
+      const previewDate = searchParams.get('date') || veDateKey();
+      const pStart = veDayStart(previewDate);
+      const pEnd = veDayEnd(previewDate);
 
       const sales = await db.sale.findMany({ where: { date: { gte: pStart, lte: pEnd } } });
       const devolutions = await db.devolution.findMany({ where: { date: { gte: pStart, lte: pEnd } } });
@@ -214,11 +206,11 @@ export async function GET(req: NextRequest) {
         toDate = new Date(closing.createdAt);
         toDate = new Date(toDate.getTime() + 2000);
       } else {
-        const startOfDay = new Date(closing.date);
-        startOfDay.setHours(0, 0, 0, 0);
-        fromDate = startOfDay;
-        toDate = new Date(closing.date);
-        toDate.setHours(23, 59, 59, 999);
+        // El cierre final guarda el inicio del dia (00:00 de Caracas, o 00:00 UTC en
+        // cierres anteriores): en ambos casos su fecha UTC es el dia del cierre.
+        const day = new Date(closing.date).toISOString().slice(0, 10);
+        fromDate = veDayStart(day);
+        toDate = veDayEnd(day);
       }
 
       const sales = await db.sale.findMany({
@@ -254,7 +246,7 @@ export async function GET(req: NextRequest) {
     // Listado normal de cierres
     const closings = await db.cashClosing.findMany({
       where: {
-        ...(startDate && endDate ? { date: { gte: new Date(startDate), lte: new Date(endDate + 'T23:59:59') } } : {}),
+        ...(startDate && endDate ? { date: { gte: veDayStart(startDate), lte: veDayEnd(endDate) } } : {}),
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -270,13 +262,16 @@ export async function POST(req: NextRequest) {
   const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
   try {
     const body = await req.json() as any;
-    const date = body.date ? new Date(body.date) : new Date();
+    // Dia del cierre en hora de Venezuela ('YYYY-MM-DD'; por defecto, hoy)
+    const day = typeof body.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.date)
+      ? body.date
+      : veDateKey(body.date ? new Date(body.date) : new Date());
     const closingType = body.closingType || 'final';
     const sellerName = body.sellerName || '';
     const sellerRole = body.sellerRole || '';
 
-    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+    const startOfDay = veDayStart(day);
+    const endOfDay = veDayEnd(day);
 
     if (closingType === 'pre') {
       // ===== PRE-CIERRE =====
@@ -286,7 +281,7 @@ export async function POST(req: NextRequest) {
       });
 
       const fromDate = lastPreClosing ? lastPreClosing.createdAt : startOfDay;
-      const toDate = getVenezuelaNow();
+      const toDate = new Date();
 
       const sales = await db.sale.findMany({ where: { date: { gte: fromDate, lte: toDate } }, include: { items: true } });
       const devolutions = await db.devolution.findMany({ where: { date: { gte: fromDate, lte: toDate } } });

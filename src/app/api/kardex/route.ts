@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n) ? fb : n; };
 
@@ -24,13 +25,13 @@ export async function GET(req: NextRequest) {
     const dateFilter: any = {};
     if (startDate && endDate) {
       dateFilter.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate + 'T23:59:59'),
+        gte: veDayStart(startDate),
+        lte: veDayEnd(endDate),
       };
     } else if (startDate) {
-      dateFilter.date = { gte: new Date(startDate) };
+      dateFilter.date = { gte: veDayStart(startDate) };
     } else if (endDate) {
-      dateFilter.date = { lte: new Date(endDate + 'T23:59:59') };
+      dateFilter.date = { lte: veDayEnd(endDate) };
     }
 
     // Fetch movements in chronological order

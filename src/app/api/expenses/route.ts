@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 // GET — Listar gastos con filtros
 export async function GET(req: NextRequest) {
@@ -18,13 +19,13 @@ export async function GET(req: NextRequest) {
 
     if (startDate && endDate) {
       where.date = {
-        gte: new Date(startDate),
-        lte: new Date(endDate + 'T23:59:59.999'),
+        gte: veDayStart(startDate),
+        lte: veDayEnd(endDate),
       };
     } else if (startDate) {
-      where.date = { gte: new Date(startDate) };
+      where.date = { gte: veDayStart(startDate) };
     } else if (endDate) {
-      where.date = { lte: new Date(endDate + 'T23:59:59.999') };
+      where.date = { lte: veDayEnd(endDate) };
     }
 
     if (categoryId) where.categoryId = categoryId;

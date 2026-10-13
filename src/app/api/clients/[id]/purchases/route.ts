@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 export async function GET(
   req: NextRequest,
@@ -19,8 +20,8 @@ export async function GET(
 
     if (dateFrom || dateTo) {
       where.date = {};
-      if (dateFrom) where.date.gte = new Date(dateFrom + 'T00:00:00');
-      if (dateTo) where.date.lte = new Date(dateTo + 'T23:59:59');
+      if (dateFrom) where.date.gte = veDayStart(dateFrom);
+      if (dateTo) where.date.lte = veDayEnd(dateTo);
     }
 
     const sales = await db.sale.findMany({

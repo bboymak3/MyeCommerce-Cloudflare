@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 // GET — Reporte de Utilidad / Pérdida por periodo
 export async function GET(req: NextRequest) {
@@ -16,8 +17,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Las fechas de inicio y fin son requeridas' }, { status: 400 });
     }
 
-    const start = new Date(startDate);
-    const end = new Date(endDate + 'T23:59:59.999');
+    const start = veDayStart(startDate);
+    const end = veDayEnd(endDate);
 
     // Obtener tasa de cambio actual
     const settings = await db.settings.findFirst();

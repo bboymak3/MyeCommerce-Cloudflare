@@ -2,6 +2,8 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { D1Batch, sqlExpr } from '@/lib/d1-batch';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get('endDate');
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '100') || 100, 1), 1000);
     const sales = await db.sale.findMany({
-      where: { ...(startDate && endDate ? { date: { gte: new Date(startDate), lte: new Date(endDate + 'T23:59:59') } } : {}) },
+      where: { ...(startDate && endDate ? { date: { gte: veDayStart(startDate), lte: veDayEnd(endDate) } } : {}) },
       include: { items: { include: { product: true } }, client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } }, _count: { select: { creditPayments: true } } },
       orderBy: { date: 'desc' }, take: limit,
     });
@@ -72,18 +74,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // D1 BATCH TRANSACTION: all reads BEFORE transaction, then all writes as a batch
-
-    // 1. Generate sequential invoice number (8-digit zero-padded) — READ FIRST
-    const lastSale = await db.sale.findFirst({
-      orderBy: { createdAt: 'desc' },
-      select: { invoiceNumber: true },
-    });
-    let nextNum = 1;
-    if (lastSale && lastSale.invoiceNumber) {
-      nextNum = parseInt(lastSale.invoiceNumber, 10) + 1;
-    }
-    const invoiceNumber = String(nextNum).padStart(8, '0');
+    // Lecturas primero; despues todas las escrituras en un lote atomico de D1
 
     // 2. Read product costs and last inventory movements for kardex — READS FIRST
     const sName = body.sellerName || '';
@@ -134,75 +125,84 @@ export async function POST(req: NextRequest) {
     }
     if (!loyaltyEnabled) { pointsEarned = 0; pointsRedeemed = 0; }
 
-    // 4. Build batch write operations
-    const ops: any[] = [];
+    // 4. Escrituras: venta, items, stock, kardex y cliente en un solo lote atomico.
+    // El numero de factura (correlativo de 8 digitos) lo calcula D1 dentro del lote:
+    // los lotes se ejecutan uno tras otro, asi que dos cajas nunca reciben el mismo.
+    const d1 = (env as any).DB as D1Database;
+    const nextInvoice = sqlExpr(
+      `SELECT printf('%08d', COALESCE(MAX(CAST("invoiceNumber" AS INTEGER)), 0) + 1) FROM "pos_sales" WHERE "tenant_id" = ?`,
+      tenantId,
+    );
+    const batch = new D1Batch(d1, tenantId);
+    const saleId = batch.insert('pos_sales', {
+      date: now,
+      subtotal,
+      taxAmount: parseFloat(body.taxAmount || 0),
+      discount,
+      total,
+      totalBs: parseFloat(body.totalBs),
+      exchangeRate: parseFloat(body.exchangeRate),
+      paymentMethod: body.paymentMethod || 'efectivo',
+      referenceNumber: body.referenceNumber || '',
+      mixedPaymentJson: body.mixedPaymentJson || '',
+      customerName: body.customerName || '',
+      clientDocType: body.clientDocType || '',
+      clientDocNumber: body.clientDocNumber || '',
+      clientName: body.clientName || '',
+      clientAddress: body.clientAddress || '',
+      sellerName: body.sellerName || '',
+      sellerRole: body.sellerRole || '',
+      notes: body.notes || '',
+      clientId: body.clientId || null,
+      isCredit: !!body.isCredit,
+      creditPaid: body.isCredit ? 0 : undefined,
+      creditDays: body.isCredit ? (parseInt(body.creditDays) || 30) : undefined,
+      creditDueDate: body.isCredit ? (() => { const d = new Date(); d.setDate(d.getDate() + (parseInt(body.creditDays) || 30)); return d; })() : undefined,
+      invoiceNumber: nextInvoice,
+      shiftId: openShift?.id || null,
+      pointsEarned,
+      pointsRedeemed,
+      createdAt: now,
+    });
 
-    // Create sale (op index 0)
-    ops.push(db.sale.create({
-      data: {
-        date: now,
-        subtotal,
-        taxAmount: parseFloat(body.taxAmount || 0),
-        discount,
-        total,
-        totalBs: parseFloat(body.totalBs),
-        exchangeRate: parseFloat(body.exchangeRate),
-        paymentMethod: body.paymentMethod || 'efectivo',
-        referenceNumber: body.referenceNumber || '',
-        mixedPaymentJson: body.mixedPaymentJson || '',
-        customerName: body.customerName || '',
-        clientDocType: body.clientDocType || '',
-        clientDocNumber: body.clientDocNumber || '',
-        clientName: body.clientName || '',
-        clientAddress: body.clientAddress || '',
-        sellerName: body.sellerName || '',
-        sellerRole: body.sellerRole || '',
-        notes: body.notes || '',
-        clientId: body.clientId || null,
-        isCredit: body.isCredit || false,
-        creditPaid: body.isCredit ? 0 : undefined,
-        creditDays: body.isCredit ? (parseInt(body.creditDays) || 30) : undefined,
-        creditDueDate: body.isCredit ? (() => { const d = new Date(); d.setDate(d.getDate() + (parseInt(body.creditDays) || 30)); return d; })() : undefined,
-        invoiceNumber,
-        shiftId: openShift?.id || null,
-        pointsEarned,
-        pointsRedeemed,
-        items: { create: body.items.map((item: any) => ({ productId: item.productId, quantity: parseFloat(item.quantity), unitPrice: parseFloat(item.unitPrice), total: parseFloat(item.total) })) },
-      },
-      include: { items: { include: { product: { select: { name: true, vendePorPeso: true, unidadPeso: true } } } }, client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } }, _count: { select: { creditPayments: true } } },
-    }));
-
-    // Decrement stock for each item
     for (const item of body.items) {
-      const qty = parseFloat(item.quantity);
-      ops.push(db.product.update({ where: { id: item.productId }, data: { stock: { decrement: qty } } }));
+      batch.insert('pos_sale_items', {
+        saleId,
+        productId: item.productId,
+        quantity: parseFloat(item.quantity),
+        unitPrice: parseFloat(item.unitPrice),
+        total: parseFloat(item.total),
+      });
+      batch.update('pos_products', item.productId, { stock: { decrement: parseFloat(item.quantity) } });
     }
 
-    // Create Kardex movements for each item (venta = salida)
-    // Note: referenceId set to '' because sale ID is not available in batch mode
+    // Kardex (venta = salida)
     for (const kd of kardexData) {
-      ops.push(db.inventoryMovement.create({
-        data: { productId: kd.productId, date: now, movementType: 'venta', concept: `Venta ${invoiceNumber}`, quantity: -kd.qty, absQuantity: kd.qty, unitCost: kd.unitCost, totalCost: kd.qty * kd.unitCost, balanceQty: kd.balQty, balanceTotalCost: kd.balTC, balanceAvgCost: kd.balAvg, userId: uId, userName: sName, userRole: sRole, referenceId: '' },
-      }));
+      batch.insert('pos_inventory_movements', {
+        productId: kd.productId, date: now, movementType: 'venta',
+        concept: sqlExpr(`SELECT 'Venta ' || "invoiceNumber" FROM "pos_sales" WHERE "id" = ?`, saleId),
+        quantity: -kd.qty, absQuantity: kd.qty, unitCost: kd.unitCost, totalCost: kd.qty * kd.unitCost,
+        balanceQty: kd.balQty, balanceTotalCost: kd.balTC, balanceAvgCost: kd.balAvg,
+        userId: uId, userName: sName, userRole: sRole, referenceId: saleId,
+      });
     }
 
-    // Actualizar cliente: saldo de credito (si aplica) y puntos de fidelidad
+    // Cliente: saldo de credito (si aplica) y puntos de fidelidad, calculados en la base
     if (body.clientId && (clientCreditBalance !== null || clientLoyaltyPoints !== null)) {
-      const clientData: any = {};
       if (body.isCredit && clientCreditBalance !== null) {
-        clientData.creditBalance = Number((clientCreditBalance + total).toFixed(2));
+        batch.raw('UPDATE "pos_clients" SET "creditBalance" = ROUND("creditBalance" + ?, 2), "updatedAt" = ? WHERE "id" = ? AND "tenant_id" = ?', total, new Date(), body.clientId);
       }
       if (loyaltyEnabled && clientLoyaltyPoints !== null && (pointsEarned > 0 || pointsRedeemed > 0)) {
-        clientData.loyaltyPoints = Math.max(0, clientLoyaltyPoints - pointsRedeemed + pointsEarned);
-      }
-      if (Object.keys(clientData).length > 0) {
-        ops.push(db.client.update({ where: { id: body.clientId }, data: clientData }));
+        batch.raw('UPDATE "pos_clients" SET "loyaltyPoints" = MAX(0, "loyaltyPoints" - ? + ?), "updatedAt" = ? WHERE "id" = ? AND "tenant_id" = ?', pointsRedeemed, pointsEarned, new Date(), body.clientId);
       }
     }
 
-    // Execute batch transaction
-    const results = await db.$transaction(ops);
-    const sale = results[0];
+    await batch.commit();
+
+    const sale = await db.sale.findUnique({
+      where: { id: saleId },
+      include: { items: { include: { product: { select: { name: true, vendePorPeso: true, unidadPeso: true } } } }, client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } }, _count: { select: { creditPayments: true } } },
+    });
 
     return NextResponse.json(sale);
   } catch (error: any) {

@@ -176,7 +176,7 @@ export async function GET(req: NextRequest) {
     const effectiveLogo = coverLogo || storeLogo;
 
     const now = new Date();
-    const dateStr = now.toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric' });
+    const dateStr = now.toLocaleDateString('es-VE', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Caracas' });
 
     // Generar HTML del catalogo
     let productsHtml = '';

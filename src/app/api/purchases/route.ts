@@ -2,6 +2,8 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { D1Batch } from '@/lib/d1-batch';
+import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
@@ -14,7 +16,7 @@ export async function GET(req: NextRequest) {
 
     const purchases = await db.purchase.findMany({
       where: {
-        ...(startDate && endDate ? { date: { gte: new Date(startDate), lte: new Date(endDate + 'T23:59:59') } } : {}),
+        ...(startDate && endDate ? { date: { gte: veDayStart(startDate), lte: veDayEnd(endDate) } } : {}),
         ...(supplierId ? { supplierId } : {}),
       },
       include: {
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
 
     // Read product data and last inventory movements for kardex — READS FIRST
     const pDate = body.date ? new Date(body.date) : new Date();
-    const pUser = req.headers.get('x-user-name') || '';
+    const pUser = req.headers.get('x-username') || '';
     const pRole = req.headers.get('x-user-role') || '';
     const pUserId = req.headers.get('x-user-id') || '';
     const kardexData: { productId: string; qty: number; unitCost: number; entryTotalCost: number; balQty: number; balTC: number; balAvg: number }[] = [];
@@ -78,129 +80,115 @@ export async function POST(req: NextRequest) {
     const isCredit = body.isCredit === true && !!body.supplierId;
     const dueDate = isCredit ? (() => { const d = new Date(); d.setDate(d.getDate() + (parseInt(body.creditDays) || 30)); return d; })() : null;
 
-    const ops: any[] = [];
-
-    // Create purchase (op index 0)
-    ops.push(db.purchase.create({
-      data: {
-        date: body.date ? new Date(body.date) : new Date(),
-        number: body.number || '',
-        supplierId: body.supplierId || null,
-        totalUsd: parseFloat(itemsTotal.toFixed(2)),
-        totalBs: parseFloat((itemsTotal * exchangeRate).toFixed(2)),
-        exchangeRate,
-        notes: body.notes || '',
-        isCredit,
-        dueDate,
-        items: {
-          create: body.items.map((item: any) => {
-            if (item.isBox) {
-              // Compra por bulto
-              const boxQty = parseFloat(item.boxQty || 0);
-              const unitsPerBox = parseFloat(item.unitsPerBox || 0);
-              const boxCost = parseFloat(item.boxCost || 0);
-              const totalUnits = boxQty * unitsPerBox;
-              const calcUnitCost = unitsPerBox > 0 ? boxCost / unitsPerBox : 0;
-              const calcMargin = parseFloat(item.calcMargin || 0);
-              const calcPrice = calcUnitCost > 0 && calcMargin > 0
-                ? calcUnitCost / (1 - calcMargin / 100)
-                : 0;
-
-              return {
-                productId: item.productId,
-                productName: item.productName || '',
-                quantity: totalUnits,
-                unitCost: parseFloat(calcUnitCost.toFixed(4)),
-                total: parseFloat((boxQty * boxCost).toFixed(2)),
-                isBox: true,
-                unitsPerBox,
-                boxQty,
-                boxCost,
-                calcUnitCost: parseFloat(calcUnitCost.toFixed(4)),
-                calcMargin,
-                calcPrice: parseFloat(calcPrice.toFixed(2)),
-              };
-            }
-            // Compra por unidad (normal)
-            const qty = parseFloat(item.quantity || 0);
-            const cost = parseFloat(item.unitCost || 0);
-            return {
-              productId: item.productId,
-              productName: item.productName || '',
-              quantity: qty,
-              unitCost: cost,
-              total: parseFloat((qty * cost).toFixed(2)),
-              isBox: false,
-            };
-          }),
-        },
-      },
-      include: { items: true, supplier: true },
-    }));
-
-    // Auto-update product stock, cost, and optionally price
+    // Escrituras en un lote atomico de D1: compra, items, stock/costos, kardex y deuda
+    const batch = new D1Batch((env as any).DB, tenantId);
+    const purchaseId = batch.insert('pos_purchases', {
+      date: pDate,
+      number: body.number || '',
+      supplierId: body.supplierId || null,
+      totalUsd: parseFloat(itemsTotal.toFixed(2)),
+      totalBs: parseFloat((itemsTotal * exchangeRate).toFixed(2)),
+      exchangeRate,
+      notes: body.notes || '',
+      isCredit,
+      dueDate,
+    });
     for (const item of body.items) {
-      if (item.productId) {
-        if (item.isBox) {
-          const boxQty = parseFloat(item.boxQty || 0);
-          const unitsPerBox = parseFloat(item.unitsPerBox || 0);
-          const boxCost = parseFloat(item.boxCost || 0);
-          const totalUnits = boxQty * unitsPerBox;
-          const calcUnitCost = unitsPerBox > 0 ? boxCost / unitsPerBox : 0;
-          const calcMargin = parseFloat(item.calcMargin || 0);
-          const calcPrice = calcUnitCost > 0 && calcMargin >= 0
-            ? calcUnitCost * (1 + calcMargin / 100) : 0;
-
-          const updateData: any = {
-            stock: { increment: totalUnits },
-            cost: parseFloat(calcUnitCost.toFixed(4)),
-          };
-          // Si se calculo precio de venta, actualizarlo tambien
-          if (calcPrice > 0) {
-            updateData.price = parseFloat(calcPrice.toFixed(2));
-            updateData.marginPercent = calcMargin;
-          }
-          // Actualizar unidades por caja si el producto tiene ese campo
-          if (unitsPerBox > 0) {
-            updateData.unitsPerBox = unitsPerBox;
-            updateData.boxPrice = boxCost;
-          }
-
-          ops.push(db.product.update({
-            where: { id: item.productId },
-            data: updateData,
-          }));
-        } else {
-          ops.push(db.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: { increment: parseFloat(item.quantity || 0) },
-              ...(item.unitCost ? { cost: parseFloat(item.unitCost) } : {}),
-            },
-          }));
-        }
+      if (item.isBox) {
+        // Compra por bulto
+        const boxQty = parseFloat(item.boxQty || 0);
+        const unitsPerBox = parseFloat(item.unitsPerBox || 0);
+        const boxCost = parseFloat(item.boxCost || 0);
+        const totalUnits = boxQty * unitsPerBox;
+        const calcUnitCost = unitsPerBox > 0 ? boxCost / unitsPerBox : 0;
+        const calcMargin = parseFloat(item.calcMargin || 0);
+        const calcPrice = calcUnitCost > 0 && calcMargin > 0
+          ? calcUnitCost / (1 - calcMargin / 100)
+          : 0;
+        batch.insert('pos_purchase_items', {
+          purchaseId,
+          productId: item.productId || null,
+          productName: item.productName || '',
+          quantity: totalUnits,
+          unitCost: parseFloat(calcUnitCost.toFixed(4)),
+          total: parseFloat((boxQty * boxCost).toFixed(2)),
+          isBox: true,
+          unitsPerBox,
+          boxQty,
+          boxCost,
+          calcUnitCost: parseFloat(calcUnitCost.toFixed(4)),
+          calcMargin,
+          calcPrice: parseFloat(calcPrice.toFixed(2)),
+        });
+      } else {
+        // Compra por unidad (normal)
+        const qty = parseFloat(item.quantity || 0);
+        const cost = parseFloat(item.unitCost || 0);
+        batch.insert('pos_purchase_items', {
+          purchaseId,
+          productId: item.productId || null,
+          productName: item.productName || '',
+          quantity: qty,
+          unitCost: cost,
+          total: parseFloat((qty * cost).toFixed(2)),
+          isBox: false,
+        });
       }
     }
 
-    // Create Kardex movements for each item (compra = entrada)
-    // Note: referenceId set to '' because purchase ID is not available in batch mode
+    // Auto-update product stock, cost, and optionally price
+    for (const item of body.items) {
+      if (!item.productId) continue;
+      if (item.isBox) {
+        const boxQty = parseFloat(item.boxQty || 0);
+        const unitsPerBox = parseFloat(item.unitsPerBox || 0);
+        const boxCost = parseFloat(item.boxCost || 0);
+        const totalUnits = boxQty * unitsPerBox;
+        const calcUnitCost = unitsPerBox > 0 ? boxCost / unitsPerBox : 0;
+        const calcMargin = parseFloat(item.calcMargin || 0);
+        const calcPrice = calcUnitCost > 0 && calcMargin >= 0
+          ? calcUnitCost * (1 + calcMargin / 100) : 0;
+
+        const updateData: Record<string, any> = {
+          stock: { increment: totalUnits },
+          cost: parseFloat(calcUnitCost.toFixed(4)),
+        };
+        // Si se calculo precio de venta, actualizarlo tambien
+        if (calcPrice > 0) {
+          updateData.price = parseFloat(calcPrice.toFixed(2));
+          updateData.marginPercent = calcMargin;
+        }
+        // Actualizar unidades por caja si el producto tiene ese campo
+        if (unitsPerBox > 0) {
+          updateData.unitsPerBox = unitsPerBox;
+          updateData.boxPrice = boxCost;
+        }
+        batch.update('pos_products', item.productId, updateData);
+      } else {
+        batch.update('pos_products', item.productId, {
+          stock: { increment: parseFloat(item.quantity || 0) },
+          ...(item.unitCost ? { cost: parseFloat(item.unitCost) } : {}),
+        });
+      }
+    }
+
+    // Kardex (compra = entrada)
     for (const kd of kardexData) {
-      ops.push(db.inventoryMovement.create({
-        data: { productId: kd.productId, date: pDate, movementType: 'compra', concept: `Compra ${body.number || ''}`, quantity: kd.qty, absQuantity: kd.qty, unitCost: kd.unitCost, totalCost: kd.entryTotalCost, balanceQty: kd.balQty, balanceTotalCost: kd.balTC, balanceAvgCost: kd.balAvg, userId: String(pUserId), userName: pUser, userRole: pRole, referenceId: '' },
-      }));
+      batch.insert('pos_inventory_movements', {
+        productId: kd.productId, date: pDate, movementType: 'compra', concept: `Compra ${body.number || ''}`,
+        quantity: kd.qty, absQuantity: kd.qty, unitCost: kd.unitCost, totalCost: kd.entryTotalCost,
+        balanceQty: kd.balQty, balanceTotalCost: kd.balTC, balanceAvgCost: kd.balAvg,
+        userId: String(pUserId), userName: pUser, userRole: pRole, referenceId: purchaseId,
+      });
     }
 
     // Compra a credito: aumenta la deuda con el proveedor
     if (isCredit && body.supplierId) {
-      ops.push(db.supplier.update({
-        where: { id: body.supplierId },
-        data: { payableBalance: { increment: parseFloat(itemsTotal.toFixed(2)) } },
-      }));
+      batch.update('pos_suppliers', body.supplierId, { payableBalance: { increment: parseFloat(itemsTotal.toFixed(2)) } });
     }
 
-    // Execute batch transaction
-    const results = await db.$transaction(ops);
-    const purchase = results[0];
+    await batch.commit();
+    const purchase = await db.purchase.findUnique({ where: { id: purchaseId }, include: { items: true, supplier: true } });
 
     return NextResponse.json(purchase);
   } catch (error: any) {
@@ -220,20 +208,17 @@ export async function DELETE(req: NextRequest) {
     // D1 BATCH TRANSACTION: reads first, then batch writes
     const purchase = await db.purchase.findUnique({ where: { id }, include: { items: true } });
     if (purchase) {
-      const ops: any[] = [];
+      const batch = new D1Batch((env as any).DB, tenantId);
       for (const item of purchase.items) {
         if (item.productId) {
           const product = await db.product.findUnique({ where: { id: item.productId } });
           if (product && product.stock >= item.quantity) {
-            ops.push(db.product.update({
-              where: { id: item.productId },
-              data: { stock: { decrement: item.quantity } },
-            }));
+            batch.update('pos_products', item.productId, { stock: { decrement: item.quantity } });
           }
         }
       }
-      ops.push(db.purchase.delete({ where: { id } }));
-      await db.$transaction(ops);
+      batch.delete('pos_purchases', id);
+      await batch.commit();
     }
 
     return NextResponse.json({ success: true });
