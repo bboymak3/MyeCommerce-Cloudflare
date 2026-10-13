@@ -13,6 +13,8 @@ export interface NexusTenant {
   expiresAt: string | null;
   active: boolean;
   reason: string;
+  /** Permisos del cajero configurados por el super admin (nx_tenants.settings.cajeroPermissions). */
+  cajeroPermissions: Record<string, boolean> | null;
 }
 
 const CACHE_MS = 30_000;
@@ -40,7 +42,7 @@ export async function getNexusTenant(
 
   let row: any = null;
   try {
-    const sql = 'SELECT id, name, slug, status, plan, billing_cycle, subscription_expires_at FROM nx_tenants WHERE ';
+    const sql = 'SELECT id, name, slug, status, plan, billing_cycle, subscription_expires_at, settings FROM nx_tenants WHERE ';
     row = tenantId === DEFAULT_TENANT_ID
       ? (legacySlug ? await d1.prepare(sql + 'slug = ?').bind(legacySlug).first() : null)
       : await d1.prepare(sql + 'id = ?').bind(tenantId).first();
@@ -65,10 +67,21 @@ export async function getNexusTenant(
       expiresAt,
       active: !reason,
       reason,
+      cajeroPermissions: parseCajeroPermissions(row.settings),
     };
   }
   cache.set(key, { at: Date.now(), value });
   return value;
+}
+
+function parseCajeroPermissions(settings: unknown): Record<string, boolean> | null {
+  try {
+    const parsed = typeof settings === 'string' ? JSON.parse(settings) : settings;
+    const perms = parsed && typeof parsed === 'object' ? (parsed as any).cajeroPermissions : null;
+    return perms && typeof perms === 'object' ? perms : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Plan de Nexus One -> tipo de licencia del POS. */
