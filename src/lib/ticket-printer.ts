@@ -1,23 +1,16 @@
 /**
- * ticket-printer.ts — Ticket Engine v8.0 (MyeCommerce POS v2.9.56)
+ * ticket-printer.ts — impresion de tickets desde el navegador.
  *
- * MODO DUAL: ESC/POS via Agente Local + Fallback HTML
- * ─────────────────────────────────────────────────
- * Si el agente local esta activo (http://localhost:9100),
- * genera un buffer ESC/POS y lo envia directamente a la impresora.
- * Si el agente NO esta activo, usa el metodo HTML (window.print) como fallback.
- *
- * VENTAJAS DEL MODO ESC/POS:
- * - Nombre de tienda GRANDE y centrado (doble alto x doble ancho)
- * - TOTAL NUNCA se corta (ancho fijo de 32 o 48 chars segun papel)
- * - Columnas CANT, P.UNI, TOTAL calculadas dinamicamente
- * - NOMBRES LARGOS con salto de linea automatico
- * - Impresion directa sin depender del driver del navegador
- * - Funciona igual en 55mm, 57mm, 58mm y 80mm
+ * El POS corre en Cloudflare: no hay agente local al que mandar ESC/POS (el agente
+ * de la version Windows escuchaba en localhost:9100 de la PC, que el servidor en la
+ * nube no puede alcanzar). El ticket se arma en HTML a la medida del papel
+ * (55/57/58/80 mm, ver PRINTER_PRESETS) y se imprime con el dialogo del navegador
+ * desde un iframe oculto: no abre ventanas emergentes, que Chrome bloquea despues de
+ * guardar la venta. La impresora termica debe estar instalada en el equipo y
+ * elegida en el dialogo (margenes: ninguno); con Chrome en modo --kiosk-printing
+ * imprime sin dialogo.
  */
 
-import { generateEscposBuffer, uint8ToBase64 } from './escpos-buffer';
-import { authFetch } from './auth-fetch';
 
 // ─── Etiquetas de metodos de pago ───────────────────────────────────
 export const TICKET_PAYMENT_LABELS: Record<string, string> = {
@@ -227,86 +220,6 @@ function wrapName(name: string, maxW: number): string[] {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// MODE 1: ESC/POS via Agente Local
-// ═══════════════════════════════════════════════════════════════════
-
-/**
- * Verifica si el agente local esta activo
- */
-export async function checkAgentStatus(agentUrl: string): Promise<{online: boolean; info?: any}> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
-    const res = await authFetch(agentUrl, {
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const data = await res.json();
-      return { online: true, info: data };
-    }
-    return { online: false };
-  } catch {
-    return { online: false };
-  }
-}
-
-/**
- * Imprime via agente local ESC/POS.
- * Retorna true si tuvo exito, false si fallo.
- */
-export async function printViaEscposAgent(params: {
-  receipt: TicketReceipt;
-  settings: TicketSettings;
-  currency?: string;
-  defaultSellerName?: string;
-  agentUrl: string;
-}): Promise<{success: boolean; error?: string}> {
-  const { receipt, settings, currency = 'USD', defaultSellerName = '', agentUrl } = params;
-
-  try {
-    // Generar buffer ESC/POS
-    const buffer = generateEscposBuffer({
-      receipt,
-      settings,
-      currency,
-      defaultSellerName,
-    });
-
-    // Convertir a base64 y enviar al agente
-    const base64Data = uint8ToBase64(buffer);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    const res = await authFetch(agentUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'print', data: base64Data }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    // Seguridad: verificar que la respuesta es JSON antes de parsear
-    const ct = res.headers.get('content-type') || '';
-    if (!ct.includes('application/json')) {
-      return { success: false, error: 'Servidor no responde como API (HTTP ' + res.status + ')' };
-    }
-
-    const result = await res.json();
-
-    if (res.ok && result.success) {
-      return { success: true };
-    } else {
-      return { success: false, error: result.error || 'El agente no pudo imprimir' };
-    }
-  } catch (e: any) {
-    return { success: false, error: e.message || 'No se pudo conectar al agente' };
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
 // MODE 2: Fallback HTML (window.print)
 // ═══════════════════════════════════════════════════════════════════
 
@@ -402,10 +315,7 @@ function printViaHtml(params: {
   }
   const itemLinesHtml = itemTextLines.map(l => escHtml(l)).join('\n');
 
-  const printWindow = window.open('', '_blank', `width=${preset.winPx},height=800`);
-  if (!printWindow) return false;
-
-  printWindow.document.write(`<!DOCTYPE html><html><head><title>Ticket</title>
+  const html = (`<!DOCTYPE html><html><head><title>Ticket</title>
 <style>
   @page{size:${paperW} auto;margin:0;padding:0}
   *{margin:0;padding:0;box-sizing:border-box}
@@ -486,7 +396,7 @@ ${isCreditSale ? (() => {
 <div style="margin-top:1px;font-size:${base}px;font-weight:bold">Pago: ${escHtml(payLabel)}</div>
 
 ${!isCreditSale && mixedBreakdown ? `<div class="s" style="white-space:pre-wrap">${escHtml(mixedBreakdown)}</div>` : ''}
-${ticketShowSeller && (receipt.sellerName || defaultSellerName) ? `<div style="font-size:${base}px;font-weight:bold">Vend: ${escHtml(receipt.sellerName || defaultSellerName || '')}</div>` : ''}
+${ticketShowSeller && (receipt.sellerName || defaultSellerName) ? `<div style="font-size:${base}px;font-weight:bold">Cajero: ${escHtml(receipt.sellerName || defaultSellerName || '')}</div>` : ''}
 
 <div class="ln"></div>
 
@@ -523,9 +433,37 @@ ${ticketFooterMsg ? (ticketShowSlogan
 
 <div class="s" style="text-align:center;margin-top:2px">ID: ${escHtml(receipt.id.slice(0, 8))}</div>
 
-<script>window.onload=function(){window.print();window.close();}<\/script>
 </body></html>`);
-  printWindow.document.close();
+  return printHtmlDocument(html);
+}
+
+/**
+ * Imprime un documento HTML desde un iframe oculto (sin ventana emergente) y lo
+ * retira al terminar. Espera a que carguen las imagenes (logo) antes de imprimir.
+ */
+function printHtmlDocument(html: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(frame);
+  const doc = frame.contentDocument;
+  const win = frame.contentWindow;
+  if (!doc || !win) { frame.remove(); return false; }
+  doc.open();
+  doc.write(html);
+  doc.close();
+  const cleanup = () => setTimeout(() => frame.remove(), 1000);
+  const doPrint = () => {
+    try { win.focus(); win.print(); } finally { cleanup(); }
+  };
+  const images = Array.from(doc.images);
+  const pending = images.filter((img) => !img.complete);
+  if (pending.length === 0) { setTimeout(doPrint, 50); return true; }
+  let left = pending.length;
+  const done = () => { if (--left === 0) doPrint(); };
+  pending.forEach((img) => { img.addEventListener('load', done); img.addEventListener('error', done); });
+  setTimeout(() => { if (left > 0) { left = 0; doPrint(); } }, 3000);
   return true;
 }
 
@@ -533,48 +471,12 @@ ${ticketFooterMsg ? (ticketShowSlogan
 // PRINT TICKET — Funcion principal (dual mode)
 // ═══════════════════════════════════════════════════════════════════
 
-/**
- * Funcion principal de impresion de ticket.
- * MODO 1: Si el agente ESC/POS esta activo, imprime directamente via ESC/POS
- * MODO 2: Si no, usa el fallback HTML con window.print()
- *
- * Ahora retorna una Promise para soportar el modo async del agente.
- * Para compatibilidad, tambien funciona en modo sync (fallback HTML).
- */
+/** Imprime el ticket con el dialogo del navegador. Devuelve false si no se pudo preparar. */
 export async function printTicket(params: {
   receipt: TicketReceipt;
   settings: TicketSettings;
   currency?: string;
   defaultSellerName?: string;
 }): Promise<boolean> {
-  const { settings } = params;
-
-  // Determinar si usar agente ESC/POS
-  const useAgent = settings.ticketUseAgent !== false; // por defecto true
-  const agentUrl = '/api/print-agent'; // Proxy server-side para evitar mixed-content
-
-  if (useAgent) {
-    // Intentar imprimir via agente ESC/POS
-    const result = await printViaEscposAgent({
-      ...params,
-      agentUrl,
-    });
-
-    if (result.success) {
-      return true;
-    }
-
-    // Si el agente falla, informar al usuario pero NO hacer fallback silencioso
-    // El usuario necesita saber que el agente no esta activo
-    console.warn('[ticket-printer] Agente ESC/POS no disponible:', result.error);
-    // NO hacer fallback a HTML (abre dialogo de Windows)
-    throw new Error(
-      'Agente de impresion no disponible. ' +
-      'Ejecute: DETENER-TODO.bat, luego INICIAR-TODO-OCULTO.vbs y espere 10s. ' +
-      'Detalle: ' + (result.error || 'sin conexion al agente')
-    );
-  }
-
-  // Modo HTML directo (solo si agente esta desactivado explicitamente)
   return printViaHtml(params);
 }

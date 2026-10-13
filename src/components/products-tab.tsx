@@ -33,7 +33,9 @@ interface Product {
 }
 interface StockAlert { id: string; name: string; barcode: string; stock: number; minStock: number; price: number; cost: number; icon: string; categoryName: string; deficit: number; }
 interface StockAlertsData { totalAlerts: number; zeroStockCount: number; lowStockCount: number; zeroStock: StockAlert[]; lowStock: StockAlert[]; }
-interface ProductsTabProps { products: Product[]; categories: Category[]; brands: Brand[]; bcvRate: number; euroUsdtRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; taxRate?: number; }
+interface ProductsTabProps { products: Product[]; categories: Category[]; brands: Brand[]; bcvRate: number; euroUsdtRate: number; currency: string; onRefresh: () => void; maxProducts?: number; licenseType?: string; taxRate?: number;
+  /** false = solo lectura (cajero sin permiso "productos"): sin crear, editar ni eliminar. */
+  canEdit?: boolean; }
 
 function CatBadge({ categoryName, categories }: { categoryName: string; categories: Category[] }) {
   const cat = categories.find(c => c.name === categoryName);
@@ -66,7 +68,7 @@ function Block({ title, icon, badge, defaultOpen = true, children }: { title: st
   );
 }
 
-export default function ProductsTab({ products, categories, brands, bcvRate, euroUsdtRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional", taxRate = 0 }: ProductsTabProps) {
+export default function ProductsTab({ products, categories, brands, bcvRate, euroUsdtRate, currency, onRefresh, maxProducts = 99999, licenseType = "profesional", taxRate = 0, canEdit = true }: ProductsTabProps) {
   const [showProductDialog, setShowProductDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -445,6 +447,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
         </div>
         {/* Action Buttons */}
         <div className="flex gap-1 flex-wrap">
+          {canEdit && <>
           <Button variant="outline" size="sm" onClick={() => setShowCategoryDialog(true)} className="text-xs h-9">
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" /></svg>
             Categorias
@@ -457,6 +460,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
             Importar
           </Button>
+          </>}
           <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="text-xs h-9">
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
             Exportar
@@ -465,10 +469,12 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" /></svg>
             Etiquetas
           </Button>
+          {canEdit && (
           <Button size="sm" onClick={openCreate} className="text-xs h-9 shadow-sm">
             <svg className="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
             Producto
           </Button>
+          )}
           <input type="file" ref={importFileRef} accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImport} />
         </div>
       </div>
@@ -644,7 +650,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
                 {paginated.map(product => {
                   const mg = product.cost > 0 && product.price > 0 ? ((product.price - product.cost) / product.price * 100) : 0;
                   return (
-                    <tr key={product.id} className="border-t hover:bg-muted/30 cursor-pointer" onDoubleClick={() => openEdit(product)}>
+                    <tr key={product.id} className="border-t hover:bg-muted/30 cursor-pointer" onDoubleClick={() => { if (canEdit) openEdit(product); }}>
                       <td className="p-2">{product.image ? <img src={product.image} alt="" crossOrigin="anonymous" className="w-7 h-7 rounded object-cover" /> : <span className="text-base">{product.icon || ''}</span>}</td>
                       <td className="p-2">
                         <div className="font-medium whitespace-normal min-w-[200px]">{product.name}
@@ -667,7 +673,7 @@ export default function ProductsTab({ products, categories, brands, bcvRate, eur
                       <td className="p-2 text-right">{product.cost > 0 ? <span className={`font-medium ${mg >= 30 ? 'text-green-600' : mg >= 15 ? 'text-yellow-600' : 'text-red-600'}`}>{mg.toFixed(0)}%</span> : <span className="text-muted-foreground">-</span>}</td>
                       <td className="p-2 text-right"><Badge variant={product.stock > (product.minStock || 5) ? "secondary" : "destructive"} className="text-[10px]">{product.stock}</Badge></td>
                       <td className="p-2"><TaxBadge taxType={product.taxType} taxRate={taxRate} /></td>
-                      <td className="p-2 text-center"><div className="flex gap-0.5 justify-center"><Button variant="ghost" size="sm" onClick={() => openEdit(product)} className="h-6 text-[10px]">Edit</Button><Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="h-6 text-[10px] text-destructive">X</Button></div></td>
+                      <td className="p-2 text-center">{canEdit && <div className="flex gap-0.5 justify-center"><Button variant="ghost" size="sm" onClick={() => openEdit(product)} className="h-6 text-[10px]">Edit</Button><Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="h-6 text-[10px] text-destructive">X</Button></div>}</td>
                     </tr>
                   );
                 })}
