@@ -2,6 +2,8 @@
 const nextConfig = {
   // Skip type checking during build (pre-existing type errors in page components)
   typescript: { ignoreBuildErrors: true },
+  // Commit desplegado (Cloudflare Pages lo define al compilar); lo muestra /api/verificacion
+  env: { BUILD_COMMIT: process.env.CF_PAGES_COMMIT_SHA || '' },
   // Cloudflare Pages compatible output
   // Disable Next.js image optimization (not supported on Edge Runtime)
   images: {

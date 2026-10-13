@@ -56,6 +56,12 @@ function tableInfo(table: string): TableInfo {
   return info;
 }
 
+/** Tablas y columnas que espera el esquema (para verificar la D1 desplegada). */
+export function expectedSchema(): Map<string, string[]> {
+  tableInfo('pos_products');
+  return new Map([...tables!].map(([name, info]) => [name, [...info.columns]]));
+}
+
 function checkColumn(table: string, column: string) {
   if (!tableInfo(table).columns.has(column)) throw new Error(`Columna desconocida: ${table}.${column}`);
 }

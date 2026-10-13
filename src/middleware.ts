@@ -19,6 +19,7 @@ const ADMIN_ROUTES = [
   '/api/roles',
   '/api/backup',
   '/api/license',
+  '/api/verificacion',
 ];
 
 // Cabeceras que solo puede fijar este middleware (nunca el cliente)
