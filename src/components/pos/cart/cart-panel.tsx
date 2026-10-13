@@ -90,6 +90,7 @@ interface CartPanelProps extends CartPanelProps_LoyaltyExtra {
   onSetCashUsd?: () => void;
   onSetCashBs?: () => void;
   onSetPagoMovil?: () => void;
+  onSetBiopago?: () => void;
   onCharge?: () => void;
   onHoldSale?: () => void;
 }
@@ -110,7 +111,7 @@ export function CartPanel({
   total, totalBs, taxAmount, taxRate, taxMode, effectiveDiscount,
   isUsdMethod, vuelto, vueltoUsd,
   cashInputRef, cashUsdInputRef, onCompleteSale,
-  onSearchFocus, onToggleCredit, onSetCashUsd, onSetCashBs, onSetPagoMovil, onCharge, onHoldSale,
+  onSearchFocus, onToggleCredit, onSetCashUsd, onSetCashBs, onSetPagoMovil, onSetBiopago, onCharge, onHoldSale,
   loyaltyEnabled = false, clientLoyaltyPoints = 0, pointsToRedeem = "", setPointsToRedeem, pointsDiscountUsd = 0,
 }: CartPanelProps) {
   return (
@@ -143,6 +144,7 @@ export function CartPanel({
           onCashUsd={onSetCashUsd}
           onCashBs={onSetCashBs}
           onPagoMovil={onSetPagoMovil}
+          onBiopago={onSetBiopago}
           onCharge={onCharge}
           onHoldSale={onHoldSale}
           onClear={cart.length > 0 ? () => onClearCart() : undefined}

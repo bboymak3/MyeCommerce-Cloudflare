@@ -7,6 +7,7 @@ interface ShortcutConfig {
   isCredit: boolean;
   anyDialogOpen: boolean;
   onF2: () => void;   // focus search
+  onF3: () => void;   // biopago
   onF4: () => void;   // toggle credit
   onF5: () => void;   // efectivo-usd
   onF6: () => void;   // efectivo Bs
@@ -21,6 +22,7 @@ export function useKeyboardShortcuts(cfg: ShortcutConfig) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (cfg.anyDialogOpen) return;
       if (e.key === "F2") { e.preventDefault(); cfg.onF2(); }
+      if (e.key === "F3") { e.preventDefault(); cfg.onF3(); } // anula la busqueda del navegador
       if (e.key === "F4") { e.preventDefault(); cfg.onF4(); }
       if (e.key === "F5") { e.preventDefault(); cfg.onF5(); }
       if (e.key === "F6") { e.preventDefault(); cfg.onF6(); }
@@ -33,6 +35,6 @@ export function useKeyboardShortcuts(cfg: ShortcutConfig) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     cfg.cartLength, cfg.isCredit, cfg.anyDialogOpen,
-    cfg.onF2, cfg.onF4, cfg.onF5, cfg.onF6, cfg.onF7, cfg.onF8, cfg.onF9, cfg.onEsc,
+    cfg.onF2, cfg.onF3, cfg.onF4, cfg.onF5, cfg.onF6, cfg.onF7, cfg.onF8, cfg.onF9, cfg.onEsc,
   ]);
 }
