@@ -31,6 +31,8 @@ interface UserRecord {
   lastLogin: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Creado en Nexus One y todavia sin entrar al POS (se administra alla). */
+  pendingFirstLogin?: boolean;
 }
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -190,8 +192,9 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
       const res = await authFetch("/api/users");
       const data = await res.json();
       if (Array.isArray(data)) setUsers(data);
-    } catch {
-      toast.error("Error al cargar usuarios");
+      else toast.error(`No se pudieron cargar los usuarios: ${data?.error || `error ${res.status}`}`);
+    } catch (e: any) {
+      toast.error(`Error al cargar usuarios: ${e?.message || "sin conexion"}`);
     } finally {
       setLoading(false);
     }
@@ -675,7 +678,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                     <td className="px-4 py-2.5">
                       <UserAvatar src={user.avatar} name={user.fullName || user.username} size="sm" />
                     </td>
-                    <td className="px-4 py-2.5 font-medium">{user.username}</td>
+                    <td className="px-4 py-2.5 font-medium">{user.username}{user.pendingFirstLogin && <span className="ml-2 text-[10px] font-normal text-amber-600" title="Creado en Nexus One. Aparecera en el POS con todas sus opciones cuando entre por primera vez desde Nexus One (Abrir Punto de Venta).">Nexus One · aun no ha entrado al POS</span>}</td>
                     <td className="px-4 py-2.5 hidden sm:table-cell">{user.fullName || "-"}</td>
                     <td className="px-4 py-2.5 hidden md:table-cell text-muted-foreground">
                       {user.lastLogin ? new Date(user.lastLogin).toLocaleString("es-VE") : "Nunca"}
@@ -686,9 +689,9 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                       </Badge>
                     </td>
                     <td className="px-4 py-2.5 text-right">
-                      <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
+                      {!user.pendingFirstLogin && <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
                         Editar
-                      </Button>
+                      </Button>}
                     </td>
                   </tr>
                 ))
@@ -730,7 +733,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                       <td className="px-4 py-2.5">
                         <UserAvatar src={user.avatar} name={user.fullName || user.username} size="sm" />
                       </td>
-                      <td className="px-4 py-2.5 font-medium">{user.username}</td>
+                      <td className="px-4 py-2.5 font-medium">{user.username}{user.pendingFirstLogin && <span className="ml-2 text-[10px] font-normal text-amber-600" title="Creado en Nexus One. Aparecera en el POS con todas sus opciones cuando entre por primera vez desde Nexus One (Abrir Punto de Venta).">Nexus One · aun no ha entrado al POS</span>}</td>
                       <td className="px-4 py-2.5 hidden sm:table-cell">{user.fullName || "-"}</td>
                       <td className="px-4 py-2.5 hidden md:table-cell text-muted-foreground">
                         {user.lastLogin ? new Date(user.lastLogin).toLocaleString("es-VE") : "Nunca"}
@@ -744,7 +747,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                         </Badge>
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1 flex-wrap">
+                        {!user.pendingFirstLogin && <div className="flex items-center justify-end gap-1 flex-wrap">
                           <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
                             Editar
                           </Button>
@@ -777,7 +780,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                           <Button variant="destructive" size="sm" onClick={() => handleDelete(user)}>
                             Eliminar
                           </Button>
-                        </div>
+                        </div>}
                       </td>
                     </tr>
                   ))
