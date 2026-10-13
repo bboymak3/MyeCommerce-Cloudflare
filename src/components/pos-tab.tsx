@@ -214,6 +214,7 @@ export default function PosTab(props: PosTabProps) {
     isCredit,
     anyDialogOpen,
     onF2: () => searchInputRef.current?.focus(),
+    onF3: () => setPaymentMethod("biopago"),
     onF4: () => setIsCredit((p) => !p),
     onF5: () => setPaymentMethod("efectivo-usd"),
     onF6: () => setPaymentMethod("efectivo"),
@@ -435,6 +436,7 @@ export default function PosTab(props: PosTabProps) {
         onSetCashUsd={() => setPaymentMethod("efectivo-usd")}
         onSetCashBs={() => setPaymentMethod("efectivo")}
         onSetPagoMovil={() => setPaymentMethod("pago-movil")}
+        onSetBiopago={() => setPaymentMethod("biopago")}
         onCharge={() => completeSale()}
         onHoldSale={() => holdCurrentSale()}
         loyaltyEnabled={loyaltyEnabled} clientLoyaltyPoints={clientLoyaltyPoints}

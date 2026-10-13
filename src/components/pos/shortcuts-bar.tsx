@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, CreditCard, DollarSign, Banknote, Smartphone, ShoppingCart, PauseCircle, XCircle } from 'lucide-react';
+import { Search, CreditCard, DollarSign, Banknote, Smartphone, ShoppingCart, PauseCircle, XCircle, Fingerprint } from 'lucide-react';
 
 interface ShortcutsBarProps {
   onHoldSale?: () => void;
@@ -9,6 +9,7 @@ interface ShortcutsBarProps {
   onCashUsd?: () => void;
   onCashBs?: () => void;
   onPagoMovil?: () => void;
+  onBiopago?: () => void;
   onCharge?: () => void;
   onClear?: () => void;
 }
@@ -41,11 +42,13 @@ function ShortcutButton({ label, keyHint, color, icon, onClick }: ShortcutButton
   );
 }
 
-export function ShortcutsBar({ onHoldSale, onSearch, onToggleCredit, onCashUsd, onCashBs, onPagoMovil, onCharge, onClear }: ShortcutsBarProps) {
+export function ShortcutsBar({ onHoldSale, onSearch, onToggleCredit, onCashUsd, onCashBs, onPagoMovil, onBiopago, onCharge, onClear }: ShortcutsBarProps) {
   return (
     <div className="flex flex-wrap gap-1.5 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800 rounded-xl px-3 py-2 border border-slate-200/60 dark:border-slate-700/60">
       <ShortcutButton label="Buscar" keyHint="F2" color="bg-blue-500 text-white hover:bg-blue-600 shadow-blue-500/20"
         icon={<Search className="w-3.5 h-3.5" />} onClick={onSearch} />
+      <ShortcutButton label="Biopago" keyHint="F3" color="bg-rose-600 text-white hover:bg-rose-700 shadow-rose-600/20"
+        icon={<Fingerprint className="w-3.5 h-3.5" />} onClick={onBiopago} />
       <ShortcutButton label="Credito" keyHint="F4" color="bg-amber-500 text-white hover:bg-amber-600 shadow-amber-500/20"
         icon={<CreditCard className="w-3.5 h-3.5" />} onClick={onToggleCredit} />
       <ShortcutButton label="Efectivo$" keyHint="F5" color="bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-500/20"
