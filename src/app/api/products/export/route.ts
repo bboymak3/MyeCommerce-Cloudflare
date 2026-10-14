@@ -1,5 +1,6 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { d1Of, loadProductsWithCategory } from '@/lib/d1-read';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
@@ -14,13 +15,12 @@ const TAX_TYPE_LABELS: Record<string, string> = {
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
-    const products = await db.product.findMany({
-      where: { active: true },
-      include: { category: true },
-      orderBy: { name: 'asc' },
-    });
+    // SQL directo (ver "Limite de CPU" en CLAUDE.md). La fecha de vencimiento como Date,
+    // igual que con Prisma, para que el Excel la guarde como fecha.
+    const products = (await loadProductsWithCategory(d1Of(env), tenantId, 'AND p.active = 1', 'p.name ASC'))
+      .map((p) => ({ ...p, expirationDate: p.expirationDate ? new Date(p.expirationDate) : null }));
 
     if (products.length === 0) {
       return NextResponse.json({ error: 'No hay productos para exportar' }, { status: 400 });
