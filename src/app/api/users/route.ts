@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeRole } from '@/lib/roles';
 import { hashPassword } from '@/lib/auth';
 
 // Helper to serialize user without password
@@ -10,7 +11,7 @@ function serializeUser(user: any) {
     id: user.id,
     username: user.username,
     fullName: user.fullName,
-    role: user.role,
+    role: normalizeRole(user.role),
     isActive: user.isActive,
     permissions: JSON.parse(user.permissions || '{}'),
     avatar: user.avatar || '',
@@ -62,7 +63,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine role and permissions
-    const userRole = role || 'cajero';
+    // Roles: admin y cajero ('vendedor' se fusiono en cajero)
+    const userRole = normalizeRole(role);
     let permissionsStr: string;
 
     if (userRole === 'admin') {
@@ -119,11 +121,11 @@ export async function PUT(req: NextRequest) {
     if (isActive !== undefined) updateData.isActive = isActive;
     if (role !== undefined) {
       if (!['admin', 'cajero', 'vendedor'].includes(role)) {
-        return NextResponse.json({ error: 'Rol no valido. Use admin, cajero o vendedor' }, { status: 400 });
+        return NextResponse.json({ error: 'Rol no valido. Use admin o cajero' }, { status: 400 });
       }
-      updateData.role = role;
+      updateData.role = normalizeRole(role);
       // When changing to admin, set all permissions
-      if (role === 'admin') {
+      if (updateData.role === 'admin') {
         updateData.permissions = JSON.stringify({ all: true });
       }
     }

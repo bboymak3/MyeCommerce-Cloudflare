@@ -89,8 +89,11 @@ export async function middleware(request: NextRequest) {
     );
   }
 
+  // GET /api/license es para todos: sin ella la pantalla del cajero se quedaba sin
+  // licencia y mostraba "TRIAL / Version de Prueba". Activar licencias sigue siendo del admin.
+  const readsLicense = request.method === 'GET' && (pathname === '/api/license' || pathname.startsWith('/api/license/'));
   for (const adminRoute of ADMIN_ROUTES) {
-    if (pathname === adminRoute || pathname.startsWith(adminRoute + '/')) {
+    if (!readsLicense && (pathname === adminRoute || pathname.startsWith(adminRoute + '/'))) {
       if (session.role !== 'admin') {
         return NextResponse.json(
           { error: 'Acceso restringido. Se requiere rol de administrador.', code: 'FORBIDDEN' },

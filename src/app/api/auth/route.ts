@@ -1,6 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeRole } from '@/lib/roles';
 import { hashPassword, verifyPassword, needsRehash } from '@/lib/auth';
 import { createSessionToken, verifySessionToken, extractToken } from '@/lib/session';
 import { getRequestContext } from '@cloudflare/next-on-pages';
@@ -44,7 +45,7 @@ function serializeUser(user: any) {
     id: user.id,
     username: user.username,
     fullName: user.fullName,
-    role: user.role,
+    role: normalizeRole(user.role),
     isActive: user.isActive,
     permissions: JSON.parse(user.permissions || '{}'),
     avatar: user.avatar || '',
@@ -172,7 +173,7 @@ export async function POST(req: NextRequest) {
     const token = await createSessionToken({
       id: updatedUser.id,
       username: updatedUser.username,
-      role: updatedUser.role,
+      role: normalizeRole(updatedUser.role),
       tenantId,
     });
 

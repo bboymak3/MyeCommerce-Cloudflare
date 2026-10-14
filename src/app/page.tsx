@@ -557,7 +557,7 @@ export default function Home() {
                 </div>
               )}
               <Badge variant={currentUser.role === "admin" ? "default" : "secondary"}>
-                {currentUser.role === "admin" ? "Admin" : currentUser.role === "vendedor" ? "Vendedor" : "Cajero"}
+                {currentUser.role === "admin" ? "Admin" : "Cajero"}
               </Badge>
               <span className="text-sm font-medium max-w-[120px] truncate hidden sm:inline-block">
                 {currentUser.fullName || currentUser.username}

@@ -49,13 +49,11 @@ const PERMISSION_KEYS = Object.keys(PERMISSION_LABELS);
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
   cajero: "Cajero",
-  vendedor: "Vendedor",
 };
 
 const ROLE_COLORS: Record<string, string> = {
   admin: "bg-purple-100 text-purple-800",
   cajero: "bg-blue-100 text-blue-800",
-  vendedor: "bg-green-100 text-green-800",
 };
 
 interface UsersTabProps {
@@ -579,7 +577,6 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
 
   const adminUsers = users.filter((u) => u.role === "admin");
   const cajeroUsers = users.filter((u) => u.role === "cajero");
-  const vendedorUsers = users.filter((u) => u.role === "vendedor");
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -856,109 +853,6 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
         </div>
       </div>
 
-      {/* ===== VENDEDORES ===== */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-semibold">Vendedores ({vendedorUsers.length})</h3>
-          <Button size="sm" onClick={() => { setNewRole("vendedor"); setShowCreateDialog(true); }}>
-            + Nuevo Vendedor
-          </Button>
-        </div>
-
-        <div className="rounded-lg border overflow-x-auto">
-          <div className="max-h-96 overflow-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-muted/50">
-                <tr>
-                  <th className="text-left px-4 py-2.5 font-medium w-12">Foto</th>
-                  <th className="text-left px-4 py-2.5 font-medium">Usuario</th>
-                  <th className="text-left px-4 py-2.5 font-medium hidden sm:table-cell">Nombre</th>
-                  <th className="text-left px-4 py-2.5 font-medium hidden md:table-cell">Ultimo Acceso</th>
-                  <th className="text-left px-4 py-2.5 font-medium">Permisos</th>
-                  <th className="text-left px-4 py-2.5 font-medium">Estado</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendedorUsers.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No hay vendedores registrados</td></tr>
-                ) : (
-                  vendedorUsers.map((user) => (
-                    <tr key={user.id} className="border-t hover:bg-muted/30">
-                      <td className="px-4 py-2.5">
-                        <UserAvatar src={user.avatar} name={user.fullName || user.username} size="sm" />
-                      </td>
-                      <td className="px-4 py-2.5 font-medium">{user.username}</td>
-                      <td className="px-4 py-2.5 hidden sm:table-cell">{user.fullName || "-"}</td>
-                      <td className="px-4 py-2.5 hidden md:table-cell text-muted-foreground">
-                        {user.lastLogin ? new Date(user.lastLogin).toLocaleString("es-VE") : "Nunca"}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex flex-wrap gap-1">
-                          {PERMISSION_KEYS.filter((k) => user.permissions[k]).map((k) => (
-                            <Badge key={k} variant="secondary" className="text-[10px] px-1.5 py-0">
-                              {PERMISSION_LABELS[k]}
-                            </Badge>
-                          ))}
-                          {PERMISSION_KEYS.filter((k) => !user.permissions[k]).length === PERMISSION_KEYS.length && (
-                            <span className="text-xs text-muted-foreground">Sin permisos</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Badge variant={user.isActive ? "success" : "destructive"}>
-                          {user.isActive ? "Activo" : "Inactivo"}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-1 flex-wrap">
-                          <Button variant="outline" size="sm" onClick={() => openEditDialog(user)}>
-                            Editar
-                          </Button>
-                          {user.isActive && (
-                            <Button variant="secondary" size="sm" onClick={() => handleDeactivate(user)}>
-                              Desactivar
-                            </Button>
-                          )}
-                          {!user.isActive && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  const res = await authFetch("/api/users", {
-                                    method: "PUT",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ id: user.id, isActive: true }),
-                                  });
-                                  const data = await res.json();
-                                  if (!res.ok) throw new Error(data.error);
-                                  toast.success(`Usuario "${data.username}" activado`);
-                                  loadUsers();
-                                } catch (e: any) { toast.error(e.message); }
-                              }}
-                            >
-                              Activar
-                            </Button>
-                          )}
-                          <Button variant="outline" size="sm" onClick={() => resetUserToRoleDefaults(user)} title="Restablecer permisos del rol">
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            Rol
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(user)}>
-                            Eliminar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       {/* ============================== */}
       {/* DIALOG: MI FOTO DE PERFIL      */}
       {/* ============================== */}
@@ -1012,16 +906,11 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
             {/* Role selector */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Tipo de Usuario</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setNewRole("admin")} className={`p-3 rounded-lg border-2 text-center transition-all ${newRole === "admin" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
                   <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></div>
                   <span className="text-sm font-medium">Admin</span>
                   <p className="text-[10px] text-muted-foreground">Acceso total</p>
-                </button>
-                <button type="button" onClick={() => setNewRole("vendedor")} className={`p-3 rounded-lg border-2 text-center transition-all ${newRole === "vendedor" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
-                  <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg></div>
-                  <span className="text-sm font-medium">Vendedor</span>
-                  <p className="text-[10px] text-muted-foreground">Puede cobrar</p>
                 </button>
                 <button type="button" onClick={() => setNewRole("cajero")} className={`p-3 rounded-lg border-2 text-center transition-all ${newRole === "cajero" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
                   <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>
@@ -1062,8 +951,8 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
               <Input type="password" placeholder="Minimo 3 caracteres" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             </div>
 
-            {/* Permissions (only for cajero or vendedor) */}
-            {(newRole === "cajero" || newRole === "vendedor") && (
+            {/* Permissions (only for cajero) */}
+            {newRole === "cajero" && (
               <>
                 <Separator />
                 <div className="space-y-2">
@@ -1132,16 +1021,11 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
             {/* Role */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Rol del Usuario</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button type="button" onClick={() => setEditRole("admin")} className={`p-3 rounded-lg border-2 text-center transition-all ${editRole === "admin" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
                   <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg></div>
                   <span className="text-sm font-medium">Admin</span>
                   <p className="text-[10px] text-muted-foreground">Acceso total</p>
-                </button>
-                <button type="button" onClick={() => setEditRole("vendedor")} className={`p-3 rounded-lg border-2 text-center transition-all ${editRole === "vendedor" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
-                  <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg></div>
-                  <span className="text-sm font-medium">Vendedor</span>
-                  <p className="text-[10px] text-muted-foreground">Puede cobrar</p>
                 </button>
                 <button type="button" onClick={() => setEditRole("cajero")} className={`p-3 rounded-lg border-2 text-center transition-all ${editRole === "cajero" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
                   <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>
@@ -1171,8 +1055,8 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
               </label>
             </div>
 
-            {/* Permissions (only for cajero or vendedor) */}
-            {(editRole === "cajero" || editRole === "vendedor") && (
+            {/* Permissions (only for cajero) */}
+            {editRole === "cajero" && (
               <>
                 <Separator />
                 <div className="space-y-2">

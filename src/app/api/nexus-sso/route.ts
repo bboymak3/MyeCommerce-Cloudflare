@@ -11,8 +11,8 @@ import { hashPassword } from '@/lib/auth';
 import { createSessionToken, verifyNexusSsoToken } from '@/lib/session';
 import { getNexusTenant } from '@/lib/nexus-tenant';
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeRole } from '@/lib/roles';
 
-const POS_ROLES = new Set(['admin', 'vendedor', 'cajero']);
 
 export async function GET(req: NextRequest) {
   try {
@@ -36,7 +36,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: nexus.reason }, { status: 403 });
     }
     const db = createDbFromEnv(env as any, tenantId);
-    const role = sso.role && POS_ROLES.has(sso.role) ? sso.role : 'cajero';
+    // Roles: admin y cajero ('vendedor' de Nexus One se fusiono en cajero)
+    const role = normalizeRole(sso.role);
 
     // nexus-one es la fuente de verdad para los usuarios que entran por SSO:
     // se crean la primera vez y su rol se sincroniza en cada acceso.

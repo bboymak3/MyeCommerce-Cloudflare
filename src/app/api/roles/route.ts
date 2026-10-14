@@ -10,11 +10,6 @@ const DEFAULT_ROLES = {
     permissions: JSON.stringify({ pos: true, products: true, clients: true, reports: true, devolutions: true, cash_closing: true, config: true, backup: true }),
     color: '#7c3aed',
   },
-  vendedor: {
-    label: 'Vendedor',
-    permissions: JSON.stringify({ pos: true, products: true, clients: true, reports: true, devolutions: false, cash_closing: true, config: false, backup: false }),
-    color: '#059669',
-  },
   cajero: {
     label: 'Cajero',
     permissions: JSON.stringify({ pos: true, products: false, clients: false, reports: false, devolutions: false, cash_closing: false, config: false, backup: false }),
@@ -45,7 +40,8 @@ export async function GET(req: NextRequest) {
   try {
     await seedDefaultRoles(db);
     const roles = await db.roleConfig.findMany({ orderBy: { createdAt: 'asc' } });
-    return NextResponse.json(roles);
+    // 'vendedor' se fusiono en cajero: su configuracion ya no se muestra
+    return NextResponse.json(roles.filter((r: any) => r.roleName !== 'vendedor'));
   } catch (error) {
     console.error('Error fetching roles:', error);
     return NextResponse.json({ error: 'Error al obtener roles' }, { status: 500 });
