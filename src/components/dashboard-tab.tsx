@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { authFetch } from "@/lib/auth-fetch";
+import { toast } from "sonner";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from "recharts";
@@ -36,7 +37,8 @@ interface DashboardData {
   };
   yesterday: { totalUsd: number; count: number };
   pctChange: number;
-  weekDays: { label: string; total: number; count: number; cashea: number; casheaCount: number }[];
+  // La carga normal trae solo hoy y ayer; la semana se pide aparte (?week=1)
+  weekDays?: WeekDay[];
   topProducts: { name: string; qty: number; total: number }[];
   paymentBreakdown: Record<string, { count: number; totalUsd: number; totalBs: number }>;
   recentSales: {
@@ -46,6 +48,8 @@ interface DashboardData {
   }[];
   lastUpdate: string;
 }
+
+type WeekDay = { label: string; total: number; count: number; cashea: number; casheaCount: number };
 
 const METHOD_LABELS: Record<string, string> = {
   efectivo: "Efectivo",
@@ -64,6 +68,18 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Grafica semanal: solo se consulta cuando el usuario la pide
+  const [weekDays, setWeekDays] = useState<WeekDay[] | null>(null);
+  const [weekLoading, setWeekLoading] = useState(false);
+  const loadWeek = async () => {
+    setWeekLoading(true);
+    try {
+      const res = await authFetch("/api/dashboard?week=1", {}, onSessionExpired);
+      const json = await res.json() as any;
+      if (json.error) toast.error(json.error); else setWeekDays(json.weekDays || []);
+    } catch { toast.error("No se pudo cargar la semana"); }
+    finally { setWeekLoading(false); }
+  };
 
   const loadDashboard = useCallback(async () => {
     setError(null);
@@ -79,9 +95,9 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
-  // Auto-refresh cada 60 segundos
+  // Auto-refresh cada 60 segundos, solo si la pestana del navegador esta visible
   useEffect(() => {
-    const interval = setInterval(loadDashboard, 60000);
+    const interval = setInterval(() => { if (document.visibilityState === "visible") loadDashboard(); }, 60000);
     return () => clearInterval(interval);
   }, [loadDashboard]);
 
@@ -103,10 +119,10 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
     );
   }
 
-  const { today, pctChange, weekDays, topProducts, paymentBreakdown, recentSales } = data;
+  const { today, pctChange, topProducts, paymentBreakdown, recentSales } = data;
 
   // Datos para grafico apilado: entradas netas + cashea
-  const stackedWeekData = weekDays.map(d => ({
+  const stackedWeekData = (weekDays || []).map(d => ({
     label: d.label,
     netas: parseFloat(d.total.toFixed(2)),
     cashea: parseFloat(d.cashea.toFixed(2)),
@@ -213,6 +229,14 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
             <p className="text-[10px] text-muted-foreground">Verde = Entradas Netas (caja) | Morado = Cashea (BNPL, se cobra despues)</p>
           </CardHeader>
           <CardContent>
+            {!weekDays ? (
+              <div className="h-56 flex flex-col items-center justify-center gap-2 text-center">
+                <p className="text-xs text-muted-foreground">Para que el dashboard cargue rapido, la semana se consulta solo cuando la pide.</p>
+                <Button variant="outline" size="sm" onClick={loadWeek} disabled={weekLoading}>
+                  {weekLoading ? "Cargando..." : "Ver ventas de la semana"}
+                </Button>
+              </div>
+            ) : (
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stackedWeekData} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
@@ -232,6 +256,7 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            )}
           </CardContent>
         </Card>
 

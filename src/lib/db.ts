@@ -10,9 +10,30 @@ export const DEFAULT_TENANT_ID = 'default';
  * Create a PrismaClient backed by Cloudflare D1 (sin aislamiento por negocio).
  * Solo para tareas administrativas; las rutas deben usar createDbFromEnv.
  */
+// Un cliente por binding D1 y por isolate. Crear un PrismaClient (con su motor WASM)
+// en cada request gasta decenas de ms de CPU: en el plan Free de Workers (10 ms por
+// request) Cloudflare corta esas requests con el error 1102 y una pagina HTML.
+const baseClients = new WeakMap<object, PrismaClient>();
+const scopedClients = new WeakMap<object, Map<string, PrismaClient>>();
+
+// El cliente compartido atiende una operacion a la vez. Prisma agrupa consultas que llegan
+// al mismo tiempo; si son de requests distintas, una resuelve promesas de la otra y Workers
+// cancela esas continuaciones (la request se cuelga o da 500). La cola lo evita.
+const queues = new WeakMap<object, Promise<unknown>>();
+function serialized<T>(key: object, fn: () => Promise<T>): Promise<T> {
+  const prev = queues.get(key) || Promise.resolve();
+  const run = prev.then(fn, fn);
+  queues.set(key, run.catch(() => undefined));
+  return run;
+}
+
 export function createDb(d1: D1Database): PrismaClient {
-  const adapter = new PrismaD1(d1);
-  return new PrismaClient({ adapter });
+  let client = baseClients.get(d1);
+  if (!client) {
+    client = new PrismaClient({ adapter: new PrismaD1(d1) });
+    baseClients.set(d1, client);
+  }
+  return client;
 }
 
 // Operaciones cuyo `where` se restringe al negocio
@@ -96,7 +117,7 @@ export function scopeToTenant(base: PrismaClient, tenantId: string) {
               }
               break;
           }
-          return query(a);
+          return serialized(base, () => query(a));
         },
       },
     },
@@ -107,7 +128,18 @@ export function scopeToTenant(base: PrismaClient, tenantId: string) {
  * Cliente de base de datos aislado al negocio indicado.
  */
 export function createDbFromEnv(env: any, tenantId: string = DEFAULT_TENANT_ID): PrismaClient {
-  return scopeToTenant(createDb(env.DB), tenantId || DEFAULT_TENANT_ID);
+  const tid = tenantId || DEFAULT_TENANT_ID;
+  let byTenant = scopedClients.get(env.DB);
+  if (!byTenant) {
+    byTenant = new Map();
+    scopedClients.set(env.DB, byTenant);
+  }
+  let client = byTenant.get(tid);
+  if (!client) {
+    client = scopeToTenant(createDb(env.DB), tid);
+    byTenant.set(tid, client);
+  }
+  return client;
 }
 
 /**

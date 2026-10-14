@@ -108,7 +108,7 @@ export async function loadCashMovements(db: any, from: Date, to: Date, filter: M
 export async function loadReturns(db: any, from: Date, to: Date, keep: (sale: any) => boolean = () => true) {
   const all = await db.devolution.findMany({
     where: { date: { gte: from, lte: to } },
-    include: { sale: { select: { sellerName: true, sellerRole: true } } },
+    select: { id: true, totalUsd: true, totalBs: true, sale: { select: { sellerName: true, sellerRole: true } } },
   });
   const devs = (all as any[]).filter((d) => keep(d.sale || {}));
   const ids = devs.map((d) => d.id);

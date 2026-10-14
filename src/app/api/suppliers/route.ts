@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json(supplier);
   } catch (error: any) {
-    return NextResponse.json({ error: 'Error al crear proveedor' }, { status: 500 });
+    return NextResponse.json({ error: 'Error al crear proveedor: ' + (error?.message || String(error)) }, { status: 500 });
   }
 }
 
@@ -75,7 +75,7 @@ export async function PUT(req: NextRequest) {
     });
     return NextResponse.json(supplier);
   } catch (error: any) {
-    return NextResponse.json({ error: 'Error al actualizar proveedor' }, { status: 500 });
+    return NextResponse.json({ error: 'Error al actualizar proveedor: ' + (error?.message || String(error)) }, { status: 500 });
   }
 }
 
