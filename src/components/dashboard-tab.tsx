@@ -29,6 +29,10 @@ interface DashboardData {
     casheaCount: number;
     casheaUsd: number;
     casheaBs: number;
+    // Devoluciones de hoy (cashUsd = reembolsado; creditUsd = descontado de deudas a credito)
+    returns?: { count: number; totalUsd: number; totalBs: number; cashUsd: number; cashBs: number; creditUsd: number };
+    // Abonos cobrados hoy de cuentas por cobrar
+    abonos?: { count: number; usd: number; bs: number };
   };
   yesterday: { totalUsd: number; count: number };
   pctChange: number;
@@ -115,7 +119,7 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
         <div>
           <h2 className="text-xl font-bold">Dashboard</h2>
           <p className="text-xs text-muted-foreground">
-            {new Date().toLocaleDateString("es-VE", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+            {new Date().toLocaleDateString("es-VE", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Caracas" })}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={loadDashboard}>
@@ -156,6 +160,15 @@ export default function DashboardTab({ bcvRate, currency, onSessionExpired }: Da
             <p className="text-[10px] text-muted-foreground uppercase font-medium">Entradas Netas (Caja)</p>
             <p className="text-2xl font-black text-green-600">${today.totalUsd.toFixed(2)}</p>
             <p className="text-sm font-medium text-muted-foreground">Bs {today.totalBs.toFixed(2)}</p>
+            {!!today.abonos?.count && (
+              <p className="text-[10px] text-green-700">+ Abonos cobrados: ${today.abonos.usd.toFixed(2)} ({today.abonos.count})</p>
+            )}
+            {!!today.returns?.count && (
+              <p className="text-[10px] text-red-600">
+                - Devoluciones: ${today.returns.cashUsd.toFixed(2)} ({today.returns.count})
+                {today.returns.creditUsd > 0 && <span className="text-muted-foreground"> · ${today.returns.creditUsd.toFixed(2)} descontado de creditos</span>}
+              </p>
+            )}
           </CardContent>
         </Card>
 

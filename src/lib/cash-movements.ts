@@ -100,3 +100,29 @@ export async function loadCashMovements(db: any, from: Date, to: Date, filter: M
     },
   };
 }
+
+/**
+ * Devoluciones del periodo: total, la parte descontada de deudas de ventas a credito
+ * (no salio dinero) y lo reembolsado. `keep` filtra por la venta (vendedor, rol).
+ */
+export async function loadReturns(db: any, from: Date, to: Date, keep: (sale: any) => boolean = () => true) {
+  const all = await db.devolution.findMany({
+    where: { date: { gte: from, lte: to } },
+    include: { sale: { select: { sellerName: true, sellerRole: true } } },
+  });
+  const devs = (all as any[]).filter((d) => keep(d.sale || {}));
+  const ids = devs.map((d) => d.id);
+  const credit = ids.length
+    ? await db.creditPayment.findMany({ where: { method: 'devolucion', reference: { in: ids } }, select: { amount: true, amountBs: true } })
+    : [];
+  const totalUsd = devs.reduce((s, d) => s + (Number(d.totalUsd) || 0), 0);
+  const totalBs = devs.reduce((s, d) => s + (Number(d.totalBs) || 0), 0);
+  const creditUsd = (credit as any[]).reduce((s, c) => s + (Number(c.amount) || 0), 0);
+  const creditBs = (credit as any[]).reduce((s, c) => s + (Number(c.amountBs) || 0), 0);
+  return {
+    count: devs.length,
+    totalUsd: round2(totalUsd), totalBs: round2(totalBs),
+    creditUsd: round2(creditUsd), creditBs: round2(creditBs),
+    cashUsd: round2(Math.max(0, totalUsd - creditUsd)), cashBs: round2(Math.max(0, totalBs - creditBs)),
+  };
+}

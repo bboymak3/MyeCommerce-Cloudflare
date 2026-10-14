@@ -3,6 +3,7 @@ import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { veDateKey, veDayStart, veDayEnd } from '@/lib/ve-time';
+import { loadCashMovements, loadReturns } from '@/lib/cash-movements';
 
 // Helper: desglosa venta en porciones netas (no-cashea) y cashea.
 // Para pago mixto, solo suma la porcion correspondiente a cada bucket.
@@ -153,6 +154,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // ===== DEVOLUCIONES Y ABONOS DE HOY =====
+    const todayReturns = await loadReturns(db, startOfDay, endOfDay);
+    const { abonos: todayAbonos } = await loadCashMovements(db, startOfDay, endOfDay);
+
     // ===== ULTIMAS 5 VENTAS =====
     const recentSalesList = todaySales.slice(0, 5).map(s => ({
       id: s.id,
@@ -179,6 +184,8 @@ export async function GET(req: NextRequest) {
         casheaCount: todayCasheaCount,
         casheaUsd: todayCasheaUsd,
         casheaBs: todayCasheaBs,
+        returns: todayReturns,
+        abonos: { count: todayAbonos.count, usd: todayAbonos.usd, bs: todayAbonos.bs },
       },
       yesterday: {
         totalUsd: yesterdayTotal,
