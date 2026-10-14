@@ -124,6 +124,31 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Venta a credito: lo devuelto se descuenta de lo que el cliente debe (hasta su saldo
+    // pendiente) y queda en su historial de abonos con metodo 'devolucion'.
+    if (sale.isCredit) {
+      const pending = Number(sale.total || 0) - Number(sale.creditPaid || 0);
+      const debtCut = Number(Math.min(totalUsd, pending).toFixed(2));
+      if (debtCut > 0) {
+        batch.insert('pos_credit_payments', {
+          saleId: body.saleId,
+          clientId: sale.clientId || null,
+          date: now,
+          amount: debtCut,
+          exchangeRate: rate,
+          amountBs: Number((debtCut * rate).toFixed(2)),
+          method: 'devolucion',
+          reference: devolutionId,
+          notes: body.reason || 'Devolucion',
+          createdBy: req.headers.get('x-username') || '',
+        });
+        batch.raw('UPDATE "pos_sales" SET "creditPaid" = ROUND(MIN("total", "creditPaid" + ?), 2) WHERE "id" = ? AND "tenant_id" = ?', debtCut, body.saleId);
+        if (sale.clientId) {
+          batch.raw('UPDATE "pos_clients" SET "creditBalance" = MAX(0, ROUND("creditBalance" - ?, 2)), "updatedAt" = ? WHERE "id" = ? AND "tenant_id" = ?', debtCut, now, sale.clientId);
+        }
+      }
+    }
+
     // Restaurar stock y registrar la entrada en el kardex
     for (const item of body.items) {
       const qty = parseFloat(item.quantity);

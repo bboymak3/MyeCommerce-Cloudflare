@@ -35,3 +35,12 @@ export function veWallNow(): Date {
 export function fromVeWall(d: Date): Date {
   return new Date(d.getTime() - (d.getTimezoneOffset() - VE_OFFSET_MIN) * 60000);
 }
+
+/**
+ * Instante para guardar una fecha elegida en un calendario ('YYYY-MM-DD'): el mediodia
+ * de Caracas. Asi la fecha UTC y la de Caracas coinciden y cae dentro de veDayStart/veDayEnd
+ * de ese dia. Otro formato se interpreta tal cual.
+ */
+export function veNoon(day: string): Date {
+  return DAY_KEY_RE.test(day) ? new Date(`${day}T12:00:00.000-04:00`) : new Date(day);
+}

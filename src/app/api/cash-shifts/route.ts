@@ -2,6 +2,48 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { loadCashMovements, cashOf } from '@/lib/cash-movements';
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Totales del turno hasta `until`: ventas del turno y efectivo esperado en la caja
+ * (inicial + efectivo de las ventas, incluida la parte en efectivo de los pagos mixtos,
+ * + abonos cobrados en efectivo - gastos y pagos a proveedores en efectivo que registro
+ * el mismo cajero durante el turno).
+ */
+async function shiftSummary(db: any, shift: any, until: Date) {
+  const sales = await db.sale.findMany({ where: { shiftId: shift.id } });
+  let totalUsd = 0, totalBs = 0, salesCashUsd = 0, salesCashBs = 0;
+  for (const s of sales) {
+    totalUsd += s.total;
+    totalBs += s.totalBs;
+    if (s.isCredit) continue;
+    if (s.paymentMethod === 'efectivo-usd') salesCashUsd += s.total;
+    else if (s.paymentMethod === 'efectivo') salesCashBs += s.totalBs;
+    else if (s.paymentMethod === 'mixto' && s.mixedPaymentJson) {
+      try {
+        for (const e of JSON.parse(s.mixedPaymentJson) as Array<{ method: string; amountBs?: number; amountUsd?: number }>) {
+          if (e.method === 'efectivo') salesCashBs += Number(e.amountBs) || 0;
+          else if (e.method === 'efectivo-usd') salesCashUsd += Number(e.amountUsd) || 0;
+        }
+      } catch { /* pago mixto ilegible */ }
+    }
+  }
+  const movements = await loadCashMovements(db, new Date(shift.openedAt), until, { userId: shift.userId, username: shift.userName });
+  return {
+    salesCount: sales.length,
+    totalUsd: r2(totalUsd),
+    totalBs: r2(totalBs),
+    expectedCashUsd: r2(shift.openingCashUsd + salesCashUsd + movements.efectivoNeto.usd),
+    expectedCashBs: r2(shift.openingCashBs + salesCashBs + movements.efectivoNeto.bs),
+    movements: {
+      abonosEfectivo: cashOf(movements.abonos),
+      gastosEfectivo: cashOf(movements.gastos),
+      pagosProveedoresEfectivo: cashOf(movements.pagosProveedores),
+    },
+  };
+}
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
@@ -12,7 +54,9 @@ export async function GET(req: NextRequest) {
 
     if (searchParams.get('current') === '1') {
       const shift = await db.cashShift.findFirst({ where: { userId, status: 'open' }, orderBy: { openedAt: 'desc' } });
-      return NextResponse.json(shift);
+      // Turno abierto: totales y efectivo esperado calculados en vivo
+      if (!shift) return NextResponse.json(null);
+      return NextResponse.json({ ...shift, ...(await shiftSummary(db, shift, new Date())) });
     }
 
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50') || 50, 1), 200);
@@ -66,15 +110,9 @@ export async function PUT(req: NextRequest) {
     if (shift.status !== 'open') return NextResponse.json({ error: 'Este turno ya esta cerrado' }, { status: 400 });
     if (shift.userId !== userId) return NextResponse.json({ error: 'Solo el cajero que abrio el turno puede cerrarlo' }, { status: 403 });
 
-    const sales = await db.sale.findMany({ where: { shiftId: shift.id } });
-    let totalUsd = 0, totalBs = 0;
-    let cashExpectedUsd = shift.openingCashUsd, cashExpectedBs = shift.openingCashBs;
-    for (const s of sales) {
-      totalUsd += s.total;
-      totalBs += s.totalBs;
-      if (s.paymentMethod === 'efectivo-usd') cashExpectedUsd += s.total;
-      else if (s.paymentMethod === 'efectivo') cashExpectedBs += s.totalBs;
-    }
+    const closedAt = new Date();
+    const summary = await shiftSummary(db, shift, closedAt);
+    const cashExpectedUsd = summary.expectedCashUsd, cashExpectedBs = summary.expectedCashBs;
 
     const closingCashUsd = parseFloat(body.closingCashUsd) || 0;
     const closingCashBs = parseFloat(body.closingCashBs) || 0;
@@ -82,15 +120,15 @@ export async function PUT(req: NextRequest) {
     const updated = await db.cashShift.update({
       where: { id: shift.id },
       data: {
-        closedAt: new Date(),
+        closedAt,
         closingCashUsd, closingCashBs,
         expectedCashUsd: Number(cashExpectedUsd.toFixed(2)),
         expectedCashBs: Number(cashExpectedBs.toFixed(2)),
         diffUsd: Number((closingCashUsd - cashExpectedUsd).toFixed(2)),
         diffBs: Number((closingCashBs - cashExpectedBs).toFixed(2)),
-        salesCount: sales.length,
-        totalUsd: Number(totalUsd.toFixed(2)),
-        totalBs: Number(totalBs.toFixed(2)),
+        salesCount: summary.salesCount,
+        totalUsd: summary.totalUsd,
+        totalBs: summary.totalBs,
         status: 'closed',
         notes: body.notes || shift.notes,
       },

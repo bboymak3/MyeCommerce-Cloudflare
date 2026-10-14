@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { veDateKey } from "@/lib/ve-time";
+import { authFetch } from "@/lib/auth-fetch";
 import {
   Receipt, Plus, Trash2, Search, Edit2, TrendingUp, TrendingDown,
   DollarSign, Calendar, Filter, PieChart, BarChart3, Wallet,
@@ -65,7 +66,8 @@ interface ProfitLossReport {
 }
 
 const PAYMENT_METHODS = [
-  { value: "efectivo", label: "Efectivo" },
+  { value: "efectivo", label: "Efectivo (Bs)" },
+  { value: "efectivo-usd", label: "Efectivo ($)" },
   { value: "transferencia", label: "Transferencia" },
   { value: "tarjeta", label: "Tarjeta" },
   { value: "zelle", label: "Zelle" },
@@ -155,7 +157,7 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
 
   async function loadCategories() {
     try {
-      const res = await fetch("/api/expense-categories");
+      const res = await authFetch("/api/expense-categories");
       if (res.ok) {
         const data = await res.json();
         setCategories(data);
@@ -174,7 +176,7 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
       if (filterEndDate) params.set("endDate", filterEndDate);
       if (filterCategory) params.set("categoryId", filterCategory);
 
-      const res = await fetch(`/api/expenses?${params.toString()}`);
+      const res = await authFetch(`/api/expenses?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setExpenses(data);
@@ -190,14 +192,14 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
     try {
       await Promise.all(
         DEFAULT_CATEGORIES.map((cat) =>
-          fetch("/api/expense-categories", {
+          authFetch("/api/expense-categories", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(cat),
           })
         )
       );
-      const res = await fetch("/api/expense-categories");
+      const res = await authFetch("/api/expense-categories");
       if (res.ok) setCategories(await res.json());
       toast.success("Categorías por defecto creadas");
     } catch {
@@ -225,7 +227,7 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
       // Para PUT pasamos id en body
       const payload = editingId ? { ...body, id: editingId } : body;
 
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -248,7 +250,7 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
   async function deleteExpense(id: string) {
     if (!confirm("¿Eliminar este gasto?")) return;
     try {
-      const res = await fetch(`/api/expenses?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/expenses?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Gasto eliminado");
         loadExpenses();
@@ -289,7 +291,7 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
   async function saveCategory() {
     if (!catForm.name.trim()) return toast.error("Nombre requerido");
     try {
-      const res = await fetch("/api/expense-categories", {
+      const res = await authFetch("/api/expense-categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(catForm),
@@ -311,7 +313,7 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
   async function deleteCategory(id: string) {
     if (!confirm("¿Eliminar esta categoría?")) return;
     try {
-      const res = await fetch(`/api/expense-categories?id=${id}`, { method: "DELETE" });
+      const res = await authFetch(`/api/expense-categories?id=${id}`, { method: "DELETE" });
       if (res.ok) {
         toast.success("Categoría eliminada");
         loadCategories();
@@ -328,7 +330,7 @@ export default function ExpensesTab({ bcvRate = 36.5, currency = "USD", sellerNa
   async function loadReport() {
     try {
       setReportLoading(true);
-      const res = await fetch(`/api/reports/profit-loss?startDate=${reportStart}&endDate=${reportEnd}`);
+      const res = await authFetch(`/api/reports/profit-loss?startDate=${reportStart}&endDate=${reportEnd}`);
       if (res.ok) {
         setReport(await res.json());
       } else {

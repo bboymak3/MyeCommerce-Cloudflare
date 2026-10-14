@@ -32,10 +32,14 @@ export async function GET(req: NextRequest) {
 
     const totalVentasUsd = sales.reduce((sum, s) => sum + s.total, 0);
     const totalVentasCount = sales.length;
-    const totalDevolucionesUsd = sales.reduce((sum, s) => {
-      const devTotal = s.devolutions?.reduce((d, dev) => d + dev.totalUsd, 0) || 0;
-      return sum + devTotal;
-    }, 0);
+    // Devoluciones hechas en el periodo (restan de las ventas, y su mercancia vuelve al inventario)
+    const devolutions: any[] = await db.devolution.findMany({
+      where: { date: { gte: start, lte: end } },
+      include: { items: { include: { product: { select: { cost: true } } } } },
+    });
+    const totalDevolucionesUsd = devolutions.reduce((sum, d) => sum + (d.totalUsd || 0), 0);
+    const costoDevueltoUsd = devolutions.reduce((sum, d) =>
+      sum + (d.items || []).reduce((s: number, it: any) => s + (it.product?.cost || 0) * it.quantity, 0), 0);
     const ventasNetasUsd = totalVentasUsd - totalDevolucionesUsd;
 
     // 2. COSTO DE VENTAS (cost * qty de cada SaleItem)
@@ -44,7 +48,7 @@ export async function GET(req: NextRequest) {
         return itemSum + (item.product?.cost || 0) * item.quantity;
       }, 0);
       return sum + itemsCost;
-    }, 0);
+    }, 0) - costoDevueltoUsd;
 
     // 3. GASTOS del periodo
     const expenses = await db.expense.findMany({
@@ -100,9 +104,12 @@ export async function GET(req: NextRequest) {
       // Parsear mixedPaymentJson si existe
       if (sale.mixedPaymentJson && sale.mixedPaymentJson !== '{}' && sale.mixedPaymentJson !== '') {
         try {
+          // Pago mixto: lista de { method, amountUsd, amountBs }
           const mixed = JSON.parse(sale.mixedPaymentJson);
-          for (const [method, amount] of Object.entries(mixed)) {
-            ventasPorMetodo[method] = (ventasPorMetodo[method] || 0) + (amount as number);
+          if (!Array.isArray(mixed)) throw new Error('formato');
+          for (const e of mixed) {
+            const usd = Number(e.amountUsd) || (Number(e.amountBs) || 0) / (sale.exchangeRate || bcvRate);
+            ventasPorMetodo[e.method] = (ventasPorMetodo[e.method] || 0) + usd;
           }
         } catch {
           ventasPorMetodo[sale.paymentMethod] = (ventasPorMetodo[sale.paymentMethod] || 0) + sale.total;

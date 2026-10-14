@@ -25,10 +25,8 @@ export async function GET(req: NextRequest) {
       orderBy: { creditDueDate: 'asc' },
     });
 
-    // Filter to only those still with remaining balance
-    const overdueSales = allCreditSales
-      .filter(s => (s.creditPaid || 0) < (s.total || 0))
-      .slice(0, 10);
+    // Solo las que aun tienen saldo. El total y la cantidad cuentan todas; la lista muestra 10.
+    const overdueSales = allCreditSales.filter(s => (s.total || 0) - (s.creditPaid || 0) > 0.01);
 
     const count = overdueSales.length;
     const totalOverdueUsd = overdueSales.reduce(
@@ -38,7 +36,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       count,
       totalOverdueUsd: Number(totalOverdueUsd.toFixed(2)),
-      sales: overdueSales.map(s => ({
+      sales: overdueSales.slice(0, 10).map(s => ({
         id: s.id,
         clientName: s.client?.fullName || 'Cliente',
         remaining: Number(((s.total || 0) - (s.creditPaid || 0)).toFixed(2)),

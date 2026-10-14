@@ -338,6 +338,7 @@ model CashClosing {
   biopagoUsd        Float    @default(0)
   biopagoBs         Float    @default(0)
   breakdownJson     String   @default("{}")
+  movementsJson     String   @default("{}")
   exchangeRate    Float    @default(0)
   observations    String   @default("")
   createdAt       DateTime @default(now())
