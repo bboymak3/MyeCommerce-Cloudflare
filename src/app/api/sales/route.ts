@@ -77,8 +77,10 @@ export async function POST(req: NextRequest) {
     // Lecturas primero; despues todas las escrituras en un lote atomico de D1
 
     // 2. Read product costs and last inventory movements for kardex — READS FIRST
-    const sName = body.sellerName || '';
-    const sRole = body.sellerRole || '';
+    // Vendedor: el nombre elegido en la pantalla o, si no viene, el usuario de la sesion.
+    // El rol sale siempre de la sesion (el del cuerpo solo si no hay sesion).
+    const sName = body.sellerName || req.headers.get('x-username') || '';
+    const sRole = req.headers.get('x-user-role') || body.sellerRole || '';
     const uId = req.headers.get('x-user-id') || String(body.userId || '');
     const openShift = uId ? await db.cashShift.findFirst({ where: { userId: uId, status: 'open' } }) : null;
     const kardexData: { productId: string; qty: number; unitCost: number; balQty: number; balTC: number; balAvg: number }[] = [];
@@ -150,8 +152,8 @@ export async function POST(req: NextRequest) {
       clientDocNumber: body.clientDocNumber || '',
       clientName: body.clientName || '',
       clientAddress: body.clientAddress || '',
-      sellerName: body.sellerName || '',
-      sellerRole: body.sellerRole || '',
+      sellerName: sName,
+      sellerRole: sRole,
       notes: body.notes || '',
       clientId: body.clientId || null,
       isCredit: !!body.isCredit,

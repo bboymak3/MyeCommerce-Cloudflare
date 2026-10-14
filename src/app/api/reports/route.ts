@@ -3,6 +3,7 @@ import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { veDayStart, veDayEnd, veWallNow, fromVeWall } from '@/lib/ve-time';
+import { loadCashMovements, loadReturns } from '@/lib/cash-movements';
 
 // Rango del periodo en hora de Venezuela (las fechas se arman "de pared" y se
 // convierten al instante real en getPeriodDates).
@@ -240,9 +241,14 @@ export async function GET(req: NextRequest) {
     const creditSales = sales.filter(s => s.isCredit);
     const creditSalesTotal = creditSales.reduce((sum, s) => sum + s.total, 0);
     const creditSalesTotalBs = creditSales.reduce((sum, s) => sum + s.totalBs, 0);
-    const creditPaidTotal = creditSales.reduce((sum, s) => sum + (s.creditPaid || 0), 0);
+    // creditPaid incluye lo descontado por devoluciones (abonos con metodo 'devolucion'): no es dinero cobrado
+    const creditReturns = creditSales.length
+      ? await db.creditPayment.findMany({ where: { method: 'devolucion', saleId: { in: creditSales.map(s => s.id) } }, select: { amount: true } })
+      : [];
+    const creditReturnedTotal = creditReturns.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const creditPaidTotal = creditSales.reduce((sum, s) => sum + (s.creditPaid || 0), 0) - creditReturnedTotal;
     const creditPaidBs = parseFloat((creditPaidTotal * currentBcvRate).toFixed(2));
-    const creditPendingTotal = creditSalesTotal - creditPaidTotal;
+    const creditPendingTotal = creditSalesTotal - creditPaidTotal - creditReturnedTotal;
     const creditPendingBs = parseFloat((creditPendingTotal * currentBcvRate).toFixed(2));
 
     // Cashea (BNPL: Compra Ahora y Paga Despues)
@@ -276,6 +282,7 @@ export async function GET(req: NextRequest) {
           entries.forEach((e) => {
             const m = e.method.toLowerCase();
             if (!paymentBreakdown[m]) paymentBreakdown[m] = { count: 0, totalUsd: 0, totalBs: 0 };
+            paymentBreakdown[m].count++;
             paymentBreakdown[m].totalUsd += e.amountUsd || 0;
             paymentBreakdown[m].totalBs += e.amountBs;
           });
@@ -416,6 +423,12 @@ export async function GET(req: NextRequest) {
 
     const roleBreakdown = Object.values(roleMap).sort((a, b) => b.totalBs - a.totalBs);
 
+    // Devoluciones del periodo (con los mismos filtros de vendedor/rol, por su venta) y
+    // abonos cobrados de cuentas por cobrar (no dependen del vendedor)
+    const returns = await loadReturns(db, start, end, (sale) =>
+      (!sellerFilter || sale.sellerName === sellerFilter) && (!roleFilter || sale.sellerRole === roleFilter));
+    const { abonos } = await loadCashMovements(db, start, end);
+
     return NextResponse.json({
       sales,
       totalSales,
@@ -440,9 +453,13 @@ export async function GET(req: NextRequest) {
       creditPaidBs,
       creditPendingTotal,
       creditPendingBs,
+      creditReturnedTotal,
+      creditReturnedBs: parseFloat((creditReturnedTotal * currentBcvRate).toFixed(2)),
       casheaSalesCount,
       casheaSalesTotal,
       casheaSalesTotalBs,
+      returns,
+      abonos,
       periodLabel,
       startDate: start.toISOString(),
       endDate: end.toISOString(),

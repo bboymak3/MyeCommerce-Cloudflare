@@ -196,6 +196,8 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
   const [creditPaidBs, setCreditPaidBs] = useState(0);
   const [creditPendingTotal, setCreditPendingTotal] = useState(0);
   const [creditPendingBs, setCreditPendingBs] = useState(0);
+  const [creditReturnedTotal, setCreditReturnedTotal] = useState(0);
+  const [creditReturnedBs, setCreditReturnedBs] = useState(0);
   // Cashea (BNPL: Compra Ahora y Paga Despues)
   const [casheaSalesCount, setCasheaSalesCount] = useState(0);
   const [casheaSalesTotal, setCasheaSalesTotal] = useState(0);
@@ -203,6 +205,9 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
   // Ventas Brutas (incluye TODO: efectivo, credito, cashea, etc.)
   const [grossTotalSales, setGrossTotalSales] = useState(0);
   const [grossTotalBs, setGrossTotalBs] = useState(0);
+  // Devoluciones y abonos cobrados del periodo
+  const [returnsData, setReturnsData] = useState<{ count: number; totalUsd: number; totalBs: number; cashUsd: number; cashBs: number; creditUsd: number; creditBs: number } | null>(null);
+  const [abonosData, setAbonosData] = useState<{ count: number; usd: number; bs: number } | null>(null);
 
   const loadReport = async () => {
     setLoading(true);
@@ -213,8 +218,8 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
       if (period === "custom" && customStart && customEnd) {
         url += `&startDate=${customStart}&endDate=${customEnd}`;
       }
-      const res = await fetch(url);
-      const data = await res.json();
+      const res = await authFetch(url);
+      const data = await res.json() as any;
       if (data.error) {
         setSales([]); setTotalSales(0); setTotalBs(0); setSalesCount(0);
         setTopProducts([]); setPaymentBreakdown({}); setReferenceDetails([]);
@@ -222,6 +227,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
         setSellerBreakdown([]); setSellerList([]);
         setGrossTotalSales(0); setGrossTotalBs(0);
         setCasheaSalesCount(0); setCasheaSalesTotal(0); setCasheaSalesTotalBs(0);
+        setReturnsData(null); setAbonosData(null);
       } else {
         setSales(data.sales || []);
         setTotalSales(data.totalSales || 0);
@@ -248,10 +254,14 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
         setCreditPaidBs(data.creditPaidBs || 0);
         setCreditPendingTotal(data.creditPendingTotal || 0);
         setCreditPendingBs(data.creditPendingBs || 0);
+        setCreditReturnedTotal(data.creditReturnedTotal || 0);
+        setCreditReturnedBs(data.creditReturnedBs || 0);
         // Cashea (BNPL) data
         setCasheaSalesCount(data.casheaSalesCount || 0);
         setCasheaSalesTotal(data.casheaSalesTotal || 0);
         setCasheaSalesTotalBs(data.casheaSalesTotalBs || 0);
+        setReturnsData(data.returns || null);
+        setAbonosData(data.abonos || null);
       }
     } catch {
       toast.error("Error al cargar reporte");
@@ -265,15 +275,17 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, sellerFilter, roleFilter]);
 
-  const avgTicket = salesCount > 0 ? totalBs / salesCount : 0;
+  // Ticket promedio sobre las ventas brutas: salesCount cuenta todas las ventas (tambien credito y cashea)
+  const avgTicket = salesCount > 0 ? grossTotalBs / salesCount : 0;
 
   // Sales by hour
   const salesByHour = useMemo(() => {
     const hourMap: Record<string, { count: number; totalBs: number }> = {};
     for (let h = 0; h < 24; h++) hourMap[`${h.toString().padStart(2, "0")}:00`] = { count: 0, totalBs: 0 };
     sales.forEach((s) => {
-      const d = new Date(s.date);
-      const label = `${d.getHours().toString().padStart(2, "0")}:00`;
+      // Hora de Caracas (UTC-4 fijo), sin depender de la zona del equipo
+      const h = (new Date(s.date).getUTCHours() + 20) % 24;
+      const label = `${h.toString().padStart(2, "0")}:00`;
       if (hourMap[label]) { hourMap[label].count++; hourMap[label].totalBs += s.totalBs; }
     });
     return Object.entries(hourMap).filter(([, v]) => v.count > 0)
@@ -282,12 +294,14 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
   }, [sales]);
 
   const paymentPieData = useMemo(() => {
+    // Porcentaje sobre lo que suma el desglose (incluye credito y cashea), no sobre las entradas netas
+    const sumBs = Object.values(paymentBreakdown).reduce((s, v) => s + v.totalBs, 0);
     return Object.entries(paymentBreakdown).filter(([, v]) => v.count > 0)
       .map(([method, data]) => ({
         name: PAYMENT_LABELS[method] || method, value: parseFloat(data.totalBs.toFixed(2)),
-        count: data.count, pct: totalBs > 0 ? ((data.totalBs / totalBs) * 100).toFixed(1) : "0",
+        count: data.count, pct: sumBs > 0 ? ((data.totalBs / sumBs) * 100).toFixed(1) : "0",
       }));
-  }, [paymentBreakdown, totalBs]);
+  }, [paymentBreakdown]);
 
   const paymentBarData = useMemo(() => {
     return Object.entries(paymentBreakdown).filter(([, v]) => v.count > 0)
@@ -582,7 +596,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
       const a = document.createElement("a");
       a.href = url;
       const safeLabel = periodLabel.replace(/[^a-zA-Z0-9]/g, "_");
-      a.download = `reporte_ventas_${safeLabel}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `reporte_ventas_${safeLabel}_${veDateKey()}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -647,7 +661,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
         XLSX.utils.book_append_sheet(wb, ws3, "Top Productos");
       }
 
-      XLSX.writeFile(wb, `reporte-ventas-${new Date().toISOString().split('T')[0]}.xlsx`);
+      XLSX.writeFile(wb, `reporte-ventas-${veDateKey()}.xlsx`);
       toast.success("Reporte Excel exportado");
     } catch (e: any) { toast.error("Error al exportar Excel: " + e.message); }
   };
@@ -696,7 +710,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
         margin: { left: 14, right: 14 },
       });
 
-      doc.save(`reporte-ventas-${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`reporte-ventas-${veDateKey()}.pdf`);
       toast.success("Reporte PDF exportado");
     } catch (e: any) { toast.error("Error al exportar PDF: " + e.message); }
   };
@@ -848,6 +862,30 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
         </Card>
       </div>
 
+      {/* ====== DEVOLUCIONES Y ABONOS ====== */}
+      {((returnsData?.count || 0) > 0 || (abonosData?.count || 0) > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Card className="border-l-4 border-l-red-500">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground">Devoluciones ({returnsData?.count || 0})</p>
+              <p className="text-xl font-bold text-red-600">-{currency} {(returnsData?.totalUsd || 0).toFixed(2)}</p>
+              <p className="text-[10px] text-muted-foreground">
+                Reembolsado: {currency} {(returnsData?.cashUsd || 0).toFixed(2)} / Bs {(returnsData?.cashBs || 0).toFixed(2)}
+                {(returnsData?.creditUsd || 0) > 0 && ` · Descontado de creditos: ${currency} ${(returnsData?.creditUsd || 0).toFixed(2)}`}
+              </p>
+              <p className="text-[9px] text-muted-foreground">Ventas brutas menos devoluciones: {currency} {(grossTotalSales - (returnsData?.totalUsd || 0)).toFixed(2)}</p>
+            </CardContent>
+          </Card>
+          <Card className="border-l-4 border-l-green-600">
+            <CardContent className="p-3">
+              <p className="text-[10px] text-muted-foreground">Abonos cobrados de creditos ({abonosData?.count || 0})</p>
+              <p className="text-xl font-bold text-green-700">+{currency} {(abonosData?.usd || 0).toFixed(2)}</p>
+              <p className="text-[10px] text-muted-foreground">Bs {(abonosData?.bs || 0).toFixed(2)} · dinero que entro por ventas a credito de cualquier fecha</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* ====== VENTAS POR CASHEA (BNPL) ====== */}
       <Card className={`border-purple-300 bg-purple-50/30 ${casheaSalesCount > 0 ? '' : 'opacity-60'}`}>
         <CardHeader className="pb-2">
@@ -923,10 +961,10 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                 <p className="text-[9px] text-red-500">{creditSalesTotal > 0 ? ((creditPendingTotal / creditSalesTotal) * 100).toFixed(1) : "0"}% pendiente</p>
               </div>
               <div className="p-3 rounded-lg border border-blue-200 bg-blue-50/50">
-                <p className="text-[10px] text-muted-foreground">Saldo Neto</p>
-                <p className="text-lg font-bold text-blue-600">{currency} {(creditSalesTotal - creditPaidTotal).toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground">Bs {(creditSalesTotalBs - creditPaidBs).toFixed(2)}</p>
-                <p className="text-[9px] text-blue-500">Por cobrar neto</p>
+                <p className="text-[10px] text-muted-foreground">Descontado por Devoluciones</p>
+                <p className="text-lg font-bold text-blue-600">{currency} {creditReturnedTotal.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">Bs {creditReturnedBs.toFixed(2)}</p>
+                <p className="text-[9px] text-blue-500">Mercancia devuelta: baja la deuda sin cobrarse</p>
               </div>
             </div>
             {/* Progress bar */}
