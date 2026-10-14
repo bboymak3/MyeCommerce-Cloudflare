@@ -1,15 +1,41 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { D1Batch } from '@/lib/d1-batch';
+import { D1Batch, fromDbRow, sqlExpr, toDbDate } from '@/lib/d1-batch';
+import { d1Of, loadProductsWithLastMove, placeholders } from '@/lib/d1-read';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
+
+// Sin Prisma: lecturas con SQL directo (ver "Limite de CPU" en CLAUDE.md)
+
+/** Notas de entrega con sus items, en el formato que devolvia Prisma (include: { items: true }). */
+async function loadNotesSql(D1: D1Database, tenantId: string, where: string, params: unknown[]) {
+  const { results } = await D1.prepare(`SELECT * FROM pos_delivery_notes WHERE tenant_id = ?1 ${where} ORDER BY createdAt DESC`)
+    .bind(tenantId, ...params).all();
+  const notes = ((results || []) as any[]).map((r) => fromDbRow<any>('pos_delivery_notes', r));
+  if (notes.length === 0) return [];
+  const ids = notes.map((n) => n.id);
+  const { results: itemRows } = await D1.prepare(
+    `SELECT * FROM pos_delivery_note_items WHERE tenant_id = ?1 AND deliveryNoteId IN (${placeholders(ids.length, 2)}) ORDER BY rowid`,
+  ).bind(tenantId, ...ids).all();
+  const items = new Map<string, any[]>();
+  for (const it of (itemRows || []) as any[]) {
+    if (!items.has(it.deliveryNoteId)) items.set(it.deliveryNoteId, []);
+    items.get(it.deliveryNoteId)!.push(fromDbRow('pos_delivery_note_items', it));
+  }
+  return notes.map((n) => ({ ...n, items: items.get(n.id) || [] }));
+}
+
+async function loadNoteSql(D1: D1Database, tenantId: string, id: string) {
+  const [note] = await loadNotesSql(D1, tenantId, 'AND id = ?2', [id]);
+  return note || null;
+}
 
 const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n) ? fb : n; };
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
@@ -17,25 +43,15 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    const where: any = {};
-    if (status) where.status = status;
-    if (userId) where.userId = userId;
-    if (startDate && endDate) {
-      where.createdAt = {
-        gte: veDayStart(startDate),
-        lte: veDayEnd(endDate),
-      };
-    } else if (startDate) {
-      where.createdAt = { gte: veDayStart(startDate) };
-    } else if (endDate) {
-      where.createdAt = { lte: veDayEnd(endDate) };
-    }
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    const add = (sql: string, v: unknown) => { params.push(v); conds.push(sql.replace('?', `?${params.length + 1}`)); };
+    if (status) add('AND status = ?', status);
+    if (userId) add('AND userId = ?', userId);
+    if (startDate) add('AND createdAt >= ?', toDbDate(veDayStart(startDate)));
+    if (endDate) add('AND createdAt <= ?', toDbDate(veDayEnd(endDate)));
 
-    const deliveryNotes = await db.deliveryNote.findMany({
-      where,
-      include: { items: true },
-      orderBy: { createdAt: 'desc' },
-    });
+    const deliveryNotes = await loadNotesSql(d1Of(env), tenantId, conds.join(' '), params);
 
     return NextResponse.json(deliveryNotes);
   } catch (error) {
@@ -46,7 +62,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
 
@@ -59,12 +76,10 @@ export async function POST(req: NextRequest) {
     const userName = body.userName || '';
     const userRole = req.headers.get('x-user-role') || '';
 
-    // Get next sequential number
-    const lastNote = await db.deliveryNote.findFirst({
-      orderBy: { number: 'desc' },
-      select: { number: true },
-    });
-    const nextNumber = (lastNote?.number || 0) + 1;
+    // El numero correlativo lo calcula D1 dentro del lote (como la factura): dos notas
+    // simultaneas nunca reciben el mismo
+    const nextNumber = sqlExpr('SELECT COALESCE(MAX("number"), 0) + 1 FROM "pos_delivery_notes" WHERE "tenant_id" = ?', tenantId);
+    const { products, lastMoves } = await loadProductsWithLastMove(D1, tenantId, body.items.map((i: any) => String(i.productId || '')), 'date');
 
     // D1 BATCH TRANSACTION: reads first, then batch writes
     // Pre-read all products and last movements for each item
@@ -75,13 +90,10 @@ export async function POST(req: NextRequest) {
       const quantity = sf(item.quantity);
       if (quantity <= 0 || !productId) continue;
 
-      const product = await db.product.findUnique({ where: { id: productId } });
+      const product = products.get(productId);
       if (!product) continue;
 
-      const lastMovement = await db.inventoryMovement.findFirst({
-        where: { productId },
-        orderBy: { date: 'desc' },
-      });
+      const lastMovement = lastMoves.get(productId);
 
       // Saldo anterior = stock real (antes solo se usaba el ultimo movimiento, o 0 si no habia)
       const prevBalanceQty = sf(product.stock);
@@ -107,7 +119,7 @@ export async function POST(req: NextRequest) {
     const totalBs = parseFloat((totalUsd * exchangeRate).toFixed(2));
 
     // Escrituras en un lote atomico de D1: nota, items, stock y kardex
-    const batch = new D1Batch((env as any).DB, tenantId);
+    const batch = new D1Batch(D1, tenantId);
     const noteId = batch.insert('pos_delivery_notes', {
       number: nextNumber,
       userId,
@@ -136,7 +148,7 @@ export async function POST(req: NextRequest) {
       batch.insert('pos_inventory_movements', {
         productId: d.productId,
         movementType: 'nota_entrega',
-        concept: `Nota de entrega #${nextNumber}`,
+        concept: sqlExpr(`SELECT 'Nota de entrega #' || "number" FROM "pos_delivery_notes" WHERE "id" = ?`, noteId),
         quantity: -d.quantity,
         absQuantity: d.quantity,
         unitCost: parseFloat(d.unitCost.toFixed(4)),
@@ -151,7 +163,7 @@ export async function POST(req: NextRequest) {
       });
     }
     await batch.commit();
-    const deliveryNote = await db.deliveryNote.findUnique({ where: { id: noteId }, include: { items: true } });
+    const deliveryNote = await loadNoteSql(D1, tenantId, noteId);
 
     return NextResponse.json(deliveryNote, { status: 201 });
   } catch (error: any) {
@@ -162,7 +174,8 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
 
@@ -174,10 +187,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Estado invalido. Use "recibida" o "anulada"' }, { status: 400 });
     }
 
-    const existing = await db.deliveryNote.findUnique({
-      where: { id: body.id },
-      include: { items: true },
-    });
+    const existing = await loadNoteSql(D1, tenantId, String(body.id));
 
     if (!existing) {
       return NextResponse.json({ error: 'Nota de entrega no encontrada' }, { status: 404 });
@@ -196,19 +206,17 @@ export async function PUT(req: NextRequest) {
       // D1 BATCH TRANSACTION: reads first, then batch writes
       // Pre-read all products and last movements for each item
       const anularData: { productId: string; quantity: number; newStock: number; unitCost: number; totalCost: number; newBalanceQty: number; newBalanceTotalCost: number; newAvgCost: number }[] = [];
+      const { products, lastMoves } = await loadProductsWithLastMove(D1, tenantId, existing.items.map((i: any) => String(i.productId || '')), 'date');
       for (const item of existing.items) {
         const quantity = item.quantity;
         if (quantity <= 0) continue;
 
-        const product = await db.product.findUnique({ where: { id: item.productId } });
+        const product = products.get(item.productId);
         if (!product) continue;
 
         const newStock = parseFloat((product.stock + quantity).toFixed(4));
 
-        const lastMovement = await db.inventoryMovement.findFirst({
-          where: { productId: item.productId },
-          orderBy: { date: 'desc' },
-        });
+        const lastMovement = lastMoves.get(item.productId);
 
         const prevBalanceQty = lastMovement ? lastMovement.balanceQty : 0;
         const prevBalanceTotalCost = lastMovement ? lastMovement.balanceTotalCost : 0;
@@ -227,7 +235,7 @@ export async function PUT(req: NextRequest) {
       }
 
       // Escrituras en un lote atomico de D1: stock, kardex y estado de la nota
-      const batch = new D1Batch((env as any).DB, tenantId);
+      const batch = new D1Batch(D1, tenantId);
       for (const d of anularData) {
         batch.update('pos_products', d.productId, { stock: { increment: d.quantity } });
         batch.insert('pos_inventory_movements', {
@@ -254,13 +262,11 @@ export async function PUT(req: NextRequest) {
     }
 
     // Simple status update for 'recibida'
-    const updated = await db.deliveryNote.update({
-      where: { id: body.id },
-      data: { status: body.status },
-      include: { items: true },
-    });
+    const batch = new D1Batch(D1, tenantId);
+    batch.update('pos_delivery_notes', body.id, { status: body.status });
+    await batch.commit();
 
-    return NextResponse.json(updated);
+    return NextResponse.json(await loadNoteSql(D1, tenantId, body.id));
   } catch (error: any) {
     console.error('Error updating delivery note:', error);
     return NextResponse.json({ error: 'Error al actualizar nota de entrega: ' + (error.message || '') }, { status: 500 });
@@ -269,7 +275,8 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -278,10 +285,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
     }
 
-    const deliveryNote = await db.deliveryNote.findUnique({
-      where: { id },
-      include: { items: true },
-    });
+    const deliveryNote = await loadNoteSql(D1, tenantId, id);
 
     if (!deliveryNote) {
       return NextResponse.json({ error: 'Nota de entrega no encontrada' }, { status: 404 });
@@ -291,7 +295,10 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Solo se pueden eliminar notas en estado "emitida"' }, { status: 400 });
     }
 
-    await db.deliveryNote.delete({ where: { id } });
+    // Los items se borran en cascada (ON DELETE CASCADE)
+    const batch = new D1Batch(D1, tenantId);
+    batch.delete('pos_delivery_notes', id);
+    await batch.commit();
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,30 +1,53 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { D1Batch } from '@/lib/d1-batch';
+import { D1Batch, fromDbRow, toDbDate } from '@/lib/d1-batch';
+import { d1Of, loadProductsWithLastMove, placeholders } from '@/lib/d1-read';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
+
+// Sin Prisma: lecturas con SQL directo (ver "Limite de CPU" en CLAUDE.md)
+
+/** Compras con sus items y proveedor, en el formato que devolvia Prisma. */
+async function loadPurchasesSql(D1: D1Database, tenantId: string, where: string, params: unknown[], fullSupplier: boolean) {
+  const { results } = await D1.prepare(`SELECT * FROM pos_purchases WHERE tenant_id = ?1 ${where} ORDER BY date DESC`).bind(tenantId, ...params).all();
+  const purchases = ((results || []) as any[]).map((r) => fromDbRow<any>('pos_purchases', r));
+  if (purchases.length === 0) return [];
+  const ids = purchases.map((p) => p.id);
+  const supplierIds = [...new Set(purchases.map((p) => p.supplierId).filter(Boolean))] as string[];
+  const [itemsRes, supRes] = await D1.batch([
+    D1.prepare(`SELECT * FROM pos_purchase_items WHERE tenant_id = ?1 AND purchaseId IN (${placeholders(ids.length, 2)}) ORDER BY rowid`).bind(tenantId, ...ids),
+    D1.prepare(`SELECT * FROM pos_suppliers WHERE tenant_id = ?1 AND id IN (${placeholders(Math.max(1, supplierIds.length), 2)})`).bind(tenantId, ...(supplierIds.length ? supplierIds : [''])),
+  ]);
+  const items = new Map<string, any[]>();
+  for (const it of (itemsRes.results || []) as any[]) {
+    if (!items.has(it.purchaseId)) items.set(it.purchaseId, []);
+    items.get(it.purchaseId)!.push(fromDbRow('pos_purchase_items', it));
+  }
+  const suppliers = new Map(((supRes.results || []) as any[]).map((r) => {
+    const full: any = fromDbRow('pos_suppliers', r);
+    return [r.id, fullSupplier ? full : { id: full.id, name: full.name, rif: full.rif }];
+  }));
+  return purchases.map((p) => ({ ...p, items: items.get(p.id) || [], supplier: (p.supplierId && suppliers.get(p.supplierId)) || null }));
+}
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const supplierId = searchParams.get('supplierId');
 
-    const purchases = await db.purchase.findMany({
-      where: {
-        ...(startDate && endDate ? { date: { gte: veDayStart(startDate), lte: veDayEnd(endDate) } } : {}),
-        ...(supplierId ? { supplierId } : {}),
-      },
-      include: {
-        items: true,
-        supplier: { select: { id: true, name: true, rif: true } },
-      },
-      orderBy: { date: 'desc' },
-    });
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    if (startDate && endDate) {
+      params.push(toDbDate(veDayStart(startDate)), toDbDate(veDayEnd(endDate)));
+      conds.push(`AND date >= ?${params.length + 0} AND date <= ?${params.length + 1}`);
+    }
+    if (supplierId) { params.push(supplierId); conds.push(`AND supplierId = ?${params.length + 1}`); }
+    const purchases = await loadPurchasesSql(d1Of(env), tenantId, conds.join(' '), params, false);
     return NextResponse.json(purchases);
   } catch (error) {
     return NextResponse.json({ error: 'Error al obtener compras' }, { status: 500 });
@@ -33,13 +56,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
     if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
       return NextResponse.json({ error: 'Items de compra son requeridos' }, { status: 400 });
     }
-    const settings = await db.settings.findFirst();
+    const settings: any = fromDbRow('pos_settings', await D1.prepare('SELECT * FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId).first());
+    const { products, lastMoves } = await loadProductsWithLastMove(D1, tenantId, body.items.map((i: any) => String(i.productId || '')));
     const exchangeRate = parseFloat(body.exchangeRate) || settings?.bcvRate || 36.5;
 
     // Calculate total from items
@@ -64,8 +89,8 @@ export async function POST(req: NextRequest) {
       const qty = item.isBox ? (parseFloat(item.boxQty || 0) * parseFloat(item.unitsPerBox || 0)) : parseFloat(item.quantity || 0);
       if (qty <= 0) continue;
       const unitCost = item.isBox ? parseFloat(item.calcUnitCost || 0) : parseFloat(item.unitCost || 0);
-      const product = await db.product.findUnique({ where: { id: item.productId } });
-      const lastMove = await db.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
+      const product = products.get(item.productId);
+      const lastMove = lastMoves.get(item.productId);
       // Saldo anterior = stock real antes de sumar la compra
       const prevQty = product?.stock ?? lastMove?.balanceQty ?? 0;
       const prevTC = lastMove?.balanceTotalCost ?? (prevQty * (product?.cost || unitCost));
@@ -188,9 +213,9 @@ export async function POST(req: NextRequest) {
     }
 
     await batch.commit();
-    const purchase = await db.purchase.findUnique({ where: { id: purchaseId }, include: { items: true, supplier: true } });
+    const [purchase] = await loadPurchasesSql(D1, tenantId, 'AND id = ?2', [purchaseId], true);
 
-    return NextResponse.json(purchase);
+    return NextResponse.json(purchase || null);
   } catch (error: any) {
     console.error('Error creating purchase:', error);
     return NextResponse.json({ error: 'Error al registrar compra: ' + (error.message || '') }, { status: 500 });
@@ -199,19 +224,21 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
 
     // D1 BATCH TRANSACTION: reads first, then batch writes
-    const purchase = await db.purchase.findUnique({ where: { id }, include: { items: true } });
+    const [purchase] = await loadPurchasesSql(D1, tenantId, 'AND id = ?2', [id], false);
     if (purchase) {
-      const batch = new D1Batch((env as any).DB, tenantId);
+      const { products } = await loadProductsWithLastMove(D1, tenantId, purchase.items.map((i: any) => String(i.productId || '')));
+      const batch = new D1Batch(D1, tenantId);
       for (const item of purchase.items) {
         if (item.productId) {
-          const product = await db.product.findUnique({ where: { id: item.productId } });
+          const product = products.get(item.productId);
           if (product && product.stock >= item.quantity) {
             batch.update('pos_products', item.productId, { stock: { decrement: item.quantity } });
           }

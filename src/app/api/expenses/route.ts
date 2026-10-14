@@ -1,8 +1,34 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { veDayStart, veDayEnd, veNoon, veDateKey } from '@/lib/ve-time';
+import { D1Batch, fromDbRow, toDbDate } from '@/lib/d1-batch';
+import { d1Of } from '@/lib/d1-read';
+
+// Sin Prisma: SQL directo (ver "Limite de CPU" en CLAUDE.md)
+
+/** Gastos con su categoria y usuario, en el formato que devolvia Prisma con include. */
+async function loadExpensesSql(D1: D1Database, tenantId: string, where: string, params: unknown[]) {
+  const { results } = await D1.prepare(
+    `SELECT e.*, c.id AS _cid, c.name AS _cname, c.icon AS _cicon, c.color AS _ccolor,
+       u.id AS _uid, u.fullName AS _ufull, u.username AS _uname, u.role AS _urole
+     FROM pos_expenses e
+     LEFT JOIN pos_expense_categories c ON c.id = e.categoryId
+     LEFT JOIN pos_users u ON u.id = e.userId
+     WHERE e.tenant_id = ?1 ${where} ORDER BY e.date DESC`,
+  ).bind(tenantId, ...params).all();
+  return ((results || []) as any[]).map(({ _cid, _cname, _cicon, _ccolor, _uid, _ufull, _uname, _urole, ...row }) => ({
+    ...fromDbRow('pos_expenses', row),
+    category: _cid ? { id: _cid, name: _cname, icon: _cicon, color: _ccolor } : null,
+    user: _uid ? { id: _uid, fullName: _ufull, username: _uname, role: _urole } : null,
+  }));
+}
+
+async function loadExpenseSql(D1: D1Database, tenantId: string, id: string) {
+  const [e] = await loadExpensesSql(D1, tenantId, 'AND e.id = ?2', [id]);
+  return e || null;
+}
 
 /**
  * Instante a guardar para la fecha del calendario ('YYYY-MM-DD'): si es hoy en Caracas, ahora
@@ -16,7 +42,8 @@ function expenseDate(day: string): Date {
 // GET — Listar gastos con filtros
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
@@ -24,30 +51,15 @@ export async function GET(req: NextRequest) {
     const categoryId = searchParams.get('categoryId');
     const paymentMethod = searchParams.get('paymentMethod');
 
-    const where: any = {};
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    const add = (sql: string, v: unknown) => { params.push(v); conds.push(sql.replace('?', `?${params.length + 1}`)); };
+    if (startDate) add('AND e.date >= ?', toDbDate(veDayStart(startDate)));
+    if (endDate) add('AND e.date <= ?', toDbDate(veDayEnd(endDate)));
+    if (categoryId) add('AND e.categoryId = ?', categoryId);
+    if (paymentMethod) add('AND e.paymentMethod = ?', paymentMethod);
 
-    if (startDate && endDate) {
-      where.date = {
-        gte: veDayStart(startDate),
-        lte: veDayEnd(endDate),
-      };
-    } else if (startDate) {
-      where.date = { gte: veDayStart(startDate) };
-    } else if (endDate) {
-      where.date = { lte: veDayEnd(endDate) };
-    }
-
-    if (categoryId) where.categoryId = categoryId;
-    if (paymentMethod) where.paymentMethod = paymentMethod;
-
-    const expenses = await db.expense.findMany({
-      where,
-      include: {
-        category: { select: { id: true, name: true, icon: true, color: true } },
-        user: { select: { id: true, fullName: true, username: true, role: true } },
-      },
-      orderBy: { date: 'desc' },
-    });
+    const expenses = await loadExpensesSql(D1, tenantId, conds.join(' '), params);
 
     return NextResponse.json(expenses);
   } catch (error) {
@@ -58,7 +70,8 @@ export async function GET(req: NextRequest) {
 // POST — Crear gasto
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
     const { categoryId, description, amount, date, paymentMethod = 'efectivo', reference = '', notes = '' } = body;
@@ -80,35 +93,36 @@ export async function POST(req: NextRequest) {
     }
 
     // Obtener tasa de cambio
-    const settings = await db.settings.findFirst();
+    const [settingsRes, catRes] = await D1.batch([
+      D1.prepare('SELECT bcvRate FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId),
+      D1.prepare('SELECT id FROM pos_expense_categories WHERE tenant_id = ?1 AND id = ?2 AND active = 1 LIMIT 1').bind(tenantId, String(categoryId)),
+    ]);
+    const settings: any = (settingsRes.results || [])[0];
     const exchangeRate = parseFloat(body.exchangeRate) || settings?.bcvRate || 36.5;
     const amountNum = parseFloat(amount);
     const amountBs = parseFloat(body.amountBs) || (amountNum * exchangeRate);
 
     // Verificar que la categoría existe y esté activa
-    const category = await db.expenseCategory.findFirst({ where: { id: categoryId, active: true } });
+    const category = (catRes.results || [])[0];
     if (!category) {
       return NextResponse.json({ error: 'Categoría no encontrada o inactiva' }, { status: 400 });
     }
 
-    const expense = await db.expense.create({
-      data: {
-        categoryId,
-        description: description.trim(),
-        amount: amountNum,
-        amountBs: Math.round(amountBs * 100) / 100,
-        exchangeRate,
-        date: expenseDate(String(date)),
-        paymentMethod,
-        reference,
-        notes,
-        userId,
-      },
-      include: {
-        category: { select: { id: true, name: true, icon: true, color: true } },
-        user: { select: { id: true, fullName: true, username: true, role: true } },
-      },
+    const batch = new D1Batch(D1, tenantId);
+    const expenseId = batch.insert('pos_expenses', {
+      categoryId,
+      description: description.trim(),
+      amount: amountNum,
+      amountBs: Math.round(amountBs * 100) / 100,
+      exchangeRate,
+      date: expenseDate(String(date)),
+      paymentMethod,
+      reference,
+      notes,
+      userId,
     });
+    await batch.commit();
+    const expense = await loadExpenseSql(D1, tenantId, expenseId);
 
     return NextResponse.json(expense, { status: 201 });
   } catch (error: any) {
@@ -119,13 +133,19 @@ export async function POST(req: NextRequest) {
 // PUT — Actualizar gasto
 export async function PUT(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
     const { id, categoryId, description, amount, date, paymentMethod, reference, notes, exchangeRate } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
+    }
+
+    const existing: any = fromDbRow('pos_expenses', await D1.prepare('SELECT * FROM pos_expenses WHERE tenant_id = ?1 AND id = ?2').bind(tenantId, String(id)).first());
+    if (!existing) {
+      return NextResponse.json({ error: 'Error al actualizar gasto: gasto no encontrado' }, { status: 500 });
     }
 
     const data: any = {};
@@ -142,29 +162,23 @@ export async function PUT(req: NextRequest) {
       const parsed = expenseDate(String(date));
       if (isNaN(parsed.getTime())) return NextResponse.json({ error: 'Fecha invalida' }, { status: 400 });
       // Solo se mueve si cambio el dia: editar otro dato no debe sacarlo de su turno o cierre
-      const current = await db.expense.findFirst({ where: { id }, select: { date: true } });
-      if (!current || veDateKey(current.date) !== veDateKey(parsed)) data.date = parsed;
+      if (veDateKey(existing.date) !== veDateKey(parsed)) data.date = parsed;
     }
     if (paymentMethod !== undefined) data.paymentMethod = paymentMethod;
     if (reference !== undefined) data.reference = reference;
     if (notes !== undefined) data.notes = notes;
 
     if (amount !== undefined || exchangeRate !== undefined) {
-      const existing = await db.expense.findFirst({ where: { id } });
-      const rate = parseFloat(String(exchangeRate)) || existing?.exchangeRate || 36.5;
-      const amt = amount !== undefined ? parseFloat(amount) : existing!.amount;
+      const rate = parseFloat(String(exchangeRate)) || existing.exchangeRate || 36.5;
+      const amt = amount !== undefined ? parseFloat(amount) : existing.amount;
       data.amountBs = Math.round(amt * rate * 100) / 100;
       data.exchangeRate = rate;
     }
 
-    const expense = await db.expense.update({
-      where: { id },
-      data,
-      include: {
-        category: { select: { id: true, name: true, icon: true, color: true } },
-        user: { select: { id: true, fullName: true, username: true, role: true } },
-      },
-    });
+    const batch = new D1Batch(D1, tenantId);
+    batch.update('pos_expenses', String(id), data);
+    await batch.commit();
+    const expense = await loadExpenseSql(D1, tenantId, String(id));
 
     return NextResponse.json(expense);
   } catch (error: any) {
@@ -175,7 +189,8 @@ export async function PUT(req: NextRequest) {
 // DELETE — Eliminar gasto
 export async function DELETE(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -184,7 +199,9 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'ID es requerido' }, { status: 400 });
     }
 
-    await db.expense.delete({ where: { id } });
+    const batch = new D1Batch(D1, tenantId);
+    batch.delete('pos_expenses', id);
+    await batch.commit();
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json({ error: 'Error al eliminar gasto: ' + (error.message || '') }, { status: 500 });
