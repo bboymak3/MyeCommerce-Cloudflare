@@ -64,10 +64,26 @@ export async function authFetch(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     ...options,
     headers,
   });
+
+  // Error de Cloudflare (pagina HTML en lugar de JSON, p. ej. 1102 por limite de CPU):
+  // una lectura se reintenta una vez; si sigue fallando se devuelve un error JSON legible
+  // para que la pantalla no muestre "Unexpected token '<'".
+  const isHtmlError = (r: Response) => r.status >= 500 && !(r.headers.get('content-type') || '').includes('json');
+  const method = (options.method || 'GET').toUpperCase();
+  if (isHtmlError(response) && method === 'GET') {
+    await new Promise((r) => setTimeout(r, 400));
+    response = await fetch(url, { ...options, headers });
+  }
+  if (isHtmlError(response)) {
+    response = new Response(
+      JSON.stringify({ error: `El servidor no pudo completar la operacion (error ${response.status}). Intente de nuevo.` }),
+      { status: response.status, headers: { 'Content-Type': 'application/json' } },
+    );
+  }
 
   // Si el token expiro o es invalido, ejecutar callback
   if (response.status === 401 && onUnauthorized) {
