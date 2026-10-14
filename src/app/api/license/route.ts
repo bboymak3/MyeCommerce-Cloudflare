@@ -9,7 +9,7 @@ import { getNexusTenant, planToLicenseType } from '@/lib/nexus-tenant';
 // Obtener estado actual de la licencia
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const currentMachineId = getMachineId();
 
@@ -47,6 +47,9 @@ export async function GET(req: NextRequest) {
         blockedReason: nexus.reason,
       });
     }
+
+    // Licencia por clave (sin Nexus One): aqui si hace falta Prisma
+    const db = createDbFromEnv(env as any, tenantId);
 
     let license = await db.license.findFirst();
 

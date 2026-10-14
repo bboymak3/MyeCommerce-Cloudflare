@@ -33,6 +33,9 @@ interface TableInfo {
   // Se completan aqui: el DEFAULT CURRENT_TIMESTAMP de SQLite guarda otro formato
   // ("2026-01-01 10:00:00") y rompe las comparaciones de fechas de Prisma.
   nowColumns: string[];
+  // Tipos para devolver filas de SQL directo con el mismo formato que Prisma
+  boolColumns: Set<string>;
+  dateColumns: Set<string>;
 }
 
 let tables: Map<string, TableInfo> | null = null;
@@ -43,10 +46,12 @@ function tableInfo(table: string): TableInfo {
     for (const sql of CREATE_TABLE_STATEMENTS) {
       const name = sql.match(/CREATE TABLE IF NOT EXISTS "(\w+)"/)?.[1];
       if (!name) continue;
-      const info: TableInfo = { columns: new Set(), nowColumns: [] };
+      const info: TableInfo = { columns: new Set(), nowColumns: [], boolColumns: new Set(), dateColumns: new Set() };
       for (const m of sql.matchAll(/"(\w+)"\s+(TEXT|INTEGER|REAL|BOOLEAN|DATETIME|BLOB)\b(\s+NOT NULL)?(\s+DEFAULT CURRENT_TIMESTAMP)?/g)) {
         info.columns.add(m[1]);
         if (m[2] === 'DATETIME' && (m[4] || (m[3] && m[1] === 'updatedAt'))) info.nowColumns.push(m[1]);
+        if (m[2] === 'BOOLEAN') info.boolColumns.add(m[1]);
+        if (m[2] === 'DATETIME') info.dateColumns.add(m[1]);
       }
       tables.set(name, info);
     }
@@ -64,6 +69,24 @@ export function expectedSchema(): Map<string, string[]> {
 
 function checkColumn(table: string, column: string) {
   if (!tableInfo(table).columns.has(column)) throw new Error(`Columna desconocida: ${table}.${column}`);
+}
+
+/**
+ * Fila leida con SQL directo (`SELECT * FROM tabla`) en el formato que devuelve Prisma:
+ * booleanos como true/false (D1 guarda 1/0) y fechas como ISO con Z (D1 guarda +00:00).
+ * Sirve para que una ruta deje Prisma sin que la pantalla note la diferencia.
+ */
+export function fromDbRow<T = any>(table: string, row: Record<string, unknown> | null | undefined): T | null {
+  if (!row) return null;
+  const info = tableInfo(table);
+  const out: Record<string, unknown> = { ...row };
+  for (const c of info.boolColumns) if (c in out && out[c] !== null) out[c] = out[c] === 1 || out[c] === true || out[c] === '1' || out[c] === 'true';
+  for (const c of info.dateColumns) {
+    if (!(c in out) || out[c] === null || out[c] === undefined || out[c] === '') continue;
+    const d = new Date(String(out[c]).replace(' ', 'T'));
+    out[c] = isNaN(d.getTime()) ? out[c] : d.toISOString();
+  }
+  return out as T;
 }
 
 /** Fecha en el formato que guarda Prisma en D1 (las comparaciones son de texto). */
