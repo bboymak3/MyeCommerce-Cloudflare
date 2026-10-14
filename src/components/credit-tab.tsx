@@ -95,6 +95,7 @@ export default function CreditTab({ bcvRate, currency, sellerName }: CreditTabPr
     biopago: "Biopago",
     zelle: "Zelle ($)",
     usdt: "USDT ($)",
+    devolucion: "Devolucion",
     // Legacy keys from older abonos
     mobile: "Pago Movil",
     punto: "Punto de Venta",

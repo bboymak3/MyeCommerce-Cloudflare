@@ -176,15 +176,16 @@ export async function POST(req: NextRequest) {
     // Clamp amount to remaining to prevent overpayment
     const finalAmount = Math.min(amount, remaining);
 
-    const exchangeRate = parseFloat(body.exchangeRate) || 36.5;
+    const settings = await db.settings.findFirst();
+    const exchangeRate = parseFloat(body.exchangeRate) || settings?.bcvRate || 36.5;
 
     // D1 BATCH TRANSACTION: reads first, then batch writes
     // Re-check remaining to prevent race condition — READ FIRST
     const freshSale = await db.sale.findUnique({ where: { id: body.saleId } });
-    if (!freshSale) throw new Error('Venta no encontrada');
+    if (!freshSale) return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
     const txRemaining = Number(freshSale.total || 0) - Number(freshSale.creditPaid || 0);
     const txAmount = Math.min(finalAmount, txRemaining);
-    if (txAmount <= 0) throw new Error('Esta venta ya esta completamente pagada');
+    if (txAmount <= 0) return NextResponse.json({ error: 'Esta venta ya esta completamente pagada' }, { status: 400 });
 
     // Read client credit balance — READ FIRST
     let clientCreditBalance: number | null = null;
@@ -209,7 +210,7 @@ export async function POST(req: NextRequest) {
       method: body.method || 'efectivo',
       reference: body.reference || '',
       notes: body.notes || '',
-      createdBy: body.createdBy || '',
+      createdBy: req.headers.get('x-username') || body.createdBy || '',
     });
     batch.raw('UPDATE "pos_sales" SET "creditPaid" = ROUND("creditPaid" + ?, 2) WHERE "id" = ? AND "tenant_id" = ?', txAmount, body.saleId);
     if (sale.clientId && clientCreditBalance !== null) {

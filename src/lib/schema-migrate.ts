@@ -128,6 +128,10 @@ async function migrate(d1: D1Database): Promise<void> {
     await d1.prepare(`UPDATE "nx_tenant_users" SET "role" = 'cajero' WHERE "role" = 'vendedor'`).run();
   } catch { /* sin tablas nx_ */ }
 
+  // 5) Gastos: la fecha del calendario se guardaba a medianoche UTC (8 pm del dia anterior en
+  // Caracas) y el gasto salia en el dia equivocado. Se pasa al mediodia de Caracas del mismo dia.
+  await runBatch(d1, [`UPDATE "pos_expenses" SET "date" = substr("date", 1, 10) || 'T16:00:00+00:00' WHERE substr("date", 11) IN ('T00:00:00+00:00', 'T00:00:00.000+00:00', 'T00:00:00.000Z', 'T00:00:00Z')`], errors);
+
   if (errors.length > 0) {
     console.warn(`[schema] Sincronizacion de esquema con ${errors.length} aviso(s):\n` + errors.join('\n'));
   } else {

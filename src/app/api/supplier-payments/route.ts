@@ -91,7 +91,8 @@ export async function POST(req: NextRequest) {
     }
     const finalAmount = Math.min(amount, remaining);
 
-    const exchangeRate = parseFloat(body.exchangeRate) || 36.5;
+    const settings = await db.settings.findFirst();
+    const exchangeRate = parseFloat(body.exchangeRate) || settings?.bcvRate || 36.5;
 
     let supplierBalance: number | null = null;
     if (purchase.supplierId) {
