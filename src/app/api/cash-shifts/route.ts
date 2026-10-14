@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { d1Of } from '@/lib/d1-read';
 import { loadCashMovements, cashOf } from '@/lib/cash-movements';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -30,7 +31,7 @@ async function shiftSummary(db: any, shift: any, until: Date) {
       } catch { /* pago mixto ilegible */ }
     }
   }
-  const movements = await loadCashMovements(db, new Date(shift.openedAt), until, { userId: shift.userId, username: shift.userName });
+  const movements = await loadCashMovements(d1Of(getRequestContext().env), shift.tenant_id, new Date(shift.openedAt), until, { userId: shift.userId, username: shift.userName });
   return {
     salesCount: sales.length,
     totalUsd: r2(totalUsd),

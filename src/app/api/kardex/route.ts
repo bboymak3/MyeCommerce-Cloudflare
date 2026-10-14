@@ -1,5 +1,7 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { toDbDate } from '@/lib/d1-batch';
+import { d1Of, selectRows } from '@/lib/d1-read';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
@@ -8,7 +10,9 @@ const sf = (v: any, fb: number = 0) => { const n = parseFloat(v); return isNaN(n
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  // Sin Prisma: SQL directo (ver "Limite de CPU" en CLAUDE.md)
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const productId = searchParams.get('productId');
@@ -21,27 +25,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'productId es requerido' }, { status: 400 });
     }
 
-    // Build date filter
-    const dateFilter: any = {};
-    if (startDate && endDate) {
-      dateFilter.date = {
-        gte: veDayStart(startDate),
-        lte: veDayEnd(endDate),
-      };
-    } else if (startDate) {
-      dateFilter.date = { gte: veDayStart(startDate) };
-    } else if (endDate) {
-      dateFilter.date = { lte: veDayEnd(endDate) };
-    }
+    // Filtro de fechas
+    const conds: string[] = [];
+    const params: unknown[] = [];
+    if (startDate) { params.push(toDbDate(veDayStart(startDate))); conds.push(`AND date >= ?${params.length + 2}`); }
+    if (endDate) { params.push(toDbDate(veDayEnd(endDate))); conds.push(`AND date <= ?${params.length + 2}`); }
 
-    // Fetch movements in chronological order
-    const movements = await db.inventoryMovement.findMany({
-      where: {
-        productId,
-        ...dateFilter,
-      },
-      orderBy: { date: 'asc' },
-    });
+    // Movimientos en orden cronologico
+    const movements = await selectRows<any>(D1, 'pos_inventory_movements',
+      `SELECT * FROM pos_inventory_movements WHERE tenant_id = ?1 AND productId = ?2 ${conds.join(' ')} ORDER BY date ASC, rowid ASC`,
+      tenantId, productId, ...params);
 
     if (movements.length === 0) {
       return NextResponse.json({
