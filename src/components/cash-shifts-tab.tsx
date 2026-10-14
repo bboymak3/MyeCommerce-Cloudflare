@@ -30,6 +30,12 @@ interface CashShift {
   totalBs: number;
   status: "open" | "closed";
   notes: string;
+  // Solo en el turno abierto (calculado en vivo por la API)
+  movements?: {
+    abonosEfectivo: { bs: number; usd: number };
+    gastosEfectivo: { bs: number; usd: number };
+    pagosProveedoresEfectivo: { bs: number; usd: number };
+  };
 }
 
 export default function CashShiftsTab({ currency }: { currency: string }) {
@@ -151,6 +157,18 @@ export default function CashShiftsTab({ currency }: { currency: string }) {
               <div className="p-2 rounded bg-muted/40"><p className="text-xs text-muted-foreground">Ventas</p><p className="font-bold">{current.salesCount}</p></div>
               <div className="p-2 rounded bg-muted/40"><p className="text-xs text-muted-foreground">Total</p><p className="font-bold">{currency} {current.totalUsd.toFixed(2)}</p></div>
             </div>
+            {current.movements && (() => {
+              const m = current.movements;
+              const fmt = (v: { bs: number; usd: number }) => `$${v.usd.toFixed(2)} / Bs ${v.bs.toFixed(2)}`;
+              return (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  <div className="p-2 rounded bg-green-50 dark:bg-green-950/30"><p className="text-muted-foreground">+ Abonos cobrados en efectivo</p><p className="font-semibold">{fmt(m.abonosEfectivo)}</p></div>
+                  <div className="p-2 rounded bg-red-50 dark:bg-red-950/30"><p className="text-muted-foreground">- Gastos pagados en efectivo</p><p className="font-semibold">{fmt(m.gastosEfectivo)}</p></div>
+                  <div className="p-2 rounded bg-red-50 dark:bg-red-950/30"><p className="text-muted-foreground">- Pagos a proveedores en efectivo</p><p className="font-semibold">{fmt(m.pagosProveedoresEfectivo)}</p></div>
+                </div>
+              );
+            })()}
+            <p className="text-xs text-muted-foreground">Efectivo esperado en caja: <span className="font-semibold text-foreground">${current.expectedCashUsd.toFixed(2)}</span> y <span className="font-semibold text-foreground">Bs {current.expectedCashBs.toFixed(2)}</span></p>
 
             {closeForm.closingCashUsd === "" ? (
               <Button variant="destructive" className="w-full" onClick={startClose}>Cerrar Turno</Button>

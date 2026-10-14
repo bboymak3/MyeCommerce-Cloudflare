@@ -3,6 +3,7 @@ import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { veDateKey, veDayStart, veDayEnd } from '@/lib/ve-time';
+import { loadCashMovements, type CashMovements } from '@/lib/cash-movements';
 
 // ─── Labels de metodos de pago ─────────────────────────────────────
 const METHOD_LABELS: Record<string, string> = {
@@ -157,6 +158,28 @@ function calcGroups(breakdown: Record<string, { usd: number; bs: number; count: 
   };
 }
 
+/**
+ * Efectivo que deberia haber en la caja: efectivo de las ventas + abonos en efectivo
+ * - gastos y pagos a proveedores en efectivo. Bs y $ por separado.
+ */
+function expectedCash(groups: ReturnType<typeof calcGroups>, mv: CashMovements) {
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const ventasBs = groups.efectivoFisico.efectivoBs.bs;
+  const ventasUsd = groups.efectivoFisico.efectivoUsd.usd;
+  return {
+    ventasBs: r2(ventasBs), ventasUsd: r2(ventasUsd),
+    bs: r2(ventasBs + mv.efectivoNeto.bs),
+    usd: r2(ventasUsd + mv.efectivoNeto.usd),
+  };
+}
+
+/** Devoluciones que salieron de la caja: las de ventas a credito solo bajaron la deuda. */
+function cashReturns(devolutions: { totalUsd: number; totalBs: number }[], mv: CashMovements) {
+  const usd = devolutions.reduce((sum, d) => sum + d.totalUsd, 0);
+  const bs = devolutions.reduce((sum, d) => sum + d.totalBs, 0);
+  return { usd: Math.max(0, usd - mv.devolucionesACredito.usd), bs: Math.max(0, bs - mv.devolucionesACredito.bs) };
+}
+
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
   const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
@@ -183,13 +206,18 @@ export async function GET(req: NextRequest) {
 
       const totalSalesBs = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.totalBs), 0);
       const totalSalesUsd = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.total), 0);
+      const movements = await loadCashMovements(db, pStart, pEnd);
+      const returns = cashReturns(devolutions, movements);
 
       return NextResponse.json({
         breakdown,
         groups,
+        movements,
+        expectedCash: expectedCash(groups, movements),
         totalSalesBs,
         totalSalesUsd,
-        totalReturnsBs: devolutions.reduce((s, d) => s + d.totalBs, 0),
+        totalReturnsBs: returns.bs,
+        totalReturnsUsd: returns.usd,
         creditSalesBs: sales.filter(s => s.isCredit).reduce((sum, s) => sum + s.totalBs, 0),
         casheaSalesBs: cashea.bs,
         casheaSalesUsd: cashea.usd,
@@ -225,6 +253,9 @@ export async function GET(req: NextRequest) {
       const referenceDetails = extractReferences(sales);
       const breakdown = rebuildLegacyBreakdown(closing);
       const groups = calcGroups(breakdown);
+      // Cierres anteriores a los movimientos de caja no los tienen guardados
+      let movements: CashMovements | null = null;
+      try { const m = JSON.parse((closing as any).movementsJson || '{}'); if (m && m.abonos) movements = m; } catch {}
 
       // Role breakdown
       const ROLE_LABELS: Record<string, string> = { admin: "Administrador", cajero: "Cajero", vendedor: "Vendedor" };
@@ -241,6 +272,8 @@ export async function GET(req: NextRequest) {
         salesCount: sales.length,
         breakdown,
         groups,
+        movements,
+        expectedCash: movements ? expectedCash(groups, movements) : null,
         referenceDetails,
         roleBreakdown: Object.values(roleBreakdown).sort((a, b) => b.totalBs - a.totalBs),
       });
@@ -294,8 +327,8 @@ export async function POST(req: NextRequest) {
 
       const totalSalesUsd = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.total), 0);
       const totalSalesBs = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.totalBs), 0);
-      const totalReturnsUsd = devolutions.reduce((sum, d) => sum + d.totalUsd, 0);
-      const totalReturnsBs = devolutions.reduce((sum, d) => sum + d.totalBs, 0);
+      const movements = await loadCashMovements(db, fromDate, toDate);
+      const { usd: totalReturnsUsd, bs: totalReturnsBs } = cashReturns(devolutions, movements);
 
       const breakdown: Record<string, { usd: number; bs: number; count: number }> = {};
       const cashea = { usd: 0, bs: 0, count: 0 };
@@ -339,6 +372,7 @@ export async function POST(req: NextRequest) {
           creditSalesCount: creditSales.length,
           casheaSalesUsd: cashea.usd, casheaSalesBs: cashea.bs, casheaSalesCount: cashea.count,
           breakdownJson: bdJson,
+          movementsJson: JSON.stringify(movements),
           exchangeRate: rate,
           observations: body.observations || '',
         },
@@ -355,8 +389,8 @@ export async function POST(req: NextRequest) {
 
       const totalSalesUsd = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.total), 0);
       const totalSalesBs = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.totalBs), 0);
-      const totalReturnsUsd = devolutions.reduce((sum, d) => sum + d.totalUsd, 0);
-      const totalReturnsBs = devolutions.reduce((sum, d) => sum + d.totalBs, 0);
+      const movements = await loadCashMovements(db, startOfDay, endOfDay);
+      const { usd: totalReturnsUsd, bs: totalReturnsBs } = cashReturns(devolutions, movements);
 
       const breakdown: Record<string, { usd: number; bs: number; count: number }> = {};
       const cashea = { usd: 0, bs: 0, count: 0 };
@@ -399,6 +433,7 @@ export async function POST(req: NextRequest) {
         creditSalesCount: creditSales.length,
         casheaSalesUsd: cashea.usd, casheaSalesBs: cashea.bs, casheaSalesCount: cashea.count,
         breakdownJson: bdJson,
+        movementsJson: JSON.stringify(movements),
         exchangeRate: rate,
         observations: body.observations || '',
         sellerName, sellerRole,

@@ -87,7 +87,7 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
   // Arqueo de caja
   const [countedCashBs, setCountedCashBs] = useState("");
   const [countedCashUsd, setCountedCashUsd] = useState("");
-  const [arqueoPreview, setArqueoPreview] = useState<{cashBs: number; totalSalesBs: number} | null>(null);
+  const [arqueoPreview, setArqueoPreview] = useState<{ cashBs?: number; totalSalesBs: number; movements?: CashMovementsData; expectedCash?: ExpectedCash } | null>(null);
 
   // Datos de detalle: ventas y referencias del cierre seleccionado
   const [detailLoading, setDetailLoading] = useState(false);
@@ -97,6 +97,8 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
     mobileTotal: number;
     salesCount: number;
     roleBreakdown: { role: string; label: string; salesCount: number; totalUsd: number; totalBs: number }[];
+    movements?: CashMovementsData | null;
+    expectedCash?: ExpectedCash | null;
     groups?: {
       efectivoFisico: { bs: number; usd: number; subtotalBs: number; subtotalUsd: number; efectivoBs: { bs: number; usd: number }; efectivoUsd: { bs: number; usd: number } };
       bsElectronicos: { bs: number; usd: number; puntoVenta: { bs: number; usd: number }; biopago?: { bs: number; usd: number }; transferencia: { bs: number; usd: number }; pagoMovil: { bs: number; usd: number } };
@@ -219,6 +221,8 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
         mobileTotal: data.mobileTotal || 0,
         salesCount: data.salesCount || 0,
         roleBreakdown: data.roleBreakdown || [],
+        movements: data.movements || null,
+        expectedCash: data.expectedCash || null,
         groups: data.groups || null,
       });
     } catch (error: any) {
@@ -337,6 +341,17 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
           <tr class="totals-row"><td>TOTAL</td><td>$ ${c.totalSalesUsd.toFixed(2)}</td><td>Bs ${c.totalSalesBs.toFixed(2)}</td></tr>
         </tbody>
       </table>
+
+      ${refData.movements && refData.expectedCash ? `
+      <div style="font-weight:bold;margin:12px 0 6px">MOVIMIENTOS DE CAJA</div>
+      <table>
+        <tbody>
+          <tr><td>+ Abonos cobrados (${refData.movements.abonos.count})</td><td>$ ${refData.movements.abonos.usd.toFixed(2)}</td><td>Bs ${refData.movements.abonos.bs.toFixed(2)}</td></tr>
+          <tr><td>- Gastos pagados (${refData.movements.gastos.count})</td><td>$ ${refData.movements.gastos.usd.toFixed(2)}</td><td>Bs ${refData.movements.gastos.bs.toFixed(2)}</td></tr>
+          <tr><td>- Pagos a proveedores (${refData.movements.pagosProveedores.count})</td><td>$ ${refData.movements.pagosProveedores.usd.toFixed(2)}</td><td>Bs ${refData.movements.pagosProveedores.bs.toFixed(2)}</td></tr>
+          <tr class="totals-row"><td>Efectivo esperado en caja</td><td>$ ${refData.expectedCash.usd.toFixed(2)}</td><td>Bs ${refData.expectedCash.bs.toFixed(2)}</td></tr>
+        </tbody>
+      </table>` : ''}
 
       <div style="margin-top:12px;border:1px solid #ccc;border-radius:6px;padding:8px;font-size:11px">
         <div style="font-weight:bold;margin-bottom:6px">DESGLOSE DE INGRESOS POR CANAL</div>
@@ -727,8 +742,9 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                 {(countedCashBs || countedCashUsd) && (() => {
                   const countedBs = parseFloat(countedCashBs) || 0;
                   const countedUsdVal = parseFloat(countedCashUsd) || 0;
-                  const expectedBs = arqueoPreview?.cashBs || todayFinalClosing?.cashBs || (todayPreClosings.length > 0 ? preClosingsTotal.salesBs : 0);
-                  const expectedUsd = todayFinalClosing?.efectivoUsdUsd || (todayPreClosings.length > 0 ? preClosingsTotal.efectivoUsdUsd : 0);
+                  // Esperado = efectivo de las ventas del dia + abonos - gastos - pagos a proveedores en efectivo
+                  const expectedBs = arqueoPreview?.expectedCash ? arqueoPreview.expectedCash.bs : (todayFinalClosing?.cashBs || (todayPreClosings.length > 0 ? preClosingsTotal.salesBs : 0));
+                  const expectedUsd = arqueoPreview?.expectedCash ? arqueoPreview.expectedCash.usd : (todayFinalClosing?.efectivoUsdUsd || (todayPreClosings.length > 0 ? preClosingsTotal.efectivoUsdUsd : 0));
                   const diffBs = countedBs - expectedBs;
                   const diffUsd = countedUsdVal - expectedUsd;
                   return (
@@ -766,6 +782,9 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                     </div>
                   );
                 })()}
+                {arqueoPreview?.movements && arqueoPreview.expectedCash && (
+                  <CashMovementsSummary m={arqueoPreview.movements} expected={arqueoPreview.expectedCash} />
+                )}
               </div>
             )}
 
@@ -929,6 +948,13 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
                 {formatPaymentRow("Zelle ($)", selectedClosing.zelleUsd, selectedClosing.zelleBs)}
                 {formatPaymentRow("USDT ($)", selectedClosing.usdtUsd, selectedClosing.usdtBs)}
               </div>
+
+              {/* Abonos, gastos y pagos a proveedores del periodo del cierre */}
+              {detailReferenceData?.movements && detailReferenceData.expectedCash && (
+                <div className="mt-4">
+                  <CashMovementsSummary m={detailReferenceData.movements} expected={detailReferenceData.expectedCash} />
+                </div>
+              )}
 
               {/* Resumen Agrupado de Ingresos */}
               <div className="mt-4 p-3 border rounded-lg space-y-2 bg-gradient-to-r from-slate-50 to-white">
@@ -1229,6 +1255,57 @@ export default function CashClosingTab({ bcvRate, currency }: CashClosingTabProp
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// ===== Movimientos de caja (abonos, gastos y pagos a proveedores) =====
+type MovementTotalsData = { usd: number; bs: number; count: number; byMethod: Record<string, { usd: number; bs: number; count: number }> };
+type CashMovementsData = {
+  abonos: MovementTotalsData;
+  gastos: MovementTotalsData;
+  pagosProveedores: MovementTotalsData;
+  devolucionesACredito: { usd: number; bs: number; count: number };
+  efectivoNeto: { bs: number; usd: number };
+};
+type ExpectedCash = { ventasBs: number; ventasUsd: number; bs: number; usd: number };
+
+const MOVEMENT_METHOD_LABELS: Record<string, string> = {
+  efectivo: "Efectivo Bs", "efectivo-usd": "Efectivo $", transferencia: "Transferencia", "pago-movil": "Pago Movil",
+  "punto-de-venta": "Punto de Venta", punto: "Punto de Venta", tarjeta: "Tarjeta", biopago: "Biopago", zelle: "Zelle", usdt: "USDT", otro: "Otro",
+};
+
+function CashMovementsSummary({ m, expected }: { m: CashMovementsData; expected: ExpectedCash }) {
+  const rows: { label: string; sign: string; t: MovementTotalsData; cls: string }[] = [
+    { label: "Abonos cobrados", sign: "+", t: m.abonos, cls: "text-green-700" },
+    { label: "Gastos pagados", sign: "-", t: m.gastos, cls: "text-red-600" },
+    { label: "Pagos a proveedores", sign: "-", t: m.pagosProveedores, cls: "text-red-600" },
+  ];
+  const methods = (t: MovementTotalsData) => Object.entries(t.byMethod)
+    .map(([k, v]) => `${MOVEMENT_METHOD_LABELS[k] || k}: ${k === "efectivo-usd" || k === "zelle" || k === "usdt" ? "$" + v.usd.toFixed(2) : "Bs " + v.bs.toFixed(2)}`)
+    .join(" | ");
+  return (
+    <div className="p-3 border rounded-lg space-y-2 text-xs">
+      <h4 className="font-bold text-sm">Movimientos de caja</h4>
+      {rows.map((r) => (
+        <div key={r.label}>
+          <div className="flex justify-between">
+            <span>{r.sign} {r.label} ({r.t.count})</span>
+            <span className={`font-semibold ${r.cls}`}>{r.sign}${r.t.usd.toFixed(2)} / Bs {r.t.bs.toFixed(2)}</span>
+          </div>
+          {r.t.count > 0 && <p className="text-[10px] text-muted-foreground">{methods(r.t)}</p>}
+        </div>
+      ))}
+      {m.devolucionesACredito.count > 0 && (
+        <p className="text-[10px] text-muted-foreground">
+          Devoluciones de ventas a credito descontadas de la deuda (no salen de la caja): ${m.devolucionesACredito.usd.toFixed(2)}
+        </p>
+      )}
+      <div className="border-t pt-2 space-y-0.5">
+        <div className="flex justify-between"><span>Efectivo de ventas</span><span>${expected.ventasUsd.toFixed(2)} / Bs {expected.ventasBs.toFixed(2)}</span></div>
+        <div className="flex justify-between"><span>Neto de movimientos en efectivo</span><span>${m.efectivoNeto.usd.toFixed(2)} / Bs {m.efectivoNeto.bs.toFixed(2)}</span></div>
+        <div className="flex justify-between font-bold text-sm"><span>Efectivo esperado en caja</span><span>${expected.usd.toFixed(2)} / Bs {expected.bs.toFixed(2)}</span></div>
+      </div>
     </div>
   );
 }

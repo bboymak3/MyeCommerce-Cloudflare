@@ -2,7 +2,16 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { veDayStart, veDayEnd, veNoon } from '@/lib/ve-time';
+import { veDayStart, veDayEnd, veNoon, veDateKey } from '@/lib/ve-time';
+
+/**
+ * Instante a guardar para la fecha del calendario ('YYYY-MM-DD'): si es hoy en Caracas, ahora
+ * (asi entra en el turno de caja abierto); otro dia, su mediodia de Caracas. A medianoche UTC
+ * caeria en el dia anterior.
+ */
+function expenseDate(day: string): Date {
+  return day === veDateKey() ? new Date() : veNoon(day);
+}
 
 // GET — Listar gastos con filtros
 export async function GET(req: NextRequest) {
@@ -66,7 +75,7 @@ export async function POST(req: NextRequest) {
     if (!(parseFloat(amount) > 0)) {
       return NextResponse.json({ error: 'El monto debe ser mayor a 0' }, { status: 400 });
     }
-    if (!date || isNaN(veNoon(String(date)).getTime())) {
+    if (!date || isNaN(expenseDate(String(date)).getTime())) {
       return NextResponse.json({ error: 'La fecha es requerida' }, { status: 400 });
     }
 
@@ -89,8 +98,7 @@ export async function POST(req: NextRequest) {
         amount: amountNum,
         amountBs: Math.round(amountBs * 100) / 100,
         exchangeRate,
-        // 'YYYY-MM-DD' del calendario: mediodia de Caracas (a medianoche UTC caeria el dia anterior)
-        date: veNoon(String(date)),
+        date: expenseDate(String(date)),
         paymentMethod,
         reference,
         notes,
@@ -131,9 +139,11 @@ export async function PUT(req: NextRequest) {
       data.amount = amountNum;
     }
     if (date !== undefined) {
-      const parsed = veNoon(String(date));
+      const parsed = expenseDate(String(date));
       if (isNaN(parsed.getTime())) return NextResponse.json({ error: 'Fecha invalida' }, { status: 400 });
-      data.date = parsed;
+      // Solo se mueve si cambio el dia: editar otro dato no debe sacarlo de su turno o cierre
+      const current = await db.expense.findFirst({ where: { id }, select: { date: true } });
+      if (!current || veDateKey(current.date) !== veDateKey(parsed)) data.date = parsed;
     }
     if (paymentMethod !== undefined) data.paymentMethod = paymentMethod;
     if (reference !== undefined) data.reference = reference;
