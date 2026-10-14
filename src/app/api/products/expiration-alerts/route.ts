@@ -1,24 +1,20 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { d1Of, loadProductsWithCategory } from '@/lib/d1-read';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const now = new Date();
     const warning15 = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days
     const warning30 = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
-    const products = await db.product.findMany({
-      where: {
-        active: true,
-        expirationDate: { not: null },
-      },
-      include: { category: true },
-      orderBy: { expirationDate: 'asc' },
-    });
+    // SQL directo (ver "Limite de CPU" en CLAUDE.md)
+    const products = await loadProductsWithCategory(d1Of(env), tenantId,
+      'AND p.active = 1 AND p.expirationDate IS NOT NULL', 'p.expirationDate ASC');
 
     const expired: any[] = [];
     const warningSoon: any[] = []; // <= 15 days

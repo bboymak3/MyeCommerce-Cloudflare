@@ -1,5 +1,7 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { toDbDate } from '@/lib/d1-batch';
+import { d1Of, loadSalesWithItems } from '@/lib/d1-read';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
@@ -9,28 +11,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const { id: clientId } = await params;
     const { searchParams } = new URL(req.url);
     const dateFrom = searchParams.get('from') || '';
     const dateTo = searchParams.get('to') || '';
 
-    const where: any = { clientId };
+    // SQL directo (ver "Limite de CPU" en CLAUDE.md)
+    const args: unknown[] = [clientId];
+    let where = 'AND s.clientId = ?2';
+    if (dateFrom) { args.push(toDbDate(veDayStart(dateFrom))); where += ` AND s.date >= ?${args.length + 1}`; }
+    if (dateTo) { args.push(toDbDate(veDayEnd(dateTo))); where += ` AND s.date <= ?${args.length + 1}`; }
 
-    if (dateFrom || dateTo) {
-      where.date = {};
-      if (dateFrom) where.date.gte = veDayStart(dateFrom);
-      if (dateTo) where.date.lte = veDayEnd(dateTo);
-    }
-
-    const sales = await db.sale.findMany({
-      where,
-      include: {
-        items: { include: { product: { select: { name: true } } } },
-      },
-      orderBy: { date: 'desc' },
-    });
+    const sales = await loadSalesWithItems(d1Of(env), tenantId, where, args, ['name']);
 
     return NextResponse.json(sales);
   } catch (error) {

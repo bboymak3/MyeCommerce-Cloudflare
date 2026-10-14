@@ -1,39 +1,23 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { d1Of, selectRows } from '@/lib/d1-read';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const { searchParams } = new URL(req.url);
     const format = searchParams.get('format') || 'xlsx'; // xlsx or csv or vcard
     const groupId = searchParams.get('groupId') || '';
     const includeInactive = searchParams.get('includeInactive') === 'true';
 
-    const whereClause: any = {};
-    if (!includeInactive) whereClause.isActive = true;
-
-    const clients = await db.client.findMany({
-      where: whereClause,
-      orderBy: [{ fullName: 'asc' }],
-      select: {
-        id: true,
-        type: true,
-        docType: true,
-        docNumber: true,
-        fullName: true,
-        phone: true,
-        email: true,
-        address: true,
-        isFinalClient: true,
-        createdAt: true,
-        creditBalance: true,
-        creditLimit: true,
-      },
-    });
+    // SQL directo (ver "Limite de CPU" en CLAUDE.md)
+    const clients = await selectRows<any>(d1Of(env), 'pos_clients',
+      `SELECT id, type, docType, docNumber, fullName, phone, email, address, isFinalClient, createdAt, creditBalance, creditLimit
+       FROM pos_clients WHERE tenant_id = ?1 ${includeInactive ? '' : 'AND isActive = 1'} ORDER BY fullName ASC`, tenantId);
 
     // Filter by group if specified
     const filtered = groupId

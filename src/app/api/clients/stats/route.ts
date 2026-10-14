@@ -1,17 +1,26 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { d1Of } from '@/lib/d1-read';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
-    const sales = await db.sale.findMany({
-      where: { clientId: { not: null } },
-      include: { client: { select: { id: true, fullName: true, phone: true, email: true, type: true, isFinalClient: true } } },
-      orderBy: { date: 'desc' },
-    });
+    // SQL directo (ver "Limite de CPU" en CLAUDE.md)
+    const { results } = await d1Of(env).prepare(
+      `SELECT s.clientId, s.date, s.total, s.totalBs, c.id AS cid, c.fullName, c.phone, c.email, c.type
+       FROM pos_sales s LEFT JOIN pos_clients c ON c.id = s.clientId
+       WHERE s.tenant_id = ?1 AND s.clientId IS NOT NULL ORDER BY s.date DESC`,
+    ).bind(tenantId).all();
+    const sales = ((results || []) as any[]).map((r) => ({
+      clientId: r.clientId as string | null,
+      date: new Date(r.date),
+      total: Number(r.total) || 0,
+      totalBs: Number(r.totalBs) || 0,
+      client: r.cid ? { fullName: r.fullName, phone: r.phone, email: r.email, type: r.type } : null,
+    }));
 
     // Group by client
     const clientMap = new Map<string, {

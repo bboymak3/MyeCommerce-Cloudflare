@@ -21,6 +21,14 @@ export async function selectRow<T = any>(D1: D1Database, table: string, sql: str
   return fromDbRow<T>(table, await D1.prepare(sql).bind(...params).first());
 }
 
+/**
+ * Patron para `columna LIKE ? ESCAPE '\\'` que busca el texto en cualquier parte, como el
+ * `contains` de Prisma en SQLite (sin distinguir mayusculas en letras sin acento).
+ */
+export function likeContains(text: string): string {
+  return '%' + text.replace(/[\\%_]/g, (c) => '\\' + c) + '%';
+}
+
 /** "?, ?, ?" para un IN (...) con n valores. */
 export function placeholders(n: number, from = 1): string {
   return Array.from({ length: n }, (_, i) => `?${from + i}`).join(', ');
@@ -88,4 +96,20 @@ export async function loadSalesWithItems(
     items.get(r.saleId)!.push(row);
   }
   return sales.map((x) => ({ ...x, items: items.get(x.id) || [] }));
+}
+
+/**
+ * Productos del negocio con su categoria completa (como `include: { category: true }`).
+ * `where` es SQL extra sobre pos_products (alias p) con parametros desde ?2.
+ */
+export async function loadProductsWithCategory(D1: D1Database, tenantId: string, where: string, orderBy: string, ...params: unknown[]): Promise<any[]> {
+  const [prodRes, catRes] = await D1.batch([
+    D1.prepare(`SELECT p.* FROM pos_products p WHERE p.tenant_id = ?1 ${where} ORDER BY ${orderBy}`).bind(tenantId, ...params),
+    D1.prepare('SELECT * FROM pos_categories WHERE tenant_id = ?1').bind(tenantId),
+  ]);
+  const categories = new Map(((catRes.results || []) as any[]).map((r) => [r.id, fromDbRow('pos_categories', r)]));
+  return ((prodRes.results || []) as any[]).map((r) => ({
+    ...fromDbRow<any>('pos_products', r),
+    category: (r.categoryId && categories.get(r.categoryId)) || null,
+  }));
 }

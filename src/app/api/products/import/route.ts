@@ -1,5 +1,7 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { D1Batch, fromDbRow } from '@/lib/d1-batch';
+import { d1Of } from '@/lib/d1-read';
 import { getNexusTenant, planToLicenseType } from '@/lib/nexus-tenant';
 import { getLicenseLimits } from '@/lib/license';
 import { getRequestContext } from '@cloudflare/next-on-pages';
@@ -49,7 +51,8 @@ function buildColumnMap(headers: string[]): Record<string, string> {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -101,9 +104,27 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // Sin Prisma (ver "Limite de CPU" en CLAUDE.md): todo se lee una vez, se decide en memoria
+    // y se escribe en lotes. Antes eran 2 o 3 consultas por cada fila del archivo.
+    const [catRes, prodRes, licRes] = await D1.batch([
+      D1.prepare('SELECT * FROM pos_categories WHERE tenant_id = ?1').bind(tenantId),
+      D1.prepare('SELECT id, name, description, barcode, cost, stock, categoryId FROM pos_products WHERE tenant_id = ?1 AND active = 1 ORDER BY rowid').bind(tenantId),
+      D1.prepare('SELECT maxProducts FROM pos_licenses WHERE tenant_id = ?1 LIMIT 1').bind(tenantId),
+    ]);
     // Pre-cargar categorias existentes
-    const existingCategories = await db.category.findMany();
+    const existingCategories = ((catRes.results || []) as any[]).map((r) => fromDbRow<any>('pos_categories', r));
     const categoryMap = new Map(existingCategories.map(c => [c.name.toLowerCase().trim(), c]));
+    // Productos activos por codigo y por nombre (el primero, como el findFirst de Prisma)
+    const byBarcode = new Map<string, any>();
+    const byName = new Map<string, any>();
+    const remember = (prod: any) => {
+      if (prod.barcode && !byBarcode.has(prod.barcode)) byBarcode.set(prod.barcode, prod);
+      if (!byName.has(prod.name)) byName.set(prod.name, prod);
+    };
+    for (const prod of (prodRes.results || []) as any[]) remember(prod);
+    // Escrituras en lotes de D1 (en orden: una categoria nueva se inserta antes que sus productos)
+    let batch = new D1Batch(D1, tenantId);
+    const flushIfFull = async () => { if (batch.size >= 100) { await batch.commit(); batch = new D1Batch(D1, tenantId); } };
 
     const results = {
       created: 0,
@@ -115,11 +136,11 @@ export async function POST(req: NextRequest) {
 
     // Obtener licencia para verificar limite
     const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
-    const license = nexus ? null : await db.license.findFirst();
+    const license: any = nexus ? null : (licRes.results || [])[0] || null;
     const maxProducts = nexus
       ? getLicenseLimits(planToLicenseType(nexus.plan)).maxProducts
       : license?.maxProducts ?? 30;
-    const currentCount = await db.product.count({ where: { active: true } });
+    const currentCount = ((prodRes.results || []) as any[]).length;
     const availableSlots = maxProducts - currentCount;
 
     for (let i = 0; i < rows.length; i++) {
@@ -151,7 +172,8 @@ export async function POST(req: NextRequest) {
         let cat = categoryMap.get(catKey);
         if (!cat) {
           // Crear categoria nueva
-          cat = await db.category.create({ data: { name: rawCategory.trim() } });
+          cat = { id: batch.insert('pos_categories', { name: rawCategory.trim(), icon: '', color: '#6366f1', active: true }), name: rawCategory.trim() };
+          await flushIfFull();
           categoryMap.set(catKey, cat);
           results.categoriesCreated.push(cat.name);
         }
@@ -159,28 +181,30 @@ export async function POST(req: NextRequest) {
       }
 
       // Buscar producto existente por codigo de barras o por nombre exacto
-      let existing = null;
+      let existing: any = null;
       if (rawBarcode) {
-        existing = await db.product.findFirst({ where: { barcode: rawBarcode, active: true } });
+        existing = byBarcode.get(rawBarcode) || null;
       }
       if (!existing) {
-        existing = await db.product.findFirst({ where: { name: rawName, active: true } });
+        existing = byName.get(rawName) || null;
       }
 
       if (existing) {
         // Actualizar producto existente
-        await db.product.update({
-          where: { id: existing.id },
-          data: {
-            name: rawName,
-            description: rawDescription || existing.description,
-            barcode: rawBarcode || existing.barcode,
-            price: rawPrice,
-            cost: isNaN(rawCost) ? existing.cost : rawCost,
-            stock: isNaN(rawStock) ? existing.stock : rawStock,
-            categoryId: categoryId !== null ? categoryId : existing.categoryId,
-          },
-        });
+        const data = {
+          name: rawName,
+          description: rawDescription || existing.description,
+          barcode: rawBarcode || existing.barcode,
+          price: rawPrice,
+          cost: isNaN(rawCost) ? existing.cost : rawCost,
+          stock: isNaN(rawStock) ? existing.stock : rawStock,
+          categoryId: categoryId !== null ? categoryId : existing.categoryId,
+        };
+        batch.update('pos_products', existing.id, data);
+        await flushIfFull();
+        // Si el archivo repite el producto, la siguiente fila parte de estos valores
+        Object.assign(existing, data);
+        remember(existing);
         results.updated++;
       } else {
         // Verificar limite de productos
@@ -195,20 +219,23 @@ export async function POST(req: NextRequest) {
         }
 
         // Crear producto nuevo
-        await db.product.create({
-          data: {
-            name: rawName,
-            description: rawDescription,
-            barcode: rawBarcode,
-            price: rawPrice,
-            cost: isNaN(rawCost) ? 0 : rawCost,
-            stock: isNaN(rawStock) ? 0 : rawStock,
-            categoryId,
-          },
-        });
+        const created = {
+          name: rawName,
+          description: rawDescription,
+          barcode: rawBarcode,
+          price: rawPrice,
+          cost: isNaN(rawCost) ? 0 : rawCost,
+          stock: isNaN(rawStock) ? 0 : rawStock,
+          categoryId,
+        };
+        const id = batch.insert('pos_products', created);
+        await flushIfFull();
+        remember({ id, ...created });
         results.created++;
       }
     }
+
+    await batch.commit();
 
     return NextResponse.json({
       success: true,
