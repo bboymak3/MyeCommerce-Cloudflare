@@ -2,6 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { d1Of } from '@/lib/d1-read';
 import { veDateKey, veDayStart, veDayEnd } from '@/lib/ve-time';
 import { loadCashMovements, type CashMovements } from '@/lib/cash-movements';
 
@@ -206,7 +207,7 @@ export async function GET(req: NextRequest) {
 
       const totalSalesBs = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.totalBs), 0);
       const totalSalesUsd = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.total), 0);
-      const movements = await loadCashMovements(db, pStart, pEnd);
+      const movements = await loadCashMovements(d1Of(env), tenantId, pStart, pEnd);
       const returns = cashReturns(devolutions, movements);
 
       return NextResponse.json({
@@ -327,7 +328,7 @@ export async function POST(req: NextRequest) {
 
       const totalSalesUsd = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.total), 0);
       const totalSalesBs = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.totalBs), 0);
-      const movements = await loadCashMovements(db, fromDate, toDate);
+      const movements = await loadCashMovements(d1Of(env), tenantId, fromDate, toDate);
       const { usd: totalReturnsUsd, bs: totalReturnsBs } = cashReturns(devolutions, movements);
 
       const breakdown: Record<string, { usd: number; bs: number; count: number }> = {};
@@ -389,7 +390,7 @@ export async function POST(req: NextRequest) {
 
       const totalSalesUsd = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.total), 0);
       const totalSalesBs = sales.reduce((sum, s) => sum + (s.isCredit || s.paymentMethod === 'cashea' ? 0 : s.totalBs), 0);
-      const movements = await loadCashMovements(db, startOfDay, endOfDay);
+      const movements = await loadCashMovements(d1Of(env), tenantId, startOfDay, endOfDay);
       const { usd: totalReturnsUsd, bs: totalReturnsBs } = cashReturns(devolutions, movements);
 
       const breakdown: Record<string, { usd: number; bs: number; count: number }> = {};

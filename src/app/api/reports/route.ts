@@ -1,7 +1,9 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { d1Of, loadSalesWithItems, placeholders } from '@/lib/d1-read';
+import { toDbDate } from '@/lib/d1-batch';
 import { veDayStart, veDayEnd, veWallNow, fromVeWall } from '@/lib/ve-time';
 import { loadCashMovements, loadReturns } from '@/lib/cash-movements';
 
@@ -159,7 +161,7 @@ function getPeriodDates(period: string): { start: Date; end: Date; label: string
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const { searchParams } = new URL(req.url);
     const period = searchParams.get('period') || 'today';
@@ -191,17 +193,14 @@ export async function GET(req: NextRequest) {
     }
 
     // Build where clause
-    const dateFilter = { date: { gte: start, lte: end } };
-    const whereClause: any = { ...dateFilter };
-    if (sellerFilter) whereClause.sellerName = sellerFilter;
-    if (roleFilter) whereClause.sellerRole = roleFilter;
-
-    // Fetch sales
-    const sales = await db.sale.findMany({
-      where: whereClause,
-      include: { items: { include: { product: { select: { id: true, name: true } } } } },
-      orderBy: { date: 'desc' },
-    });
+    // Ventas del periodo con sus items (SQL directo: ver "Limite de CPU" en CLAUDE.md)
+    const D1 = d1Of(env);
+    const periodWhere = 'AND s.date >= ?2 AND s.date <= ?3';
+    const periodParams = [toDbDate(start), toDbDate(end)];
+    const filterWhere = periodWhere + (sellerFilter ? ` AND s.sellerName = ?${periodParams.length + 2}` : '')
+      + (roleFilter ? ` AND s.sellerRole = ?${periodParams.length + 2 + (sellerFilter ? 1 : 0)}` : '');
+    const filterParams = [...periodParams, ...(sellerFilter ? [sellerFilter] : []), ...(roleFilter ? [roleFilter] : [])];
+    const sales = await loadSalesWithItems(D1, tenantId, filterWhere, filterParams, ['id', 'name']);
 
     // VENTAS BRUTAS: incluye TODO (efectivo, credito, cashea, mixto, etc.)
     const grossTotalSales = sales.reduce((sum, s) => sum + s.total, 0);
@@ -236,14 +235,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Credit breakdown - use settings BCV rate for accurate Bs conversion
-    const settings = await db.settings.findFirst();
+    const settings: any = await D1.prepare('SELECT bcvRate FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId).first();
     const currentBcvRate = settings?.bcvRate || 36.5;
     const creditSales = sales.filter(s => s.isCredit);
     const creditSalesTotal = creditSales.reduce((sum, s) => sum + s.total, 0);
     const creditSalesTotalBs = creditSales.reduce((sum, s) => sum + s.totalBs, 0);
     // creditPaid incluye lo descontado por devoluciones (abonos con metodo 'devolucion'): no es dinero cobrado
     const creditReturns = creditSales.length
-      ? await db.creditPayment.findMany({ where: { method: 'devolucion', saleId: { in: creditSales.map(s => s.id) } }, select: { amount: true } })
+      ? (((await D1.prepare(`SELECT amount FROM pos_credit_payments WHERE tenant_id = ?1 AND method = 'devolucion' AND saleId IN (${placeholders(creditSales.length, 2)})`)
+        .bind(tenantId, ...creditSales.map(s => s.id)).all()).results || []) as { amount: number }[])
       : [];
     const creditReturnedTotal = creditReturns.reduce((sum, p) => sum + (p.amount || 0), 0);
     const creditPaidTotal = creditSales.reduce((sum, s) => sum + (s.creditPaid || 0), 0) - creditReturnedTotal;
@@ -367,11 +367,7 @@ export async function GET(req: NextRequest) {
 
     // ===== SELLER BREAKDOWN / RANKING (all sellers in period, without filters) =====
     const allSalesInPeriod = (sellerFilter || roleFilter)
-      ? await db.sale.findMany({
-          where: dateFilter,
-          include: { items: { include: { product: { select: { id: true, name: true } } } } },
-          orderBy: { date: 'desc' },
-        })
+      ? await loadSalesWithItems(D1, tenantId, periodWhere, periodParams, ['id', 'name'])
       : sales;
 
     const ROLE_LABELS: Record<string, string> = {
@@ -425,9 +421,9 @@ export async function GET(req: NextRequest) {
 
     // Devoluciones del periodo (con los mismos filtros de vendedor/rol, por su venta) y
     // abonos cobrados de cuentas por cobrar (no dependen del vendedor)
-    const returns = await loadReturns(db, start, end, (sale) =>
+    const returns = await loadReturns(D1, tenantId, start, end, (sale) =>
       (!sellerFilter || sale.sellerName === sellerFilter) && (!roleFilter || sale.sellerRole === roleFilter));
-    const { abonos } = await loadCashMovements(db, start, end);
+    const { abonos } = await loadCashMovements(D1, tenantId, start, end);
 
     return NextResponse.json({
       sales,

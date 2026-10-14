@@ -51,3 +51,41 @@ export async function loadProductsWithLastMove(
   });
   return { products, lastMoves };
 }
+
+/**
+ * Ventas del negocio (formato Prisma, mas recientes primero) con sus items y, en cada item,
+ * las columnas pedidas del producto: lo mismo que
+ * `findMany({ include: { items: { include: { product: { select } } } } })`.
+ * `where` es SQL extra sobre pos_sales (alias s) con parametros desde ?2.
+ */
+export async function loadSalesWithItems(
+  D1: D1Database, tenantId: string, where: string, params: unknown[], productCols: string[], orderBy = 's.date DESC',
+): Promise<any[]> {
+  const { results } = await D1.prepare(`SELECT s.* FROM pos_sales s WHERE s.tenant_id = ?1 ${where} ORDER BY ${orderBy}`)
+    .bind(tenantId, ...params).all();
+  const sales = ((results || []) as any[]).map((r) => fromDbRow<any>('pos_sales', r));
+  if (sales.length === 0) return [];
+  const cols = productCols.map((c) => `p."${c}" AS "_p_${c}"`).join(', ');
+  // Items de esas ventas: mismo filtro sobre la venta (evita un IN con miles de ids)
+  const { results: itemRows } = await D1.prepare(
+    `SELECT si.*, p.id AS _p__exists${cols ? ', ' + cols : ''}
+     FROM pos_sale_items si
+     JOIN pos_sales s ON s.id = si.saleId AND s.tenant_id = ?1
+     LEFT JOIN pos_products p ON p.id = si.productId
+     WHERE si.tenant_id = ?1 ${where} ORDER BY si.rowid`,
+  ).bind(tenantId, ...params).all();
+  const items = new Map<string, any[]>();
+  for (const r of (itemRows || []) as any[]) {
+    const item: any = {};
+    const product: any = {};
+    for (const [k, v] of Object.entries(r)) {
+      if (k === '_p__exists') continue;
+      if (k.startsWith('_p_')) product[k.slice(3)] = v;
+      else item[k] = v;
+    }
+    const row = { ...fromDbRow('pos_sale_items', item), product: r._p__exists ? fromDbRow('pos_products', product) : null };
+    if (!items.has(r.saleId)) items.set(r.saleId, []);
+    items.get(r.saleId)!.push(row);
+  }
+  return sales.map((x) => ({ ...x, items: items.get(x.id) || [] }));
+}

@@ -1,5 +1,7 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
+import { fromDbRow, toDbDate } from '@/lib/d1-batch';
+import { d1Of, loadSalesWithItems, placeholders, selectRows } from '@/lib/d1-read';
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
@@ -7,7 +9,9 @@ import { veDayStart, veDayEnd } from '@/lib/ve-time';
 // GET — Reporte de Utilidad / Pérdida por periodo
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  // Sin Prisma: SQL directo (ver "Limite de CPU" en CLAUDE.md)
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
@@ -21,22 +25,29 @@ export async function GET(req: NextRequest) {
     const end = veDayEnd(endDate);
 
     // Obtener tasa de cambio actual
-    const settings = await db.settings.findFirst();
+    const settings: any = await D1.prepare('SELECT bcvRate FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId).first();
     const bcvRate = settings?.bcvRate || 36.5;
+    const range = [toDbDate(start), toDbDate(end)];
 
     // 1. VENTAS del periodo
-    const sales: any[] = await db.sale.findMany({
-      where: { date: { gte: start, lte: end } },
-      include: { items: { include: { product: { select: { cost: true } } } } },
-    });
+    const sales: any[] = await loadSalesWithItems(D1, tenantId, 'AND s.date >= ?2 AND s.date <= ?3', range, ['cost'], 's.rowid');
 
     const totalVentasUsd = sales.reduce((sum, s) => sum + s.total, 0);
     const totalVentasCount = sales.length;
     // Devoluciones hechas en el periodo (restan de las ventas, y su mercancia vuelve al inventario)
-    const devolutions: any[] = await db.devolution.findMany({
-      where: { date: { gte: start, lte: end } },
-      include: { items: { include: { product: { select: { cost: true } } } } },
-    });
+    const devolutions: any[] = await selectRows(D1, 'pos_devolutions',
+      'SELECT * FROM pos_devolutions WHERE tenant_id = ?1 AND date >= ?2 AND date <= ?3 ORDER BY rowid', tenantId, ...range);
+    if (devolutions.length) {
+      const { results: devItems } = await D1.prepare(
+        `SELECT di.devolutionId, di.quantity, p.cost AS cost, p.id AS pid FROM pos_devolution_items di
+         LEFT JOIN pos_products p ON p.id = di.productId
+         WHERE di.tenant_id = ?1 AND di.devolutionId IN (${placeholders(devolutions.length, 2)}) ORDER BY di.rowid`,
+      ).bind(tenantId, ...devolutions.map((d) => d.id)).all();
+      for (const d of devolutions) {
+        d.items = ((devItems || []) as any[]).filter((i) => i.devolutionId === d.id)
+          .map((i) => ({ quantity: i.quantity, product: i.pid ? { cost: i.cost } : null }));
+      }
+    }
     const totalDevolucionesUsd = devolutions.reduce((sum, d) => sum + (d.totalUsd || 0), 0);
     const costoDevueltoUsd = devolutions.reduce((sum, d) =>
       sum + (d.items || []).reduce((s: number, it: any) => s + (it.product?.cost || 0) * it.quantity, 0), 0);
@@ -51,19 +62,21 @@ export async function GET(req: NextRequest) {
     }, 0) - costoDevueltoUsd;
 
     // 3. GASTOS del periodo
-    const expenses = await db.expense.findMany({
-      where: { date: { gte: start, lte: end } },
-      include: {
-        category: { select: { id: true, name: true, icon: true, color: true } },
-      },
-    });
+    const { results: expenseRows } = await D1.prepare(
+      `SELECT e.*, c.id AS _cid, c.name AS _cname, c.icon AS _cicon, c.color AS _ccolor
+       FROM pos_expenses e LEFT JOIN pos_expense_categories c ON c.id = e.categoryId
+       WHERE e.tenant_id = ?1 AND e.date >= ?2 AND e.date <= ?3 ORDER BY e.rowid`,
+    ).bind(tenantId, ...range).all();
+    const expenses = ((expenseRows || []) as any[]).map(({ _cid, _cname, _cicon, _ccolor, ...r }) => ({
+      ...fromDbRow<any>('pos_expenses', r),
+      category: { id: _cid, name: _cname, icon: _cicon, color: _ccolor },
+    }));
 
     const totalGastosUsd = expenses.reduce((sum, e) => sum + e.amount, 0);
 
     // 4. COMPRAS del periodo (inventario)
-    const purchases = await db.purchase.findMany({
-      where: { date: { gte: start, lte: end } },
-    });
+    const purchases = await selectRows<any>(D1, 'pos_purchases',
+      'SELECT * FROM pos_purchases WHERE tenant_id = ?1 AND date >= ?2 AND date <= ?3 ORDER BY rowid', tenantId, ...range);
     const totalComprasUsd = purchases.reduce((sum, p) => sum + p.totalUsd, 0);
 
     // 5. Cálculos

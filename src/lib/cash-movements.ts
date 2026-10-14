@@ -5,6 +5,8 @@
 // Efectivo: el metodo 'efectivo' es efectivo en Bs (cuenta su monto en Bs) y
 // 'efectivo-usd' es efectivo en dolares (cuenta su monto en $).
 
+import { toDbDate } from './d1-batch';
+
 export interface MovementTotals {
   usd: number;
   bs: number;
@@ -60,17 +62,24 @@ export interface MovementFilter {
 }
 
 /**
- * Suma los movimientos con fecha en [from, to]. `db` es el cliente Prisma del negocio
- * (createDbFromEnv), que ya filtra por tenant_id.
+ * Suma los movimientos del negocio con fecha en [from, to], con SQL directo en un solo lote
+ * (ver "Limite de CPU" en CLAUDE.md).
  */
-export async function loadCashMovements(db: any, from: Date, to: Date, filter: MovementFilter = {}): Promise<CashMovements> {
-  const range = { gte: from, lte: to };
+export async function loadCashMovements(D1: D1Database, tenantId: string, from: Date, to: Date, filter: MovementFilter = {}): Promise<CashMovements> {
   const byUser = filter.username !== undefined;
-  const [payments, expenses, supplierPayments] = await Promise.all([
-    db.creditPayment.findMany({ where: { date: range, ...(byUser ? { createdBy: filter.username } : {}) } }),
-    db.expense.findMany({ where: { date: range, ...(filter.userId !== undefined ? { userId: filter.userId } : {}) } }),
-    db.supplierPayment.findMany({ where: { date: range, ...(byUser ? { createdBy: filter.username } : {}) } }),
+  const byUserId = filter.userId !== undefined;
+  const base = [tenantId, toDbDate(from), toDbDate(to)];
+  const [payRes, expRes, supRes] = await D1.batch([
+    D1.prepare(`SELECT amount, amountBs, method FROM pos_credit_payments WHERE tenant_id = ?1 AND date >= ?2 AND date <= ?3 ${byUser ? 'AND createdBy = ?4' : ''}`)
+      .bind(...base, ...(byUser ? [filter.username] : [])),
+    D1.prepare(`SELECT amount, amountBs, paymentMethod FROM pos_expenses WHERE tenant_id = ?1 AND date >= ?2 AND date <= ?3 ${byUserId ? 'AND userId = ?4' : ''}`)
+      .bind(...base, ...(byUserId ? [filter.userId] : [])),
+    D1.prepare(`SELECT amount, amountBs, method FROM pos_supplier_payments WHERE tenant_id = ?1 AND date >= ?2 AND date <= ?3 ${byUser ? 'AND createdBy = ?4' : ''}`)
+      .bind(...base, ...(byUser ? [filter.username] : [])),
   ]);
+  const payments = (payRes.results || []) as any[];
+  const expenses = (expRes.results || []) as any[];
+  const supplierPayments = (supRes.results || []) as any[];
 
   const abonos = emptyTotals();
   const devolucionesACredito = { usd: 0, bs: 0, count: 0 };
@@ -105,15 +114,17 @@ export async function loadCashMovements(db: any, from: Date, to: Date, filter: M
  * Devoluciones del periodo: total, la parte descontada de deudas de ventas a credito
  * (no salio dinero) y lo reembolsado. `keep` filtra por la venta (vendedor, rol).
  */
-export async function loadReturns(db: any, from: Date, to: Date, keep: (sale: any) => boolean = () => true) {
-  const all = await db.devolution.findMany({
-    where: { date: { gte: from, lte: to } },
-    select: { id: true, totalUsd: true, totalBs: true, sale: { select: { sellerName: true, sellerRole: true } } },
-  });
-  const devs = (all as any[]).filter((d) => keep(d.sale || {}));
+export async function loadReturns(D1: D1Database, tenantId: string, from: Date, to: Date, keep: (sale: any) => boolean = () => true) {
+  const { results } = await D1.prepare(
+    `SELECT d.id, d.totalUsd, d.totalBs, s.sellerName AS sellerName, s.sellerRole AS sellerRole
+     FROM pos_devolutions d LEFT JOIN pos_sales s ON s.id = d.saleId
+     WHERE d.tenant_id = ?1 AND d.date >= ?2 AND d.date <= ?3`,
+  ).bind(tenantId, toDbDate(from), toDbDate(to)).all();
+  const devs = ((results || []) as any[]).filter((d) => keep({ sellerName: d.sellerName, sellerRole: d.sellerRole }));
   const ids = devs.map((d) => d.id);
   const credit = ids.length
-    ? await db.creditPayment.findMany({ where: { method: 'devolucion', reference: { in: ids } }, select: { amount: true, amountBs: true } })
+    ? ((await D1.prepare(`SELECT amount, amountBs FROM pos_credit_payments WHERE tenant_id = ?1 AND method = 'devolucion' AND reference IN (${ids.map((_, i) => '?' + (i + 2)).join(', ')})`)
+      .bind(tenantId, ...ids).all()).results || [])
     : [];
   const totalUsd = devs.reduce((s, d) => s + (Number(d.totalUsd) || 0), 0);
   const totalBs = devs.reduce((s, d) => s + (Number(d.totalBs) || 0), 0);
