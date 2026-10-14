@@ -2,7 +2,8 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { D1Batch, sqlExpr } from '@/lib/d1-batch';
+import { d1Of, loadProductsWithLastMove } from '@/lib/d1-read';
+import { D1Batch, sqlExpr, fromDbRow } from '@/lib/d1-batch';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
 
 export async function GET(req: NextRequest) {
@@ -36,7 +37,9 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  // Sin Prisma: lecturas y respuesta con SQL directo (ver "Limite de CPU" en CLAUDE.md)
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
     const now = new Date();
@@ -56,7 +59,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Descuento no puede ser negativo' }, { status: 400 });
     }
 
-    const settings = await db.settings.findFirst();
+    // Todas las lecturas en dos viajes: configuracion, turno y cliente; productos y su ultimo
+    // movimiento de kardex
+    const uId = req.headers.get('x-user-id') || String(body.userId || '');
+    const [settingsRes, shiftRes, clientRes] = await D1.batch([
+      D1.prepare('SELECT * FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId),
+      D1.prepare(`SELECT id FROM pos_cash_shifts WHERE tenant_id = ?1 AND userId = ?2 AND status = 'open' LIMIT 1`).bind(tenantId, uId),
+      D1.prepare('SELECT * FROM pos_clients WHERE tenant_id = ?1 AND id = ?2 LIMIT 1').bind(tenantId, String(body.clientId || '')),
+    ]);
+    const settings: any = fromDbRow('pos_settings', (settingsRes.results || [])[0] as any);
+    const { products, lastMoves } = await loadProductsWithLastMove(D1, tenantId, body.items.map((i: any) => String(i.productId || '')));
     const allowZeroStock = settings?.allowZeroStock === true;
     const loyaltyEnabled = settings?.loyaltyEnabled === true;
 
@@ -66,7 +78,7 @@ export async function POST(req: NextRequest) {
       if (isNaN(qty) || qty <= 0) {
         return NextResponse.json({ error: `Cantidad invalida para "${item.productName || item.productId}"` }, { status: 400 });
       }
-      const product = await db.product.findUnique({ where: { id: item.productId } });
+      const product = products.get(item.productId);
       if (!product) return NextResponse.json({ error: `Producto no encontrado: ${item.productName || item.productId}` }, { status: 400 });
       // Only check stock level when zero-stock is NOT allowed
       if (!allowZeroStock && product.stock < qty) {
@@ -81,15 +93,14 @@ export async function POST(req: NextRequest) {
     // El rol sale siempre de la sesion (el del cuerpo solo si no hay sesion).
     const sName = body.sellerName || req.headers.get('x-username') || '';
     const sRole = req.headers.get('x-user-role') || body.sellerRole || '';
-    const uId = req.headers.get('x-user-id') || String(body.userId || '');
-    const openShift = uId ? await db.cashShift.findFirst({ where: { userId: uId, status: 'open' } }) : null;
+    const openShift: any = uId ? (shiftRes.results || [])[0] || null : null;
     const kardexData: { productId: string; qty: number; unitCost: number; balQty: number; balTC: number; balAvg: number }[] = [];
     let pointsEarned = 0;
     for (const item of body.items) {
       const qty = parseFloat(item.quantity);
-      const product = await db.product.findUnique({ where: { id: item.productId } });
+      const product = products.get(item.productId);
       const unitCost = product?.cost || 0;
-      const lastMove = await db.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
+      const lastMove = lastMoves.get(item.productId);
       // Saldo anterior = stock real antes de descontar (el kardex siempre cuadra con el inventario)
       const prevQty = product?.stock ?? lastMove?.balanceQty ?? 0;
       const prevTC = lastMove?.balanceTotalCost ?? (prevQty * unitCost);
@@ -106,7 +117,7 @@ export async function POST(req: NextRequest) {
     let clientLoyaltyPoints: number | null = null;
     let pointsRedeemed = 0;
     if (body.clientId) {
-      const client = await db.client.findUnique({ where: { id: body.clientId } });
+      const client: any = fromDbRow('pos_clients', (clientRes.results || [])[0] as any);
       if (client) {
         clientCreditBalance = Number(client.creditBalance || 0);
         clientLoyaltyPoints = Math.round(Number(client.loyaltyPoints || 0));
@@ -201,14 +212,36 @@ export async function POST(req: NextRequest) {
 
     await batch.commit();
 
-    const sale = await db.sale.findUnique({
-      where: { id: saleId },
-      include: { items: { include: { product: { select: { name: true, vendePorPeso: true, unidadPeso: true } } } }, client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } }, _count: { select: { creditPayments: true } } },
-    });
-
-    return NextResponse.json(sale);
+    return NextResponse.json(await loadSaleSql(D1, tenantId, saleId));
   } catch (error: any) {
     console.error('Error creating sale:', error);
     return NextResponse.json({ error: `Error al registrar venta: ${error?.message || String(error)}` }, { status: 500 });
   }
+}
+
+/**
+ * Venta con sus items (nombre y peso del producto), el cliente y la cantidad de abonos:
+ * lo mismo que devolvia el findUnique de Prisma, leido con SQL directo.
+ */
+async function loadSaleSql(D1: D1Database, tenantId: string, saleId: string) {
+  const [saleRes, itemsRes, payRes] = await D1.batch([
+    D1.prepare('SELECT * FROM pos_sales WHERE tenant_id = ?1 AND id = ?2').bind(tenantId, saleId),
+    D1.prepare(`SELECT si.*, p.id AS _pid, p.name AS _pname, p.vendePorPeso AS _pvpp, p.unidadPeso AS _pup
+      FROM pos_sale_items si LEFT JOIN pos_products p ON p.id = si.productId
+      WHERE si.tenant_id = ?1 AND si.saleId = ?2 ORDER BY si.rowid`).bind(tenantId, saleId),
+    D1.prepare('SELECT COUNT(*) AS n FROM pos_credit_payments WHERE tenant_id = ?1 AND saleId = ?2').bind(tenantId, saleId),
+  ]);
+  const sale: any = fromDbRow('pos_sales', (saleRes.results || [])[0] as any);
+  if (!sale) return null;
+  let client = null;
+  if (sale.clientId) {
+    const c: any = await D1.prepare('SELECT id, fullName, docType, docNumber, creditBalance FROM pos_clients WHERE tenant_id = ?1 AND id = ?2')
+      .bind(tenantId, sale.clientId).first();
+    client = c ? { id: c.id, fullName: c.fullName, docType: c.docType, docNumber: c.docNumber, creditBalance: c.creditBalance } : null;
+  }
+  const items = ((itemsRes.results || []) as any[]).map(({ _pid, _pname, _pvpp, _pup, ...item }) => ({
+    ...fromDbRow('pos_sale_items', item),
+    product: _pid ? { name: _pname, vendePorPeso: _pvpp === 1 || _pvpp === true, unidadPeso: _pup } : null,
+  }));
+  return { ...sale, items, client, _count: { creditPayments: Number(((payRes.results || []) as any[])[0]?.n) || 0 } };
 }
