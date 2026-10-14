@@ -1,13 +1,47 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { D1Batch } from '@/lib/d1-batch';
+import { D1Batch, fromDbRow } from '@/lib/d1-batch';
+import { d1Of, placeholders, selectRow, selectRows } from '@/lib/d1-read';
+
+// Sin Prisma: lecturas con SQL directo (ver "Limite de CPU" en CLAUDE.md)
+
+const CLIENT_COLS = 'id, fullName, docType, docNumber, creditBalance';
+
+/** Ventas a credito (formato Prisma) con sus abonos (por fecha), su cliente y, si se pide, sus items. */
+async function creditSalesSql(D1: D1Database, tenantId: string, where: string, params: unknown[], withItems: boolean) {
+  const sales = await selectRows<any>(D1, 'pos_sales', `SELECT * FROM pos_sales WHERE tenant_id = ?1 ${where} ORDER BY date DESC`, tenantId, ...params);
+  if (sales.length === 0) return [];
+  const ids = sales.map((x) => x.id);
+  const clientIds = [...new Set(sales.map((x) => x.clientId).filter(Boolean))] as string[];
+  const [payRes, cliRes, itemRes] = await D1.batch([
+    D1.prepare(`SELECT * FROM pos_credit_payments WHERE tenant_id = ?1 AND saleId IN (${placeholders(ids.length, 2)}) ORDER BY date ASC`).bind(tenantId, ...ids),
+    D1.prepare(`SELECT ${CLIENT_COLS} FROM pos_clients WHERE tenant_id = ?1 AND id IN (${placeholders(Math.max(1, clientIds.length), 2)})`).bind(tenantId, ...(clientIds.length ? clientIds : [''])),
+    D1.prepare(`SELECT si.*, p.name AS _pname, p.id AS _pid FROM pos_sale_items si LEFT JOIN pos_products p ON p.id = si.productId
+      WHERE si.tenant_id = ?1 AND si.saleId IN (${placeholders(ids.length, 2)}) ORDER BY si.rowid`).bind(tenantId, ...(withItems ? ids : ids.map(() => ''))),
+  ]);
+  const group = (rows: any[], key: string, map: (r: any) => any) => {
+    const m = new Map<string, any[]>();
+    for (const r of rows) { if (!m.has(r[key])) m.set(r[key], []); m.get(r[key])!.push(map(r)); }
+    return m;
+  };
+  const payments = group((payRes.results || []) as any[], 'saleId', (r) => fromDbRow('pos_credit_payments', r));
+  const clients = new Map(((cliRes.results || []) as any[]).map((c) => [c.id, { id: c.id, fullName: c.fullName, docType: c.docType, docNumber: c.docNumber, creditBalance: c.creditBalance }]));
+  const items = group((itemRes.results || []) as any[], 'saleId', ({ _pname, _pid, ...it }) => ({ ...fromDbRow('pos_sale_items', it), product: _pid ? { name: _pname } : null }));
+  return sales.map((x) => ({
+    ...x,
+    creditPayments: payments.get(x.id) || [],
+    client: (x.clientId && clients.get(x.clientId)) || null,
+    ...(withItems ? { items: items.get(x.id) || [] } : {}),
+  }));
+}
 
 // GET /api/credit - List credit accounts (clients with debt)
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const clientId = searchParams.get('clientId');
@@ -17,50 +51,34 @@ export async function GET(req: NextRequest) {
 
     // If requesting payments for a specific sale
     if (showPayments && saleId) {
-      const payments = await db.creditPayment.findMany({
-        where: { saleId },
-        orderBy: { date: 'desc' },
-      });
+      const payments = await selectRows(D1, 'pos_credit_payments',
+        'SELECT * FROM pos_credit_payments WHERE tenant_id = ?1 AND saleId = ?2 ORDER BY date DESC', tenantId, saleId);
       return NextResponse.json(payments);
     }
 
     // If filtering by specific client
     if (clientId) {
-      const creditSales = await db.sale.findMany({
-        where: { clientId, isCredit: true },
-        include: {
-          creditPayments: { orderBy: { date: 'asc' } },
-          client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } },
-        },
-        orderBy: { date: 'desc' },
-      });
+      const creditSales = await creditSalesSql(D1, tenantId, 'AND clientId = ?2 AND isCredit = 1', [clientId], false);
       return NextResponse.json(creditSales);
     }
 
     // If filtering by specific sale
     if (saleId) {
-      const sale = await db.sale.findUnique({
-        where: { id: saleId },
-        include: {
-          creditPayments: { orderBy: { date: 'asc' } },
-          client: { select: { id: true, fullName: true, docType: true, docNumber: true, creditBalance: true } },
-          items: { include: { product: { select: { name: true } } } },
-        },
-      });
-      return NextResponse.json(sale);
+      const [sale] = await creditSalesSql(D1, tenantId, 'AND id = ?2', [saleId], true);
+      return NextResponse.json(sale || null);
     }
 
     // Default: all clients with credit debt
     // Get current BCV rate from settings for Bs conversion
-    const settings = await db.settings.findFirst();
+    const settings: any = await D1.prepare('SELECT bcvRate FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId).first();
     const bcvRate = settings?.bcvRate || 36.5;
 
     // Find clients with REAL unpaid credit by checking actual sales data
     // (creditBalance field can be stale, so we compute from sales)
-    const allCreditSales = await db.sale.findMany({
-      where: { isCredit: true, clientId: { not: null } },
-      select: { clientId: true, total: true, creditPaid: true },
-    });
+    const { results: creditRows } = await D1.prepare(
+      'SELECT clientId, total, creditPaid FROM pos_sales WHERE tenant_id = ?1 AND isCredit = 1 AND clientId IS NOT NULL',
+    ).bind(tenantId).all();
+    const allCreditSales = (creditRows || []) as { clientId: string | null; total: number; creditPaid: number }[];
 
     // Build map of clientId -> actual debt from sales
     const clientDebtMap = new Map<string, number>();
@@ -74,10 +92,8 @@ export async function GET(req: NextRequest) {
 
     // Also include clients with creditBalance > 0 (catches orphaned balances)
     if (!all) {
-      const clientsByBalance = await db.client.findMany({
-        where: { creditBalance: { gt: 0 } },
-        select: { id: true, creditBalance: true },
-      });
+      const { results: balRows } = await D1.prepare('SELECT id, creditBalance FROM pos_clients WHERE tenant_id = ?1 AND creditBalance > 0').bind(tenantId).all();
+      const clientsByBalance = (balRows || []) as { id: string; creditBalance: number }[];
       for (const c of clientsByBalance) {
         if (!clientDebtMap.has(c.id)) {
           clientDebtMap.set(c.id, Number(c.creditBalance || 0));
@@ -93,20 +109,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch those clients
-    const clientsWithDebt = await db.client.findMany({
-      where: { id: { in: clientIdsWithDebt } },
-      include: {
-        _count: { select: { sales: { where: { isCredit: true } } } },
-      },
-      orderBy: { fullName: 'asc' },
-    });
+    const ph = placeholders(clientIdsWithDebt.length, 2);
+    const clientsWithDebt = await selectRows<any>(D1, 'pos_clients',
+      `SELECT * FROM pos_clients WHERE tenant_id = ?1 AND id IN (${ph}) ORDER BY fullName ASC`, tenantId, ...clientIdsWithDebt);
 
     // Traer TODAS las ventas a credito de esos clientes en 1 sola query
-    const allCreditSalesDetail = await db.sale.findMany({
-      where: { clientId: { in: clientIdsWithDebt }, isCredit: true },
-      select: { clientId: true, id: true, total: true, totalBs: true, creditPaid: true, creditDays: true, creditDueDate: true, date: true, exchangeRate: true },
-      orderBy: { date: 'desc' },
-    });
+    const allCreditSalesDetail = (await selectRows<any>(D1, 'pos_sales',
+      `SELECT clientId, id, total, totalBs, creditPaid, creditDays, creditDueDate, date, exchangeRate FROM pos_sales
+       WHERE tenant_id = ?1 AND clientId IN (${ph}) AND isCredit = 1 ORDER BY date DESC`, tenantId, ...clientIdsWithDebt)) as
+      { clientId: string | null; id: string; total: number; totalBs: number; creditPaid: number; creditDays: number; creditDueDate: string | null; date: string; exchangeRate: number }[];
 
     // Agrupar por cliente en memoria
     const salesByClient = new Map<string, typeof allCreditSalesDetail>();
@@ -154,7 +165,8 @@ export async function GET(req: NextRequest) {
 // POST /api/credit - Register payment (abono)
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
     const amount = parseFloat(body.amount);
@@ -164,7 +176,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get the sale
-    const sale = await db.sale.findUnique({ where: { id: body.saleId } });
+    const sale: any = await selectRow(D1, 'pos_sales', 'SELECT * FROM pos_sales WHERE tenant_id = ?1 AND id = ?2', tenantId, String(body.saleId));
     if (!sale) return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
     if (!sale.isCredit) return NextResponse.json({ error: 'Esta venta no es a credito' }, { status: 400 });
 
@@ -176,12 +188,12 @@ export async function POST(req: NextRequest) {
     // Clamp amount to remaining to prevent overpayment
     const finalAmount = Math.min(amount, remaining);
 
-    const settings = await db.settings.findFirst();
+    const settings: any = await D1.prepare('SELECT bcvRate FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId).first();
     const exchangeRate = parseFloat(body.exchangeRate) || settings?.bcvRate || 36.5;
 
     // D1 BATCH TRANSACTION: reads first, then batch writes
     // Re-check remaining to prevent race condition — READ FIRST
-    const freshSale = await db.sale.findUnique({ where: { id: body.saleId } });
+    const freshSale = sale;
     if (!freshSale) return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
     const txRemaining = Number(freshSale.total || 0) - Number(freshSale.creditPaid || 0);
     const txAmount = Math.min(finalAmount, txRemaining);
@@ -190,7 +202,7 @@ export async function POST(req: NextRequest) {
     // Read client credit balance — READ FIRST
     let clientCreditBalance: number | null = null;
     if (sale.clientId) {
-      const client = await db.client.findUnique({ where: { id: sale.clientId } });
+      const client: any = await D1.prepare('SELECT creditBalance FROM pos_clients WHERE tenant_id = ?1 AND id = ?2').bind(tenantId, sale.clientId).first();
       if (client) {
         clientCreditBalance = Number(client.creditBalance || 0);
       }
@@ -198,7 +210,7 @@ export async function POST(req: NextRequest) {
 
     // Escrituras en un lote atomico de D1. Los saldos se calculan en la base de datos
     // para que dos abonos simultaneos no se pisen.
-    const batch = new D1Batch((env as any).DB, tenantId);
+    const batch = new D1Batch(D1, tenantId);
     // Usar SIEMPRE el clientId de la venta, nunca el del body
     const paymentId = batch.insert('pos_credit_payments', {
       saleId: body.saleId,
@@ -217,7 +229,7 @@ export async function POST(req: NextRequest) {
       batch.raw('UPDATE "pos_clients" SET "creditBalance" = MAX(0, ROUND("creditBalance" - ?, 2)), "updatedAt" = ? WHERE "id" = ? AND "tenant_id" = ?', txAmount, new Date(), sale.clientId);
     }
     await batch.commit();
-    const payment = await db.creditPayment.findUnique({ where: { id: paymentId } });
+    const payment = await selectRow(D1, 'pos_credit_payments', 'SELECT * FROM pos_credit_payments WHERE tenant_id = ?1 AND id = ?2', tenantId, paymentId);
 
     return NextResponse.json(payment);
   } catch (error: any) {
