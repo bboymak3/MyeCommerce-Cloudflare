@@ -63,6 +63,39 @@ interface UsersTabProps {
   onUserUpdate?: (user: CurrentUser) => void;
 }
 
+// Permisos del rol cajero: los define el super admin en Nexus One ("Permisos del cajero").
+// Aqui solo se muestran; el servidor los aplica en cada accion.
+function CajeroPermissionsCard() {
+  const [data, setData] = useState<{ cajero: Record<string, boolean>; catalog: { key: string; label: string }[]; managedBy: string } | null>(null);
+  useEffect(() => {
+    authFetch("/api/permissions").then(r => r.json()).then((d: any) => { if (d && d.cajero) setData(d); }).catch(() => {});
+  }, []);
+  return (
+    <Card className="border-primary/30">
+      <CardContent className="p-5">
+        <h3 className="text-base font-semibold">Permisos del cajero</h3>
+        <p className="text-xs text-muted-foreground mt-0.5 mb-3">
+          {data?.managedBy === "nexus"
+            ? "Los configura el super administrador en Nexus One (boton \"Permisos del cajero\" del negocio). Se aplican a todos los cajeros."
+            : "Permisos predeterminados del cajero. Se aplican a todos los cajeros."}
+        </p>
+        {!data ? (
+          <p className="text-xs text-muted-foreground">Cargando...</p>
+        ) : (
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            {data.catalog.map(p => (
+              <div key={p.key} className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${data.cajero[p.key] ? "" : "opacity-60"}`}>
+                <span className={data.cajero[p.key] ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{data.cajero[p.key] ? "\u2713" : "\u2717"}</span>
+                <span>{p.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // Avatar component with initials fallback
 function UserAvatar({ src, name, size = "md" }: { src?: string; name?: string; size?: "sm" | "md" | "lg" }) {
   const sizeClasses = {
@@ -613,93 +646,8 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
 
       <Separator />
 
-      {/* ===== CONFIGURACION DE ROLES (solo admin) ===== */}
-      {currentUser.role === "admin" && (
-        <Card className="border-primary/30">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-base font-semibold flex items-center gap-2">
-                  <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                  Permisos por Rol
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Configure los permisos predeterminados de cada rol. Al crear un nuevo usuario, se aplicaran estos permisos automaticamente.
-                </p>
-              </div>
-            </div>
-
-            {loadingRoles ? (
-              <div className="flex items-center justify-center py-4">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {roleConfigs.map((role) => (
-                  <div key={role.roleName} className="rounded-lg border p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }} />
-                        <span className="font-semibold text-sm">{role.label || role.roleName}</span>
-                        <Badge variant="secondary" className="text-[10px]">{role.roleName}</Badge>
-                        <span className="text-xs text-muted-foreground">
-                          ({users.filter(u => u.role === role.roleName).length} usuario{users.filter(u => u.role === role.roleName).length !== 1 ? 's' : ''})
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {editingRole === role.roleName ? (
-                          <div className="flex gap-1">
-                            <Button size="sm" onClick={() => saveRolePerms(role.roleName)} disabled={savingRolePerms}>
-                              {savingRolePerms ? "Guardando..." : "Guardar"}
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setEditingRole(null)}>Cancelar</Button>
-                          </div>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => { setEditingRole(role.roleName); setEditRolePerms({ ...role.permissions }); }}>
-                            Editar Permisos
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    {editingRole === role.roleName ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {PERMISSION_KEYS.map((key) => (
-                          <label key={key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${editRolePerms[key] ? "border-primary bg-primary/5" : "border-muted hover:border-primary/30"}`}>
-                            <input
-                              type="checkbox"
-                              checked={!!editRolePerms[key]}
-                              onChange={() => setEditRolePerms(prev => ({ ...prev, [key]: !prev[key] }))}
-                              className="rounded border-gray-300"
-                            />
-                            <span className="text-xs font-medium">{PERMISSION_LABELS[key]}</span>
-                          </label>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {PERMISSION_KEYS.filter(k => role.permissions[k]).map(k => (
-                          <Badge key={k} variant="secondary" className="text-[10px] px-2 py-0.5">
-                            <svg className="w-3 h-3 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            {PERMISSION_LABELS[k]}
-                          </Badge>
-                        ))}
-                        {PERMISSION_KEYS.filter(k => !role.permissions[k]).map(k => (
-                          <Badge key={k} variant="outline" className="text-[10px] px-2 py-0.5 text-muted-foreground line-through opacity-50">
-                            {PERMISSION_LABELS[k]}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* ===== PERMISOS DEL CAJERO (los define el super admin en Nexus One) ===== */}
+      {currentUser.role === "admin" && <CajeroPermissionsCard />}
 
       {/* ===== ADMINISTRADORES ===== */}
       <div>
@@ -791,16 +739,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                         {user.lastLogin ? new Date(user.lastLogin).toLocaleString("es-VE") : "Nunca"}
                       </td>
                       <td className="px-4 py-2.5">
-                        <div className="flex flex-wrap gap-1">
-                          {PERMISSION_KEYS.filter((k) => user.permissions[k]).map((k) => (
-                            <Badge key={k} variant="secondary" className="text-[10px] px-1.5 py-0">
-                              {PERMISSION_LABELS[k]}
-                            </Badge>
-                          ))}
-                          {PERMISSION_KEYS.filter((k) => !user.permissions[k]).length === PERMISSION_KEYS.length && (
-                            <span className="text-xs text-muted-foreground">Sin permisos</span>
-                          )}
-                        </div>
+                        <span className="text-xs text-muted-foreground">Segun permisos del cajero</span>
                       </td>
                       <td className="px-4 py-2.5">
                         <Badge variant={user.isActive ? "success" : "destructive"}>
@@ -838,10 +777,6 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                               Activar
                             </Button>
                           )}
-                          <Button variant="outline" size="sm" onClick={() => resetUserToRoleDefaults(user)} title="Restablecer permisos del rol">
-                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            Rol
-                          </Button>
                           <Button variant="destructive" size="sm" onClick={() => handleDelete(user)}>
                             Eliminar
                           </Button>
@@ -918,7 +853,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                 <button type="button" onClick={() => setNewRole("cajero")} className={`p-3 rounded-lg border-2 text-center transition-all ${newRole === "cajero" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
                   <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>
                   <span className="text-sm font-medium">Cajero</span>
-                  <p className="text-[10px] text-muted-foreground">Puede cobrar</p>
+                  <p className="text-[10px] text-muted-foreground">Permisos definidos en Nexus One</p>
                 </button>
               </div>
             </div>
@@ -954,25 +889,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
               <Input type="password" placeholder="Minimo 3 caracteres" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             </div>
 
-            {/* Permissions (only for cajero) */}
-            {newRole === "cajero" && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Permisos</Label>
-                  <div className="space-y-2">
-                    {PERMISSION_KEYS.map((key) => (
-                      <label key={key} className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={!!newPermissions[key]} onChange={() => togglePermission(key, setNewPermissions)} disabled={key === "pos"} className="rounded border-gray-300" />
-                        <span className="text-sm">{PERMISSION_LABELS[key]}</span>
-                        {key === "pos" && <span className="text-xs text-muted-foreground">(siempre activo)</span>}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
+            
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowCreateDialog(false)}>Cancelar</Button>
               <Button className="flex-1" onClick={handleCreate} disabled={creating}>
@@ -1033,7 +950,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
                 <button type="button" onClick={() => setEditRole("cajero")} className={`p-3 rounded-lg border-2 text-center transition-all ${editRole === "cajero" ? "border-primary bg-primary/10 text-primary" : "border-muted hover:border-primary/50"}`}>
                   <div className="text-lg mb-1"><svg className="w-6 h-6 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>
                   <span className="text-sm font-medium">Cajero</span>
-                  <p className="text-[10px] text-muted-foreground">Puede cobrar</p>
+                  <p className="text-[10px] text-muted-foreground">Permisos definidos en Nexus One</p>
                 </button>
               </div>
             </div>
@@ -1058,25 +975,7 @@ export default function UsersTab({ currentUser, onUserUpdate }: UsersTabProps) {
               </label>
             </div>
 
-            {/* Permissions (only for cajero) */}
-            {editRole === "cajero" && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Permisos</Label>
-                  <div className="space-y-2">
-                    {PERMISSION_KEYS.map((key) => (
-                      <label key={key} className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={!!editPermissions[key]} onChange={() => togglePermission(key, setEditPermissions)} disabled={key === "pos"} className="rounded border-gray-300" />
-                        <span className="text-sm">{PERMISSION_LABELS[key]}</span>
-                        {key === "pos" && <span className="text-xs text-muted-foreground">(siempre activo)</span>}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
+            
             <div className="flex gap-2 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowEditDialog(false)}>Cancelar</Button>
               <Button className="flex-1" onClick={handleEditSave} disabled={saving || savingAvatar}>
