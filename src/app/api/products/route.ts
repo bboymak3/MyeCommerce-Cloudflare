@@ -2,7 +2,7 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { D1Batch } from '@/lib/d1-batch';
+import { D1Batch, fromDbRow } from '@/lib/d1-batch';
 
 function safeFloat(v: any, fallback: number = 0): number {
   const n = parseFloat(v);
@@ -11,18 +11,41 @@ function safeFloat(v: any, fallback: number = 0): number {
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
-    const products = await db.product.findMany({
-      where: { active: true },
-      include: {
-        category: true,
-        brand: true,
-        comboItems: { include: { product: { select: { id: true, name: true, barcode: true, price: true, stock: true } } } },
-        comboItemsRef: { include: { combo: { select: { id: true, name: true } } } },
-      },
-      orderBy: { name: 'asc' },
-    });
+    // SQL directo en un solo lote (se pide al abrir la app; ver "Limite de CPU" en CLAUDE.md).
+    // Mismo formato que el findMany de Prisma con category, brand, comboItems y comboItemsRef.
+    const D1 = (env as any).DB as D1Database;
+    const [prodRes, catRes, brandRes, comboRes] = await D1.batch([
+      D1.prepare('SELECT * FROM pos_products WHERE tenant_id = ?1 AND active = 1 ORDER BY name ASC').bind(tenantId),
+      D1.prepare('SELECT * FROM pos_categories WHERE tenant_id = ?1').bind(tenantId),
+      D1.prepare('SELECT * FROM pos_brands WHERE tenant_id = ?1').bind(tenantId),
+      D1.prepare(`SELECT ci.*, p.id AS _pid, p.name AS _pname, p.barcode AS _pbarcode, p.price AS _pprice, p.stock AS _pstock,
+          c.id AS _cid, c.name AS _cname
+        FROM pos_combo_items ci
+        LEFT JOIN pos_products p ON p.id = ci.productId
+        LEFT JOIN pos_products c ON c.id = ci.comboId
+        WHERE ci.tenant_id = ?1`).bind(tenantId),
+    ]);
+    const categories = new Map(((catRes.results || []) as any[]).map((r) => [r.id, fromDbRow('pos_categories', r)]));
+    const brands = new Map(((brandRes.results || []) as any[]).map((r) => [r.id, fromDbRow('pos_brands', r)]));
+    const byCombo = new Map<string, any[]>();
+    const byProduct = new Map<string, any[]>();
+    for (const r of (comboRes.results || []) as any[]) {
+      const { _pid, _pname, _pbarcode, _pprice, _pstock, _cid, _cname, ...item } = r;
+      const base = fromDbRow('pos_combo_items', item);
+      if (!byCombo.has(r.comboId)) byCombo.set(r.comboId, []);
+      byCombo.get(r.comboId)!.push({ ...base, product: _pid ? { id: _pid, name: _pname, barcode: _pbarcode, price: _pprice, stock: _pstock } : null });
+      if (!byProduct.has(r.productId)) byProduct.set(r.productId, []);
+      byProduct.get(r.productId)!.push({ ...base, combo: _cid ? { id: _cid, name: _cname } : null });
+    }
+    const products = ((prodRes.results || []) as any[]).map((r) => ({
+      ...fromDbRow('pos_products', r),
+      category: (r.categoryId && categories.get(r.categoryId)) || null,
+      brand: (r.brandId && brands.get(r.brandId)) || null,
+      comboItems: byCombo.get(r.id) || [],
+      comboItemsRef: byProduct.get(r.id) || [],
+    }));
     return NextResponse.json(products);
   } catch (error) {
     return NextResponse.json({ error: 'Error al obtener productos' }, { status: 500 });

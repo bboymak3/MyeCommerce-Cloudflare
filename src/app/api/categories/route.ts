@@ -2,15 +2,18 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { fromDbRow } from '@/lib/d1-batch';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
-    const categories = await db.category.findMany({
-      include: { _count: { select: { products: true } } },
-      orderBy: { name: 'asc' },
-    });
+    // SQL directo (se pide al abrir la app; ver "Limite de CPU" en CLAUDE.md). Mismo formato que Prisma.
+    const { results } = await (env as any).DB.prepare(
+      `SELECT c.*, (SELECT COUNT(*) FROM pos_products p WHERE p.categoryId = c.id) AS _n
+       FROM pos_categories c WHERE c.tenant_id = ?1 ORDER BY c.name ASC`
+    ).bind(tenantId).all();
+    const categories = (results as any[]).map(({ _n, ...row }) => ({ ...fromDbRow('pos_categories', row), _count: { products: Number(_n) || 0 } }));
     return NextResponse.json(categories);
   } catch (error: any) {
     console.error('Categories GET error:', error.message || error);

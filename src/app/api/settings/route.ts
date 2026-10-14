@@ -2,13 +2,19 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { fromDbRow } from '@/lib/d1-batch';
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
-    let settings = await db.settings.findFirst();
+    // SQL directo (se pide al abrir la app; ver "Limite de CPU" en CLAUDE.md). Prisma solo
+    // si el negocio aun no tiene configuracion y hay que crearla.
+    let settings: any = fromDbRow('pos_settings', await (env as any).DB.prepare(
+      'SELECT * FROM pos_settings WHERE tenant_id = ?1 LIMIT 1'
+    ).bind(tenantId).first());
     if (!settings) {
+      const db = createDbFromEnv(env as any, tenantId);
       settings = await db.settings.create({
         data: {
           storeName: 'Mi Tienda',

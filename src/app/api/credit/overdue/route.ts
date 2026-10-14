@@ -1,29 +1,27 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
+import { toDbDate } from '@/lib/d1-batch';
 
 // GET /api/credit/overdue - Returns count + summary of overdue credits
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
   try {
     const now = new Date();
-    // Get all credit sales with due date before now
-    const allCreditSales = await db.sale.findMany({
-      where: {
-        isCredit: true,
-        creditDueDate: { lt: now },
-      },
-      select: {
-        id: true,
-        total: true,
-        creditPaid: true,
-        creditDueDate: true,
-        client: { select: { fullName: true } },
-      },
-      orderBy: { creditDueDate: 'asc' },
-    });
+    // Ventas a credito vencidas (SQL directo: se pide al abrir la app; ver "Limite de CPU" en CLAUDE.md)
+    const { results } = await (env as any).DB.prepare(
+      `SELECT s.id, s.total, s.creditPaid, s.creditDueDate, c.fullName AS clientName
+       FROM pos_sales s LEFT JOIN pos_clients c ON c.id = s.clientId
+       WHERE s.tenant_id = ?1 AND s.isCredit = 1 AND s.creditDueDate IS NOT NULL AND s.creditDueDate < ?2
+       ORDER BY s.creditDueDate ASC`
+    ).bind(tenantId, toDbDate(now)).all();
+    const allCreditSales = (results as any[]).map((r) => ({
+      id: r.id, total: Number(r.total) || 0, creditPaid: Number(r.creditPaid) || 0,
+      creditDueDate: new Date(r.creditDueDate),
+      client: r.clientName != null ? { fullName: r.clientName } : null,
+    }));
 
     // Solo las que aun tienen saldo. El total y la cantidad cuentan todas; la lista muestra 10.
     const overdueSales = allCreditSales.filter(s => (s.total || 0) - (s.creditPaid || 0) > 0.01);
