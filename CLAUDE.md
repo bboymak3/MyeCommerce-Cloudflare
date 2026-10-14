@@ -8,7 +8,7 @@ POS (punto de venta) para Venezuela en **Cloudflare Pages** (Next.js 15 App Rout
 
 Todo el código, los comentarios y los mensajes al usuario están en español. Producción: `https://myecommerce-pos-7g0.pages.dev`; cada push a `main` despliega solo.
 
-`LEAME-PROYECTO.md`, `ESTADO-PROYECTO.txt`, `LEEME.txt`, `VERSIONES.md`, los `.bat`/`.vbs`, `caddy/`, `printer-agent/` y las rutas `/api/update`, `/api/check-version`, `/api/download-version`, `/api/local-ip`, `/api/logs` son de la versión on-premise para Windows y **no aplican** a este despliegue (las rutas son solo de admin).
+`LEAME-PROYECTO.md`, `ESTADO-PROYECTO.txt`, `LEEME.txt`, `VERSIONES.md`, los `.bat`/`.vbs`, `caddy/`, `printer-agent/` y las rutas `/api/update`, `/api/check-version`, `/api/download-version`, `/api/local-ip`, `/api/logs` son de la versión on-premise para Windows y **no aplican** a este despliegue.
 
 ## Comandos
 
@@ -31,21 +31,12 @@ npx wrangler pages dev .vercel/output/static --port 8788 --persist-to <dir> \
 ## Arquitectura
 
 ### Multi-negocio (tenant)
-- `src/middleware.ts` corre en todo `/api/*`: aplica la migración automática del esquema, verifica el JWT (`src/lib/session.ts`, jose), aplica roles y permisos (ver abajo) y fija las cabeceras de confianza `x-user-id`, `x-user-role` (normalizado), `x-username` y `x-tenant-id` (borra las que mande el cliente). Bloquea con 403 la API si el negocio está suspendido o vencido en nexus-one, salvo `/api/license`. `PUBLIC_ROUTES` se define ahí.
+- `src/middleware.ts` corre en todo `/api/*`: aplica la migración automática del esquema, verifica el JWT (`src/lib/session.ts`, jose) y fija las cabeceras de confianza `x-user-id`, `x-user-role`, `x-username` y `x-tenant-id` (borra las que mande el cliente). Bloquea con 403 la API si el negocio está suspendido o vencido en nexus-one, salvo `/api/license`. `PUBLIC_ROUTES` y `ADMIN_ROUTES` se definen ahí.
 - Las rutas obtienen el cliente con `createDbFromEnv(env, getTenantId(req.headers))` (`src/lib/db.ts`). Es un Prisma extendido que agrega `tenant_id` a todo `where` y a todo `create`, incluidas las creaciones anidadas. **Las rutas nunca filtran `tenant_id` a mano.** El SQL directo (`env.DB.prepare`) no tiene ese aislamiento: hay que filtrar por `tenant_id` explícitamente.
 - `tenant_id = 'default'` son los datos previos al modo multi-negocio y pertenecen al negocio `LEGACY_TENANT_SLUG` de `wrangler.toml`.
 - Licencia y estado: `src/lib/nexus-tenant.ts` lee `nx_tenants` (status, plan y `subscription_expires_at`) con caché de 30 s. Los planes `business`/`premium` equivalen a la licencia "profesional"; `basic` a "básica". Sin nexus-one se usa la licencia por clave (`src/lib/license.ts`).
 - SSO: nexus-one firma un JWT de 5 min con `NEXUS_SSO_SECRET` (iss `nexus-one`, aud `myecommerce-pos`) → `GET /api/nexus-sso?token=` crea o sincroniza el usuario `pos_users` y redirige a `/#sso=<token de sesión>`.
 - Login local (`/api/auth`): solo usuario y clave. El negocio sale de la cookie `tenant_id` o se busca el usuario en todos los negocios.
-
-### Roles y permisos
-- Dos roles: `admin` (todo) y `cajero`. El antiguo `vendedor` se fusionó en `cajero` (`normalizeRole`; la migración automática convierte los existentes).
-- Catálogo de permisos del cajero y reglas por ruta y por pestaña en `src/lib/permissions.ts`. El súper admin los configura por negocio en Nexus One (`nx_tenants.settings.cajeroPermissions`, botón "Permisos del cajero"); lo no configurado toma el valor por defecto. **Mantener sincronizado** con `src/lib/cajero-permissions.ts` de nexus-one.
-- El middleware los aplica en la API (`isAdminRoute`, `requiredPermissions`); la pantalla usa `GET /api/permissions` y `canSeeTab`. Una ruta nueva que escribe datos sensibles debe agregarse a `PERMISSION_ROUTES` o `ADMIN_ROUTES`.
-- `GET /api/license` es para todos (si no, el cajero caía en modo "trial"); activar licencias es solo del admin.
-
-### Impresión
-Solo con el navegador (`src/lib/ticket-printer.ts`): ticket HTML a la medida del papel, impreso desde un iframe oculto (sin ventanas emergentes). No hay agente ESC/POS: desde Cloudflare no se puede llegar al `localhost` de la PC.
 
 ### Escrituras: siempre en lote atómico
 El adaptador D1 de Prisma **ignora `$transaction`**: cada operación va por separado. Toda escritura de varias filas (venta, compra, devolución, abono, nota de entrega, ajuste masivo) usa `D1Batch` (`src/lib/d1-batch.ts`), que ejecuta `D1Database.batch()`: se aplica todo o se deshace todo.

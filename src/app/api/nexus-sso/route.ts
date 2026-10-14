@@ -11,7 +11,7 @@ import { hashPassword } from '@/lib/auth';
 import { createSessionToken, verifyNexusSsoToken } from '@/lib/session';
 import { getNexusTenant } from '@/lib/nexus-tenant';
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeRole } from '@/lib/permissions';
+import { normalizeRole } from '@/lib/roles';
 
 
 export async function GET(req: NextRequest) {

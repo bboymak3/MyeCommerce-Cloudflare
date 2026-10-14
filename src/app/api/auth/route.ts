@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeRole } from '@/lib/permissions';
+import { normalizeRole } from '@/lib/roles';
 import { hashPassword, verifyPassword, needsRehash } from '@/lib/auth';
 import { createSessionToken, verifySessionToken, extractToken } from '@/lib/session';
 import { getRequestContext } from '@cloudflare/next-on-pages';

@@ -2,19 +2,8 @@ export const runtime = 'edge';
 import { createDbFromEnv, getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeRole } from '@/lib/permissions';
-import { getNexusTenant } from '@/lib/nexus-tenant';
+import { normalizeRole } from '@/lib/roles';
 import { hashPassword } from '@/lib/auth';
-
-// Permisos guardados como JSON; un valor invalido no debe tumbar la lista de usuarios
-function parsePermissions(raw: unknown): Record<string, boolean> {
-  try {
-    const parsed = JSON.parse(typeof raw === 'string' && raw ? raw : '{}');
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
 
 // Helper to serialize user without password
 function serializeUser(user: any) {
@@ -24,7 +13,7 @@ function serializeUser(user: any) {
     fullName: user.fullName,
     role: normalizeRole(user.role),
     isActive: user.isActive,
-    permissions: parsePermissions(user.permissions),
+    permissions: JSON.parse(user.permissions || '{}'),
     avatar: user.avatar || '',
     lastLogin: user.lastLogin,
     createdAt: user.createdAt,
@@ -40,37 +29,7 @@ export async function GET(req: NextRequest) {
     const users = await db.user.findMany({
       orderBy: { createdAt: 'asc' },
     });
-    const list: any[] = users.map(serializeUser);
-
-    // Usuarios creados en Nexus One que todavia no entraron al POS: el POS los crea
-    // en su primer acceso ("Abrir Punto de Venta"), pero el admin debe verlos ya.
-    const nexus = await getNexusTenant((env as any).DB, tenantId, (env as any).LEGACY_TENANT_SLUG);
-    if (nexus) {
-      try {
-        const { results } = await (env as any).DB
-          .prepare('SELECT id, username, full_name, role, is_active, created_at FROM nx_tenant_users WHERE tenant_id = ? ORDER BY created_at')
-          .bind(nexus.id)
-          .all();
-        const known = new Set(list.map((u) => u.username));
-        for (const n of (results || []) as any[]) {
-          if (known.has(n.username)) continue;
-          list.push({
-            id: `nexus:${n.id}`,
-            username: n.username,
-            fullName: n.full_name || n.username,
-            role: normalizeRole(n.role),
-            isActive: !!n.is_active,
-            permissions: {},
-            avatar: '',
-            lastLogin: null,
-            createdAt: n.created_at,
-            updatedAt: n.created_at,
-            pendingFirstLogin: true, // se administra desde Nexus One
-          });
-        }
-      } catch { /* sin tablas nx_ */ }
-    }
-    return NextResponse.json(list);
+    return NextResponse.json(users.map(serializeUser));
   } catch (error) {
     console.error('Error fetching users:', error);
     return NextResponse.json({ error: 'Error al obtener usuarios' }, { status: 500 });
@@ -104,8 +63,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine role and permissions
-    // Roles: admin y cajero ('vendedor' se fusiono en cajero). Los permisos del cajero
-    // los define el super admin en Nexus One (ver src/lib/permissions.ts).
+    // Roles: admin y cajero ('vendedor' se fusiono en cajero)
     const userRole = normalizeRole(role);
     let permissionsStr: string;
 

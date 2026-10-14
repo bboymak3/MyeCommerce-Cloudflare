@@ -522,7 +522,33 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
     }
   }, [ticketPaperWidth]);
 
+  // Check agent status on mount and when URL changes
+  const checkAgent = async () => {
+    setAgentStatus('unknown');
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+      const res = await authFetch('/api/print-agent', {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        setAgentStatus('online');
+        setAgentInfo(data);
+      } else {
+        setAgentStatus('offline');
+        setAgentInfo(null);
+      }
+    } catch {
+      setAgentStatus('offline');
+      setAgentInfo(null);
+    }
+  };
 
+  useEffect(() => {
+    if (ticketUseAgent) checkAgent();
+  }, [ticketUseAgent, ticketAgentUrl]);
 
   const canAutoBackup = licenseFeatures?.autoBackup || false;
   const canExportImport = licenseFeatures?.exportImport || false;
@@ -658,7 +684,7 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         ticketPaperWidth,
         ticketMarginLeft: parseFloat(String(ticketMarginLeft)),
         ticketMarginRight: parseFloat(String(ticketMarginRight)),
-        ticketUseAgent: false, // sin agente local: se imprime desde el navegador
+        ticketUseAgent,
         ticketAgentUrl: ticketAgentUrl.replace(/\/+$/, ''),
         ticketShowCashReceived,
         ticketShowLogo,
@@ -1544,20 +1570,92 @@ export default function ConfigTab({ settings, onSettingsChange, licenseFeatures 
         </CardContent>
       </Card>
 
-      {/* ====== Impresora de tickets ====== */}
+      {/* ====== Agente de Impresion ESC/POS ====== */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Impresora de tickets (termica / POS)</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" /></svg>
+            Agente de Impresion ESC/POS
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p className="text-muted-foreground">
-            El ticket se imprime desde el navegador, ajustado al ancho de papel elegido arriba (55, 57, 58 u 80 mm).
-          </p>
-          <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
-            <li>Instale la impresora termica en el equipo (driver del fabricante) y haga una pagina de prueba.</li>
-            <li>Al imprimir el primer ticket, elija esa impresora, margenes <b>Ninguno</b> y escala <b>100%</b>. El navegador recuerda la eleccion.</li>
-            <li>Para imprimir sin el dialogo: abra Chrome con la opcion <code className="bg-muted px-1 rounded">--kiosk-printing</code> y deje la termica como impresora predeterminada.</li>
-          </ol>
+        <CardContent className="space-y-4">
+          <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700">
+            <strong>Recomendado:</strong> El agente local envia comandos directos a la impresora termica via USB/COM. El nombre de la tienda se imprime en GRANDE, el TOTAL nunca se corta, y funciona igual en 55mm, 57mm, 58mm y 80mm sin depender del navegador.
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-lg border">
+            <div className="flex-1">
+              <Label className="font-medium text-sm">Usar agente de impresion local</Label>
+              <p className="text-xs text-muted-foreground">Imprime directamente via ESC/POS (recomendado)</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" checked={ticketUseAgent} onChange={(e) => setTicketUseAgent(e.target.checked)} className="sr-only peer" />
+              <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+            </label>
+          </div>
+
+          {ticketUseAgent && (
+            <div className="space-y-3">
+              <div>
+                <Label>Direccion del Agente</Label>
+                <input
+                  type="text"
+                  value={ticketAgentUrl}
+                  onChange={(e) => setTicketAgentUrl(e.target.value)}
+                  placeholder="http://localhost:9100"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  URL del agente local. Por defecto http://localhost:9100
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={checkAgent}
+                  disabled={agentStatus === 'unknown'}
+                >
+                  {agentStatus === 'unknown' ? 'Verificando...' : 'Probar Conexion'}
+                </Button>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${agentStatus === 'online' ? 'bg-green-500' : agentStatus === 'offline' ? 'bg-red-500' : 'bg-gray-300'}`}></div>
+                  <span className="text-sm">
+                    {agentStatus === 'online' ? 'Agente conectado' : agentStatus === 'offline' ? 'Agente no encontrado' : 'Sin verificar'}
+                  </span>
+                </div>
+              </div>
+
+              {agentStatus === 'online' && agentInfo && (
+                <div className="p-2.5 rounded-lg bg-green-50 border border-green-200 text-xs text-green-700 space-y-1">
+                  <strong>Info del agente:</strong>
+                  <p>Version: {agentInfo.version || 'N/A'}</p>
+                  <p>Impresora detectada: {agentInfo.autoPrinter || agentInfo.connectedPort || 'No detectada'}</p>
+                  <p>Impresiones realizadas: {agentInfo.printCount || 0}</p>
+                  <p>Serial disponible: {agentInfo.serialAvailable ? 'Si' : 'No (modo archivo)'}</p>
+                </div>
+              )}
+
+              {agentStatus === 'offline' && (
+                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+                  <strong>El agente no esta activo.</strong> Para instalarlo:
+                  <ol className="list-decimal pl-4 mt-1 space-y-0.5">
+                    <li>Ejecute <code className="bg-amber-100 px-1 rounded">DETENER-TODO.bat</code></li>
+                    <li>Ejecute <code className="bg-amber-100 px-1 rounded">INICIAR-TODO-OCULTO.vbs</code></li>
+                    <li>Espere 10 segundos</li>
+                    <li>El agente se activa automaticamente con INICIAR-TODO-OCULTO.vbs</li>
+                  </ol>
+                  <p className="mt-1">Mientras el agente no este activo, el sistema usara la impresion via navegador (fallback).</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!ticketUseAgent && (
+            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+              <strong>Modo navegador activo (fallback).</strong> La impresion dependera del driver de la impresora en el navegador. Puede que el TOTAL se corte o el nombre de la tienda no se vea correctamente en algunas impresoras. Se recomienda activar el agente local para mejor resultados.
+            </div>
+          )}
         </CardContent>
       </Card>
 
