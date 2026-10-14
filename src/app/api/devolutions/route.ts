@@ -1,36 +1,71 @@
 export const runtime = 'edge';
-import { createDbFromEnv, getTenantId } from '@/lib/db'
+import { getTenantId } from '@/lib/db'
 import { getRequestContext } from '@cloudflare/next-on-pages';
 import { NextRequest, NextResponse } from 'next/server';
-import { D1Batch } from '@/lib/d1-batch';
+import { D1Batch, fromDbRow, toDbDate } from '@/lib/d1-batch';
+import { d1Of, loadProductsWithLastMove, placeholders } from '@/lib/d1-read';
 import { veDayStart, veDayEnd } from '@/lib/ve-time';
+
+// Sin Prisma: lecturas con SQL directo (ver "Limite de CPU" en CLAUDE.md)
+
+/** Filas de `table` cuyo `fk` esta en `ids`, agrupadas por ese campo (formato Prisma). */
+async function childrenBy(D1: D1Database, tenantId: string, table: string, fk: string, ids: string[]) {
+  const out = new Map<string, any[]>();
+  if (ids.length === 0) return out;
+  const { results } = await D1.prepare(`SELECT * FROM "${table}" WHERE tenant_id = ?1 AND "${fk}" IN (${placeholders(ids.length, 2)}) ORDER BY rowid`)
+    .bind(tenantId, ...ids).all();
+  for (const r of (results || []) as any[]) {
+    if (!out.has(r[fk])) out.set(r[fk], []);
+    out.get(r[fk])!.push(fromDbRow(table, r));
+  }
+  return out;
+}
+
+/** Productos completos por id (formato Prisma). */
+async function productsById(D1: D1Database, tenantId: string, ids: string[]) {
+  const uniq = [...new Set(ids.filter(Boolean))];
+  const out = new Map<string, any>();
+  if (uniq.length === 0) return out;
+  const { results } = await D1.prepare(`SELECT * FROM pos_products WHERE tenant_id = ?1 AND id IN (${placeholders(uniq.length, 2)})`)
+    .bind(tenantId, ...uniq).all();
+  for (const r of (results || []) as any[]) out.set(r.id, fromDbRow('pos_products', r));
+  return out;
+}
 
 export async function GET(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const { searchParams } = new URL(req.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '100') || 100, 1), 1000);
 
-    const devolutions = await db.devolution.findMany({
-      where: {
-        ...(startDate && endDate
-          ? {
-              date: {
-                gte: veDayStart(startDate),
-                lte: veDayEnd(endDate),
-              },
-            }
-          : {}),
-      },
-      include: {
-        sale: { include: { items: true } },
-        items: { include: { product: true } },
-      },
-      orderBy: { date: 'desc' },
-      take: limit,
+    // Devoluciones con su venta (y los items de la venta) y sus items (con el producto)
+    const range = startDate && endDate;
+    const { results } = await D1.prepare(
+      `SELECT * FROM pos_devolutions WHERE tenant_id = ?1 ${range ? 'AND date >= ?3 AND date <= ?4' : ''} ORDER BY date DESC LIMIT ?2`,
+    ).bind(tenantId, limit, ...(range ? [toDbDate(veDayStart(startDate)), toDbDate(veDayEnd(endDate))] : [])).all();
+    const devs = ((results || []) as any[]).map((r) => fromDbRow<any>('pos_devolutions', r));
+    const saleIds = [...new Set(devs.map((d) => d.saleId))];
+    const [salesRes, devItems, saleItems] = await Promise.all([
+      saleIds.length
+        ? D1.prepare(`SELECT * FROM pos_sales WHERE tenant_id = ?1 AND id IN (${placeholders(saleIds.length, 2)})`).bind(tenantId, ...saleIds).all()
+        : Promise.resolve({ results: [] as any[] }),
+      childrenBy(D1, tenantId, 'pos_devolution_items', 'devolutionId', devs.map((d) => d.id)),
+      childrenBy(D1, tenantId, 'pos_sale_items', 'saleId', saleIds),
+    ]);
+    const sales = new Map(((salesRes.results || []) as any[]).map((r) => [r.id, fromDbRow<any>('pos_sales', r)]));
+    const allItems = [...devItems.values()].flat();
+    const products = await productsById(D1, tenantId, allItems.map((i) => i.productId));
+    const devolutions = devs.map((d) => {
+      const sale = sales.get(d.saleId);
+      return {
+        ...d,
+        sale: sale ? { ...sale, items: saleItems.get(d.saleId) || [] } : null,
+        items: (devItems.get(d.id) || []).map((i) => ({ ...i, product: products.get(i.productId) || null })),
+      };
     });
     return NextResponse.json(devolutions);
   } catch (error) {
@@ -40,7 +75,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { env } = getRequestContext();
-  const tenantId = getTenantId(req.headers); const db = createDbFromEnv(env as any, tenantId);
+  const tenantId = getTenantId(req.headers);
+  const D1 = d1Of(env);
   try {
     const body = await req.json() as any;
 
@@ -52,11 +88,25 @@ export async function POST(req: NextRequest) {
     }
 
     // Validar que la venta existe
-    const sale = await db.sale.findUnique({
-      where: { id: body.saleId },
-      // Las devoluciones previas con sus items: sin ellos no se puede saber cuanto ya se devolvio
-      include: { items: { include: { product: { select: { name: true } } } }, devolutions: { include: { items: true } } },
-    });
+    // Las devoluciones previas con sus items: sin ellos no se puede saber cuanto ya se devolvio
+    const saleRow: any = fromDbRow('pos_sales', await D1.prepare('SELECT * FROM pos_sales WHERE tenant_id = ?1 AND id = ?2')
+      .bind(tenantId, String(body.saleId)).first());
+    let sale: any = null;
+    if (saleRow) {
+      const { results: prevDevs } = await D1.prepare('SELECT id FROM pos_devolutions WHERE tenant_id = ?1 AND saleId = ?2').bind(tenantId, saleRow.id).all();
+      const prevIds = ((prevDevs || []) as any[]).map((d) => d.id);
+      const [items, prevItems] = await Promise.all([
+        childrenBy(D1, tenantId, 'pos_sale_items', 'saleId', [saleRow.id]),
+        childrenBy(D1, tenantId, 'pos_devolution_items', 'devolutionId', prevIds),
+      ]);
+      const saleItemList = items.get(saleRow.id) || [];
+      const names = await productsById(D1, tenantId, saleItemList.map((i) => i.productId));
+      sale = {
+        ...saleRow,
+        items: saleItemList.map((i) => ({ ...i, product: names.has(i.productId) ? { name: names.get(i.productId).name } : null })),
+        devolutions: prevIds.map((id) => ({ id, items: prevItems.get(id) || [] })),
+      };
+    }
 
     if (!sale) {
       return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
@@ -89,8 +139,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const settings = await db.settings.findFirst();
+    const settings: any = await D1.prepare('SELECT bcvRate FROM pos_settings WHERE tenant_id = ?1 LIMIT 1').bind(tenantId).first();
     const rate = settings?.bcvRate || 36.50;
+    const { products, lastMoves } = await loadProductsWithLastMove(D1, tenantId, body.items.map((i: any) => String(i.productId || '')));
 
     const totalUsd = body.items.reduce((sum: number, item: any) => {
       const qty = parseFloat(item.quantity) || 0;
@@ -99,7 +150,7 @@ export async function POST(req: NextRequest) {
     }, 0);
 
     // Escrituras en un lote atomico de D1: devolucion, items, stock y kardex
-    const batch = new D1Batch((env as any).DB, tenantId);
+    const batch = new D1Batch(D1, tenantId);
     const now = new Date();
     const devolutionId = batch.insert('pos_devolutions', {
       saleId: body.saleId,
@@ -152,8 +203,8 @@ export async function POST(req: NextRequest) {
     // Restaurar stock y registrar la entrada en el kardex
     for (const item of body.items) {
       const qty = parseFloat(item.quantity);
-      const product = await db.product.findUnique({ where: { id: item.productId } });
-      const lastMove = await db.inventoryMovement.findFirst({ where: { productId: item.productId }, orderBy: { createdAt: 'desc' } });
+      const product = products.get(item.productId);
+      const lastMove = lastMoves.get(item.productId);
       const unitCost = product?.cost || 0;
       const prevQty = product?.stock ?? 0;
       const prevTC = lastMove && lastMove.balanceQty > 0 ? (lastMove.balanceTotalCost / lastMove.balanceQty) * prevQty : prevQty * unitCost;
@@ -171,7 +222,13 @@ export async function POST(req: NextRequest) {
     }
 
     await batch.commit();
-    const devolution = await db.devolution.findUnique({ where: { id: devolutionId }, include: { items: true, sale: true } });
+    const devolution: any = fromDbRow('pos_devolutions', await D1.prepare('SELECT * FROM pos_devolutions WHERE tenant_id = ?1 AND id = ?2')
+      .bind(tenantId, devolutionId).first());
+    if (devolution) {
+      devolution.items = (await childrenBy(D1, tenantId, 'pos_devolution_items', 'devolutionId', [devolutionId])).get(devolutionId) || [];
+      devolution.sale = fromDbRow('pos_sales', await D1.prepare('SELECT * FROM pos_sales WHERE tenant_id = ?1 AND id = ?2')
+        .bind(tenantId, String(body.saleId)).first());
+    }
 
     return NextResponse.json(devolution);
   } catch (error) {
