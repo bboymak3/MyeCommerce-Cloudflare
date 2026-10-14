@@ -777,6 +777,7 @@ export default function ReportsTab({ bcvRate, currency }: ReportsTabProps) {
                 <Select value={roleFilter} onChange={(e: any) => setRoleFilter(e.target.value)} className="w-auto">
                   <option value="">Todos</option>
                   <option value="admin">Administrador</option>
+                  <option value="vendedor">Vendedor</option>
                   <option value="cajero">Cajero</option>
                 </Select>
               </div>

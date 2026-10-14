@@ -38,7 +38,6 @@ import type { CurrentUser } from "@/components/users-tab";
 import ThemeSwitcher from "@/components/theme-switcher";
 import AppNav from "@/components/app-nav";
 import { useAppStore } from "@/lib/app-store";
-import { canSeeTab, cajeroPermissions, normalizeRole, type PermissionSet } from "@/lib/permissions";
 import { toast } from "sonner";
 import { authFetch, storeSession, clearSession, getStoredUser as getStoredUserFromLib } from "@/lib/auth-fetch";
 
@@ -103,8 +102,6 @@ export default function Home() {
     storeLogo: '', businessType: 'general', taxMode: 'included', themeMode: 'light',
   });
   const [license, setLicense] = useState<LicenseInfo | null>(null);
-  // Permisos vigentes (admin: todo; cajero: lo configurado en Nexus One). Ver /api/permissions
-  const [permissions, setPermissions] = useState<PermissionSet | null>(null);
   const [loading, setLoading] = useState(true);
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
@@ -262,11 +259,6 @@ export default function Home() {
         setSettings(settingsData);
       }
       if (licenseData && !licenseData.error) setLicense(licenseData);
-
-      authFetch("/api/permissions", {}, handleSessionExpired)
-        .then(r => r.json())
-        .then((data: any) => { if (data && data.permissions) setPermissions(data.permissions); })
-        .catch(() => {});
 
       // Inicializar Cliente Final si no existe
       authFetch("/api/clients", { method: "PATCH" }, handleSessionExpired).catch(() => {});
@@ -427,12 +419,36 @@ export default function Home() {
     { value: "catalog", label: "Catalogo", icon: "📖", allowed: true, restricted: false, plan: "" },
   ];
 
-  // Pestanas segun la licencia (allowed) y los permisos del rol (src/lib/permissions.ts).
-  // El middleware aplica las mismas reglas en la API.
-  const userRole = normalizeRole(currentUser.role);
-  const effectivePerms = permissions || cajeroPermissions();
-  const availableTabs = allTabs.filter((tab) => tab.allowed && canSeeTab(tab.value, userRole, effectivePerms));
-  const canEditProducts = userRole === "admin" || effectivePerms.productos;
+  // Filter tabs based on user role and permissions
+  const availableTabs = allTabs.filter((tab) => {
+    if (currentUser.role === "admin") return tab.allowed;
+    // Admin-only tabs (cannot be overridden by permissions)
+    if (tab.value === "users") return false;
+    if (tab.value === "config") return false;
+    if (tab.value === "license") return false;
+    if (tab.value === "backup") return false;
+    // POS and core modules always available to any logged-in user
+    if (["pos", "products", "dashboard", "reports"].includes(tab.value)) return tab.allowed;
+    // Special permission tabs (suppliers, purchases, credit)
+    if (tab.value === "suppliers") {
+      return tab.allowed && !!currentUser.permissions?.suppliers;
+    }
+    if (tab.value === "purchases") {
+      return tab.allowed && !!currentUser.permissions?.purchases;
+    }
+    if (tab.value === "credit") {
+      return tab.allowed && !!currentUser.permissions?.credit;
+    }
+    // For restricted/plan-locked tabs
+    if (tab.restricted) return tab.allowed;
+    // For tabs with specific permission keys (cash-closing, devolutions, clients, etc.)
+    if (tab.value === "cash-closing") {
+      return tab.allowed && !!currentUser.permissions?.cash_closing;
+    }
+    // All other tabs with allowed:true and no specific restriction — available to everyone
+    // (kardex, held-sales, quotes, delivery-notes, expenses, etc.)
+    return tab.allowed;
+  });
 
   return (
     <div className="min-h-screen flex flex-col relative">
@@ -540,8 +556,8 @@ export default function Home() {
                   {(currentUser.fullName || currentUser.username).split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
                 </div>
               )}
-              <Badge variant={userRole === "admin" ? "default" : "secondary"}>
-                {userRole === "admin" ? "Admin" : "Cajero"}
+              <Badge variant={currentUser.role === "admin" ? "default" : "secondary"}>
+                {currentUser.role === "admin" ? "Admin" : currentUser.role === "vendedor" ? "Vendedor" : "Cajero"}
               </Badge>
               <span className="text-sm font-medium max-w-[120px] truncate hidden sm:inline-block">
                 {currentUser.fullName || currentUser.username}
@@ -579,7 +595,7 @@ export default function Home() {
               loyaltyEnabled={(settings as any).loyaltyEnabled === true} loyaltyPointsPerUsd={(settings as any).loyaltyPointsPerUsd ?? 100}
               canSaleNotes={license?.features?.saleNotes || false} canFrequentCustomers={canFrequentCustomers}
               sellerName={currentUser.fullName || currentUser.username}
-              sellerRole={userRole}
+              sellerRole={currentUser.role}
               ticketFontSize={settings.ticketFontSize || 8}
               ticketFontFamily={settings.ticketFontFamily || 'monospace'}
               ticketHeaderMsg={settings.ticketHeaderMsg || ""}
@@ -651,7 +667,7 @@ export default function Home() {
         <TabsContent value="products" activeTab={activeTab}>
           <ErrorBoundary name="Productos">
             <ProductsTab products={products} categories={categories} brands={brands} bcvRate={settings.bcvRate ?? 36.5} euroUsdtRate={settings.euroUsdtRate ?? 0}
-              currency={settings.currency} onRefresh={loadData} maxProducts={license?.maxProducts || 30} licenseType={license?.licenseType || "trial"} taxRate={settings.taxRate ?? 0} canEdit={canEditProducts} />
+              currency={settings.currency} onRefresh={loadData} maxProducts={license?.maxProducts || 30} licenseType={license?.licenseType || "trial"} taxRate={settings.taxRate ?? 0} />
           </ErrorBoundary>
         </TabsContent>
         <TabsContent value="devolutions" activeTab={activeTab}>
@@ -758,7 +774,7 @@ export default function Home() {
           <ErrorBoundary name="Gastos">
             <ExpensesTab bcvRate={settings.bcvRate ?? 36.5} currency={settings.currency}
               sellerName={currentUser.fullName || currentUser.username}
-              sellerRole={userRole}
+              sellerRole={currentUser.role}
               userId={currentUser.id} />
           </ErrorBoundary>
         </TabsContent>

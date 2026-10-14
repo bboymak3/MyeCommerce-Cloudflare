@@ -3,7 +3,6 @@ import { getRequestContext } from '@cloudflare/next-on-pages';
 import { verifySessionToken } from './lib/session';
 import { ensureSchema } from './lib/schema-migrate';
 import { getNexusTenant } from './lib/nexus-tenant';
-import { cajeroPermissions, isAdminRoute, normalizeRole, requiredPermissions } from './lib/permissions';
 
 // Rutas API que NO requieren autenticacion (metodos permitidos sin sesion)
 const PUBLIC_ROUTES: Record<string, string[] | '*'> = {
@@ -14,6 +13,14 @@ const PUBLIC_ROUTES: Record<string, string[] | '*'> = {
   '/api/cron/bcv-rate': ['POST'],
 };
 
+// Rutas API que requieren rol de administrador
+const ADMIN_ROUTES = [
+  '/api/users',
+  '/api/roles',
+  '/api/backup',
+  '/api/license',
+  '/api/verificacion',
+];
 
 // Cabeceras que solo puede fijar este middleware (nunca el cliente)
 const TRUSTED_HEADERS = ['x-user-id', 'x-user-role', 'x-username', 'x-tenant-id'];
@@ -82,26 +89,11 @@ export async function middleware(request: NextRequest) {
     );
   }
 
-  // Roles: admin (todo) y cajero (lo que configure el super admin en Nexus One).
-  // 'vendedor' es el rol anterior, fusionado en cajero.
-  const role = normalizeRole(session.role);
-  const method = request.method;
-  const env = getRequestContext().env as any;
-  const nexus = await getNexusTenant(env.DB, session.tenantId || 'default', env.LEGACY_TENANT_SLUG);
-
-  if (role !== 'admin') {
-    if (isAdminRoute(pathname, method)) {
-      return NextResponse.json(
-        { error: 'Acceso restringido. Se requiere rol de administrador.', code: 'FORBIDDEN' },
-        { status: 403 }
-      );
-    }
-    const needed = requiredPermissions(pathname, method);
-    if (needed) {
-      const perms = cajeroPermissions(nexus?.cajeroPermissions);
-      if (!needed.some((k) => perms[k])) {
+  for (const adminRoute of ADMIN_ROUTES) {
+    if (pathname === adminRoute || pathname.startsWith(adminRoute + '/')) {
+      if (session.role !== 'admin') {
         return NextResponse.json(
-          { error: 'Su usuario no tiene permiso para esta accion. Consulte al administrador.', code: 'FORBIDDEN' },
+          { error: 'Acceso restringido. Se requiere rol de administrador.', code: 'FORBIDDEN' },
           { status: 403 }
         );
       }
@@ -111,6 +103,8 @@ export async function middleware(request: NextRequest) {
   // Negocio de Nexus One suspendido o con la suscripcion vencida: se bloquea la API.
   // /api/license sigue disponible para que la pantalla muestre el motivo.
   if (!(pathname === '/api/license' || pathname.startsWith('/api/license/'))) {
+    const env = getRequestContext().env as any;
+    const nexus = await getNexusTenant(env.DB, session.tenantId || 'default', env.LEGACY_TENANT_SLUG);
     if (nexus && !nexus.active) {
       return NextResponse.json({ error: nexus.reason, code: 'TENANT_INACTIVE' }, { status: 403 });
     }
@@ -118,7 +112,7 @@ export async function middleware(request: NextRequest) {
 
   // Inyectar informacion del usuario + NEGOCIO (solo desde el token firmado)
   requestHeaders.set('x-user-id', session.userId);
-  requestHeaders.set('x-user-role', role);
+  requestHeaders.set('x-user-role', session.role);
   requestHeaders.set('x-username', session.username);
   requestHeaders.set('x-tenant-id', session.tenantId || 'default');
 

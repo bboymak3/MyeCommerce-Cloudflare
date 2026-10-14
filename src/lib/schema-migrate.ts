@@ -121,13 +121,6 @@ async function migrate(d1: D1Database): Promise<void> {
   // 3) Unicidad por negocio (usuario, factura, categoria... repetibles entre negocios) — un viaje
   await runBatch(d1, [...DROP_LEGACY_UNIQUE_INDEXES, ...CREATE_INDEX_STATEMENTS], errors);
 
-  // 4) Roles: 'vendedor' se fusiono en 'cajero' (ver src/lib/permissions.ts)
-  await runBatch(d1, [`UPDATE "pos_users" SET "role" = 'cajero' WHERE "role" = 'vendedor'`], errors);
-  try {
-    // Usuarios de Nexus One en la misma D1 (no existe en instalaciones independientes)
-    await d1.prepare(`UPDATE "nx_tenant_users" SET "role" = 'cajero' WHERE "role" = 'vendedor'`).run();
-  } catch { /* sin tablas nx_ */ }
-
   if (errors.length > 0) {
     console.warn(`[schema] Sincronizacion de esquema con ${errors.length} aviso(s):\n` + errors.join('\n'));
   } else {

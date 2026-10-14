@@ -391,7 +391,7 @@ export default function PosTab(props: PosTabProps) {
     };
     try {
       const ok = await _printTicket({ receipt, settings: ticketSettings, currency, defaultSellerName: sellerName });
-      if (!ok) toast.error("No se pudo preparar el ticket para imprimir.");
+      if (!ok) toast.error("No se pudo abrir ventana de impresion. Permita ventanas emergentes.");
     } catch (e: any) { toast.error("Impresion: " + (e.message || "desconocido"), { duration: 8000 }); }
   }, [storeName, storeRif, storeAddress, storePhone, ticketFontSize, ticketFontFamily, ticketBold,
     ticketShowPhone, ticketShowSeller, ticketShowExchange, ticketShowSlogan,

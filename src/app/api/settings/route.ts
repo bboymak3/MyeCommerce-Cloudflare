@@ -66,13 +66,6 @@ export async function PUT(req: NextRequest) {
     if (isNaN(bcvRate) || bcvRate <= 0) {
       return NextResponse.json({ error: 'La tasa de cambio debe ser un numero mayor a cero' }, { status: 400 });
     }
-    // El cajero (con permiso "tasa", ver middleware) solo puede cambiar la tasa del dolar
-    if (req.headers.get('x-user-role') !== 'admin') {
-      settings = settings
-        ? await db.settings.update({ where: { id: settings.id }, data: { bcvRate } })
-        : await db.settings.create({ data: { bcvRate } });
-      return NextResponse.json(settings);
-    }
     if (!body.storeName?.trim()) {
       return NextResponse.json({ error: 'El nombre de la tienda es requerido' }, { status: 400 });
     }

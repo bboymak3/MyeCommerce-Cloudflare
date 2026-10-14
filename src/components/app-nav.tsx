@@ -102,11 +102,11 @@ function buildGroups(tabs: NavItem[], stockAlertCount: number): NavGroup[] {
 
     switch (tab.value) {
       case 'dashboard':                     groupMap.inicio.items.push(item); break
-      case 'pos': case 'cash-closing': case 'cash-shifts': case 'held-sales': case 'quotes': case 'delivery-notes':
+      case 'pos': case 'cash-closing': case 'held-sales': case 'quotes': case 'delivery-notes':
         groupMap.ventas.items.push(item); break
-      case 'products': case 'kardex': case 'reorder': case 'catalog':
+      case 'products': case 'kardex': case 'catalog':
         groupMap.inventario.items.push(item); break
-      case 'clients': case 'suppliers': case 'credit': case 'payables':
+      case 'clients': case 'suppliers': case 'credit':
         groupMap.personas.items.push(item); break
       case 'purchases': case 'devolutions': case 'expenses':
         groupMap.operaciones.items.push(item); break
