@@ -234,6 +234,19 @@ export default function PosTab(props: PosTabProps) {
     }
   }, [clients, setCreditClientId, setCreditClientName, setCreditClientDebt]);
 
+  // Al activar VENTA A CREDITO: refrescar la lista de clientes (pudieron crearse despues de
+  // abrir el POS) y proponer el cliente ya elegido para la venta, si no es Cliente Final.
+  useEffect(() => {
+    if (!isCredit) return;
+    clientHook.reloadClients();
+    if (!creditClientId && selectedClient && !selectedClient.isFinalClient) {
+      setCreditClientId(selectedClient.id);
+      setCreditClientName(selectedClient.fullName);
+      setCreditClientDebt(selectedClient.creditBalance || 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCredit]);
+
   // ─── Hold sale ────────────────────────────────────────────────
   const holdCurrentSale = useCallback(async () => {
     if (cart.length === 0) { toast.error("El carrito esta vacio"); return; }

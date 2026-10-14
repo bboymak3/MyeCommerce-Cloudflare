@@ -17,11 +17,27 @@ export function useClients() {
     businessName: "", phone: "", email: "", address: "",
   });
 
+  // Agrega (o actualiza) un cliente en la lista sin recargarla: la lista alimenta el
+  // selector de VENTA A CREDITO, que solo ofrece clientes que esten en ella.
+  const upsertClient = useCallback((client: ClientData) => {
+    setClients((prev) => [client, ...prev.filter((c) => c.id !== client.id)]);
+  }, []);
+
+  // Recarga la lista (clientes creados en otra pantalla despues de abrir el POS)
+  const reloadClients = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/clients", {});
+      const data = await res.json();
+      if (Array.isArray(data)) setClients(data);
+    } catch { /* se mantiene la lista anterior */ }
+  }, []);
+
   // Load clients on mount + select final client
   useEffect(() => {
     authFetch("/api/clients", {})
       .then((r) => r.json())
       .then((data) => {
+        if (!Array.isArray(data)) return;
         setClients(data);
         const fc = data.find((c: ClientData) => c.isFinalClient);
         if (fc) setSelectedClient(fc);
@@ -60,6 +76,7 @@ export function useClients() {
 
   const selectClient = (client: ClientData) => {
     setSelectedClient(client);
+    upsertClient(client);
     setShowClientDialog(false);
     setClientSearch("");
     setClientResults([]);
@@ -81,8 +98,9 @@ export function useClients() {
         body: JSON.stringify({ ...newClientForm, fullName }),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-      const client = await res.json();
+      const client = await res.json() as ClientData;
       setSelectedClient(client);
+      upsertClient(client);
       setShowNewClientDialog(false);
       setShowClientDialog(false);
       toast.success("Cliente creado y seleccionado");
@@ -96,5 +114,6 @@ export function useClients() {
     showNewClientDialog, setShowNewClientDialog,
     newClientForm, setNewClientForm,
     searchClients, selectFinalClient, selectNoClient, selectClient, createQuickClient,
+    reloadClients, upsertClient,
   };
 }
